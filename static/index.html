@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>vibepm</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <button id="add-btn" class="add" title="切换仓库">＋</button>
+    <span id="repo-name" class="repo">…</span>
+    <button id="connect-btn" class="connect hidden">连接 GitHub</button>
+    <button id="sync-btn" class="sync">同步</button>
+  </header>
+  <div id="dropdown" class="dropdown hidden"></div>
+  <main id="main" class="main"></main>
+  <footer id="statusbar" class="statusbar">vibepm · 加载中…</footer>
+
+  <div id="auth-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3>连接 GitHub</h3>
+      <p>打开 <a id="auth-uri" href="#" target="_blank" rel="noopener">github.com/login/device</a> 并输入设备码</p>
+      <p class="auth-code" id="auth-code">······</p>
+      <p id="auth-state" class="auth-state">等待授权…</p>
+      <button id="auth-cancel">取消</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
