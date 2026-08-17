@@ -1,0 +1,22 @@
+{
+  "name": "@vibepm/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./slots": "./dist/slots.js",
+    "./manifest": "./dist/manifest.js",
+    "./client-modules": "./dist/client-modules.js",
+    "./loader": "./dist/loader.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"import('fs').then(f=>f.rmSync('dist',{recursive:true,force:true}))\"",
+    "test": "node --import tsx --test test/**/*.test.ts || exit 0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  }
+}

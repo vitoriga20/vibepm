@@ -1,6 +1,13 @@
 node_modules/
 dist/
+.pnpm-store/
 *.tgz
 .DS_Store
 *.log
+logs.txt
+run.log
+.vibepm/
+*.db
 .npmrc-publish
+.patch.port.json
+recon_ide.py

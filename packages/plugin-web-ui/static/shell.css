@@ -1,0 +1,47 @@
+/* 全局 tokens（墨绿单一强调色；硬分割线；小圆角；等宽字体；无渐变无大阴影无发光） */
+:root{
+  --bg:          #0f1215;
+  --panel:       #161a1e;
+  --panel-alt:   #1b2025;
+  --line:        #262c33;
+  --line-strong: #313840;
+  --fg:          #d6dbe1;
+  --dim:         #7a828c;
+  --accent:      #2ba77d;      /* 墨绿 accent 单一 */
+  --accent-dim:  #16392e;
+  --accent-line: #2f8566;
+  --warn:        #c69a3a;
+  --danger:      #b24a4a;
+  --radius:      4px;
+  --bar-h:       36px;
+  --activity-w:  48px;
+  --sidebar-w:   260px;
+  --right-w:     260px;
+  --status-h:    24px;
+  --mono:        "JetBrains Mono", Consolas, ui-monospace, "Cascadia Code", monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;width:100%}
+body{
+  background:var(--bg);color:var(--fg);
+  font:13px/1.55 var(--mono);
+  overflow:hidden;user-select:none;
+}
+button,input,textarea,select{font:inherit;color:var(--fg);background:transparent}
+button{border:1px solid var(--line);padding:4px 10px;border-radius:var(--radius);cursor:pointer;background:var(--panel)}
+button:hover{border-color:var(--accent-line)}
+.hidden{display:none!important}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--panel)}
+::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--accent-dim)}
+
+/* 启动页 */
+.boot-indicator{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--accent);gap:16px;z-index:99}
+.boot-indicator .logo{width:72px;height:72px;animation:spin 4s linear infinite}
+.boot-indicator .boot-text{color:var(--dim);letter-spacing:2px;font-size:12px}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+/* 主工作台 */
+.app{width:100vw;height:100vh;display:flex;flex-direction:column}
+.workbench{flex:1;display:flex;min-height:0}

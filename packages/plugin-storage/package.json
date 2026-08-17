@@ -1,0 +1,24 @@
+{
+  "name": "@vibepm/plugin-storage",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "vibepm": {
+    "node": {
+      "inject": [],
+      "provide": ["db"]
+    }
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"import('fs').then(f=>f.rmSync('dist',{recursive:true,force:true}))\"",
+    "test": "node --import tsx --test test/**/*.test.ts || exit 0"
+  },
+  "dependencies": {
+    "@vibepm/core": "workspace:*"
+  }
+}
