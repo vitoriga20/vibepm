@@ -40,5 +40,5 @@ class StoragePlugin {
   }
 }
 
-// dsh 形态入口：模块导出单插件对象
+// 插件入口：模块导出单插件对象
 export const PLUGIN = new StoragePlugin();

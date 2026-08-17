@@ -1,4 +1,4 @@
-// 插件元数据解析（照 Python registry.resolve_plugin + dsh 三形态）
+// 插件元数据解析（callable / 对象含 apply / 类 三形态）
 import { PluginLoadError } from "./errors.js";
 
 export interface PluginMeta {
@@ -15,7 +15,7 @@ function toArray(x: unknown): string[] {
   return [];
 }
 
-/** 从插件对象解析元数据。dsh 三形态：callable(apply) / 对象含 apply / 类 */
+/** 从插件对象解析元数据。三形态：callable(apply) / 对象含 apply / 类 */
 export function resolvePlugin(plugin: unknown, name?: string): PluginMeta {
   const anyPlugin = plugin as any;
   const provided: string[] = toArray(anyPlugin?.provide);

@@ -1,4 +1,4 @@
-// CLI 命令实现（照 commands.py web/setup/sync/status + dsh failLoud）
+// CLI 命令实现（web/setup/sync/status + failLoud 启动失败处理）
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";

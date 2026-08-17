@@ -1,7 +1,7 @@
 {
   "name": "@vitoriga20/vibepm",
   "version": "0.1.0",
-  "description": "一切皆插件，用 Cordis 内核重写的个人 GitHub 项目管理器（TS 版，架构照 dsh）",
+  "description": "一切皆插件，用 Cordis 内核构建的个人 GitHub 项目管理器（纯 TS / Node）",
   "type": "module",
   "license": "MIT",
   "engines": {

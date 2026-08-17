@@ -22,7 +22,7 @@ export class FieldService {
   }
 }
 
-/** 把字段定义变成 dsh 形态插件对象（含 name/provide/apply），feature 雕service）。 */
+/** 把字段定义变成插件对象形态（含 name/provide/apply），每个字段提供独立 service）。 */
 export function fieldPlugin(def: FieldDefinition): { name: string; provide: string[]; inject: string[]; apply(ctx: Context): () => void } {
   const provides = [`field-${def.column}`];
   return {

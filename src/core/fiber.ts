@@ -1,4 +1,4 @@
-// Fiber：插件在 Context 内的生命期载体 + 反应式依赖刷新（照 Python fiber.py + dsh fiber.ts）
+// Fiber：插件在 Context 内的生命期载体 + 反应式依赖刷新
 import type { Context } from "./context.js";
 
 export const PENDING = "PENDING";

@@ -1,11 +1,22 @@
-﻿# vibepm (TS)
+# vibepm (TS)
 
-一切皆插件，用 Cordis 内核重写的个人 GitHub 项目管理器。架构照抄 dsh（DeepSeek Harness），零 Python。
+一切皆插件，用 Cordis 内核构建的个人 GitHub 项目管理器。零 Python，纯 TypeScript / Node。
 
 ## 一键使用
 
+需先装 Node >= 22。
+
 ```bash
-uvx --from git+https://github.com/<your-org>/vibepm-cli vibepm web
+npx @vitoriga20/vibepm web
+```
+
+或从源码跑：
+
+```bash
+git clone https://github.com/vitoriga20/vibepm
+cd vibepm
+npm install && npm run build
+node dist/bin.js web
 ```
 
 ## 命令

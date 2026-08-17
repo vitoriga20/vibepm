@@ -1,4 +1,4 @@
-// web-ui 插件：node:http 本地服务 + 静态前端（照 dsh webserver：同步 bind / port=0 / 就绪行 / 优雅关闭）
+// web-ui 插件：node:http 本地服务 + 静态前端（同步 bind / port=0 / 就绪行 / 优雅关闭）
 import { createServer, type Server } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -138,7 +138,7 @@ class WebUiPlugin {
       const url = `http://${host}:${actualPort}`;
       ctx.provide("webApp", new WebApp(server));
       ctx.provide("webUrl", new WebUrl(url));
-      // 就绪行（照 dsh：URL 行即就绪信号）
+      // 就绪行（URL 行即就绪信号）
       process.stdout.write(`vibepm web: ${url}\n`);
       if (openBrowser) void webopen(url);
     });

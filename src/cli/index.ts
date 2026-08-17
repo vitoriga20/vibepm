@@ -1,4 +1,4 @@
-// CLI 入口（commander，照 dsh apps/cli）
+// CLI 入口（commander）
 import { Command } from "commander";
 import { web, setup, syncLocal, status } from "./commands.js";
 

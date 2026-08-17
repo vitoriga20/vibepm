@@ -1,4 +1,4 @@
-// 加载器：扫描插件目录 → 解析元数据 → 合成配置 → 挂载进 Context（照 Python loader.py + dsh app-boot）
+// 加载器：扫描插件目录 → 解析元数据 → 合成配置 → 挂载进 Context
 import { Context } from "./context.js";
 import { resolvePluginObject } from "./registry.js";
 
