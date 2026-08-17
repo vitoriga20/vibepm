@@ -13,4 +13,5 @@ run.log
 .patch.port.json
 recon_ide.py
 smoke_test.py
+.tmp-test/
 _artifacts_/

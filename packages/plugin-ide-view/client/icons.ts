@@ -23,7 +23,8 @@ type IName =
   // === 新增 dsh 极简 3 功能对应图标 ===
   | "settings"      // 齿轮
   | "github"        // GitHub 猫（简线）
-  | "feed";         // 动态信号流
+  | "feed"          // 动态信号流
+  | "plugins";      // 拼图/插件（plugin-manager 用）
 
 /** 直接返回 SVG 字符串（innerHTML 可用），或者在 shadow DOM 里当 innerHTML。
  *  所有 icon 尺寸：宽度 100%；由父级定具体大小。
@@ -123,6 +124,17 @@ export function iconSVG(name: IName): string {
         <path d="M4 11 a9 9 0 0 1 9 9"/>
         <path d="M4 4 a16 16 0 0 1 16 16"/>
         <circle cx="5" cy="19" r="1.4" fill="currentColor"/>
+      `);
+    case "plugins":
+      return c(`
+        <path d="M10 12 L4 9 a1.2 1.2 0 0 1 0 -2.1 L8 5.2"/>
+        <path d="M10 12 V5.2 a1.2 1.2 0 0 0 -1.8 -1 L4 7"/>
+        <path d="M14 12 l6 -3 a1.2 1.2 0 0 0 0 -2.1 L16 5.2"/>
+        <path d="M14 12 V5.2 a1.2 1.2 0 0 1 1.8 -1 L20 7"/>
+        <path d="M10 12 L4 15 a1.2 1.2 0 0 0 0 2.1 L8 18.8"/>
+        <path d="M10 12 V18.8 a1.2 1.2 0 0 0 1.8 1 L14 17"/>
+        <path d="M14 12 V18.8 a1.2 1.2 0 0 1 1.8 1 L20 16.5"/>
+        <path d="M14 12 l6 3 a1.2 1.2 0 0 1 0 2.1 L16 19.5"/>
       `);
     default:
       return "";

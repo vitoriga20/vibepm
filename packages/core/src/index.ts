@@ -10,4 +10,4 @@ export * from "./config.js";
 export * from "./manifest.js";
 export * from "./slots.js";
 export * from "./client-modules.js";
-export { boot, buildBootConfig, availableEntries, DEFAULT_BUNDLES, type BootResult } from "./loader.js";
+export { boot, buildBootConfig, availableEntries, DEFAULT_BUNDLES, PROTECTED_CORE, PLUGINS_ENABLED_KEY, type BootResult } from "./loader.js";

@@ -161,10 +161,10 @@ export class VibeShell extends HTMLElement {
     this._currentRoute = route;
 
     host.innerHTML = "";
-    host.append(this.mkHeader(route), this.mkMain(slots, route), this.mkFooter(slots));
+    host.append(this.mkHeader(slots, route), this.mkMain(slots, route), this.mkFooter(slots));
   }
 
-  private mkHeader(route: string): HTMLElement {
+  private mkHeader(slots: Slots, route: string): HTMLElement {
     const hd = document.createElement("div");
     hd.className = "hd";
     const brand = document.createElement("div");
@@ -177,7 +177,17 @@ export class VibeShell extends HTMLElement {
     small.textContent = "· minimal";
     brand.appendChild(small);
     const nav = document.createElement("nav");
-    const mkLink = (r: string, label: string, icon: "settings" | "github" | "feed" | null) => {
+    const iconFor = (rt: string): "settings" | "github" | "feed" | "plugins" | null => {
+      switch (rt) {
+        case "settings": return "settings";
+        case "auth": return "github";
+        case "feed": return "feed";
+        case "plugins": return "plugins";
+        default: return null;
+      }
+    };
+    // Home 固定入口；其余导航项由 shell.primary 面板槽驱动（被禁用插件 → 面板消失 → 导航同步消失）
+    const mkLink = (r: string, label: string, icon: "settings" | "github" | "feed" | "plugins" | null) => {
       const a = document.createElement("a");
       a.href = r ? `#${r}` : "#/";
       const isActive = r === route || (!r && !route);
@@ -189,9 +199,13 @@ export class VibeShell extends HTMLElement {
       nav.appendChild(a);
     };
     mkLink("", "Home", null);
-    mkLink("feed", "Feed", "feed");
-    mkLink("auth", "GitHub", "github");
-    mkLink("settings", "Settings", "settings");
+    const panelItems = (slots["shell.primary"] ?? []).slice().sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
+    for (const it of panelItems) {
+      const pd: any = it.payload ?? {};
+      const r = String(pd.route ?? "");
+      if (!r) continue;
+      mkLink(r, String(pd.title ?? it.label ?? r), iconFor(r));
+    }
     hd.append(brand, nav);
     return hd;
   }
@@ -281,6 +295,7 @@ export class VibeShell extends HTMLElement {
       case "github-auth-panel": body = document.createElement("github-auth-panel"); break;
       case "settings-panel": body = document.createElement("settings-panel"); break;
       case "feed-panel": body = document.createElement("feed-panel"); break;
+      case "plugin-manager-panel": body = document.createElement("plugin-manager-panel"); break;
       default:
         body = document.createElement("div");
         body.className = "empty";
