@@ -36,11 +36,16 @@ button:hover{border-color:var(--accent-line)}
 ::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:var(--accent-dim)}
 
-/* 启动页 */
-.boot-indicator{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--accent);gap:16px;z-index:99}
-.boot-indicator .logo{width:72px;height:72px;animation:spin 4s linear infinite}
-.boot-indicator .boot-text{color:var(--dim);letter-spacing:2px;font-size:12px}
-@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+/* 启动失败横幅（没有「loading」动画——首屏直接显示 IDE 壳，像 dsh 一样静默渲染） */
+.boot-error{
+  position:fixed;right:16px;bottom:calc(var(--status-h) + 16px);z-index:99;
+  max-width:min(92vw,720px);padding:12px 14px;
+  background:#2a1616;color:#ffd2d2;border:1px solid #5a2a2a;border-radius:var(--radius);
+  font:12px/1.55 var(--mono);box-shadow:0 2px 0 rgba(0,0,0,.25);
+}
+.boot-error b{display:block;margin-bottom:4px;color:#fff;letter-spacing:1px}
+.boot-error pre{margin-top:8px;max-height:40vh;overflow:auto;font-size:11px;color:#ffc9c9;
+  background:#1a0f0f;padding:8px 10px;border:1px solid #4a2424;border-radius:2px;white-space:pre-wrap;word-break:break-word}
 
 /* 主工作台 */
 .app{width:100vw;height:100vh;display:flex;flex-direction:column}

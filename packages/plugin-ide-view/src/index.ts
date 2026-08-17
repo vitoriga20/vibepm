@@ -6,7 +6,7 @@ import type { Context, SlotService } from "@vibepm/core";
 class IdeViewPlugin {
   name = "plugin-ide-view";
   provide = [];
-  inject = ["slots", "db", "webApp"];
+  inject = ["slots"];
   // dsh.client manifest 在 package.json
 
   apply(ctx: Context): () => void {
