@@ -1,0 +1,55 @@
+{
+  "name": "@vibepm/plugin-settings",
+  "version": "0.1.0",
+  "description": "Generic settings plugin for vibepm (key-value persistence + minimal form shell).",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rimraf dist client-dist",
+    "build:ts": "tsc -b",
+    "build:client": "esbuild client/index.ts --bundle --format=esm --outfile=client-dist/client.js --platform=browser --external:@vibepm/* --external:/plugins/plugin-ide-view/module-system.js",
+    "build": "pnpm run clean && pnpm run build:ts && pnpm run build:client",
+    "dev": "pnpm run build"
+  },
+  "dependencies": {
+    "@vibepm/core": "workspace:*",
+    "@vibepm/plugin-ide-view": "workspace:*",
+    "@vibepm/plugin-web-ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.10",
+    "esbuild": "^0.24.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.3"
+  },
+  "vibepm": {
+    "id": "plugin-settings",
+    "display": "Settings",
+    "role": "ui",
+    "order": 30,
+    "node": {
+      "immediately": true,
+      "inject": ["db", "slots"],
+      "provide": []
+    },
+    "client": {
+      "entry": "./client-dist/client.js",
+      "inject": [],
+      "provide": [],
+      "immediately": true
+    },
+    "configSchema": {}
+  }
+}

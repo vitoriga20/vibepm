@@ -75,14 +75,18 @@ class ClientModuleSystem {
       plugins.push({ id, entry, shape });
     }
     // Phase 2: 顺序 apply（极简，不做 service 依赖等待，当前 ide-view 无 inject 服务）
-    for (const p of plugins) {
-      try {
-        const disp = p.shape.apply(ctx);
-        this._applied.set(p.id, { entry: p.entry, plugin: p.shape, dispose: disp ?? undefined });
-      } catch (e) {
-        console.error("[vibepm] client plugin failed:", p.id, e);
-      }
-    }
+        // 幂等：已经 applied 的插件直接跳过（ide-view shell 等不会重复 apply → CustomElement already defined 错）
+        for (const p of plugins) {
+            if (this._applied.has(p.id))
+                continue;
+            try {
+                const disp = p.shape.apply(ctx);
+                this._applied.set(p.id, { entry: p.entry, plugin: p.shape, dispose: disp ?? undefined });
+            }
+            catch (e) {
+                console.error("[vibepm] client plugin failed:", p.id, e);
+            }
+        }
   }
 }
 

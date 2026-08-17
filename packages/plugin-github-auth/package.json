@@ -1,0 +1,60 @@
+{
+  "name": "@vibepm/plugin-github-auth",
+  "version": "0.1.0",
+  "description": "GitHub PAT-based auth plugin. Persists token in settings table + exposes GitHub service wrapper.",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rimraf dist client-dist",
+    "build:ts": "tsc -b",
+    "build:client": "esbuild client/index.ts --bundle --format=esm --outfile=client-dist/client.js --platform=browser --external:@vibepm/* --external:/plugins/plugin-ide-view/module-system.js",
+    "build": "pnpm run clean && pnpm run build:ts && pnpm run build:client",
+    "dev": "pnpm run build"
+  },
+  "dependencies": {
+    "@vibepm/core": "workspace:*",
+    "@vibepm/plugin-ide-view": "workspace:*",
+    "@vibepm/plugin-web-ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.10",
+    "esbuild": "^0.24.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.3"
+  },
+  "vibepm": {
+    "id": "plugin-github-auth",
+    "display": "GitHub Auth",
+    "role": "service",
+    "order": 20,
+    "node": {
+      "immediately": true,
+      "inject": ["db", "slots"],
+      "provide": ["github"]
+    },
+    "client": {
+      "entry": "./client-dist/client.js",
+      "inject": [],
+      "provide": [],
+      "immediately": true
+    },
+    "configSchema": {
+      "type": "object",
+      "properties": {
+        "api_base": { "type": "string", "default": "https://api.github.com" }
+      }
+    }
+  }
+}

@@ -1,5 +1,6 @@
 node_modules/
 dist/
+client-dist/
 .pnpm-store/
 *.tgz
 .DS_Store
@@ -11,3 +12,5 @@ run.log
 .npmrc-publish
 .patch.port.json
 recon_ide.py
+smoke_test.py
+_artifacts_/

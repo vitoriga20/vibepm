@@ -7,17 +7,12 @@
   --line-strong: #313840;
   --fg:          #d6dbe1;
   --dim:         #7a828c;
-  --accent:      #2ba77d;      /* 墨绿 accent 单一 */
+  --accent:      #2ba77d;
   --accent-dim:  #16392e;
   --accent-line: #2f8566;
   --warn:        #c69a3a;
   --danger:      #b24a4a;
   --radius:      4px;
-  --bar-h:       36px;
-  --activity-w:  48px;
-  --sidebar-w:   260px;
-  --right-w:     260px;
-  --status-h:    24px;
   --mono:        "JetBrains Mono", Consolas, ui-monospace, "Cascadia Code", monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -28,17 +23,33 @@ body{
   overflow:hidden;user-select:none;
 }
 button,input,textarea,select{font:inherit;color:var(--fg);background:transparent}
-button{border:1px solid var(--line);padding:4px 10px;border-radius:var(--radius);cursor:pointer;background:var(--panel)}
+button{border:1px solid var(--line);padding:6px 14px;border-radius:var(--radius);cursor:pointer;background:var(--panel);
+  font-size:12px;letter-spacing:.5px}
 button:hover{border-color:var(--accent-line)}
+button.primary{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+button.primary:hover{background:var(--panel-alt)}
+input[type=text],input[type=password],textarea{
+  border:1px solid var(--line);background:var(--panel);padding:8px 10px;border-radius:var(--radius);
+  font-size:12px;width:100%}
+input[type=text]:focus,input[type=password]:focus,textarea:focus{outline:none;border-color:var(--accent-line)}
+label{font-size:12px;color:var(--dim);display:block;margin-bottom:6px;letter-spacing:.5px}
+.field{margin-bottom:16px}
+.row{display:flex;gap:12px}
+.row .field{flex:1}
 .hidden{display:none!important}
+code{font-family:var(--mono);font-size:11px;background:var(--panel);padding:1px 6px;border-radius:2px;
+  border:1px solid var(--line)}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-track{background:var(--panel)}
 ::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:var(--accent-dim)}
 
-/* 启动失败横幅（没有「loading」动画——首屏直接显示 IDE 壳，像 dsh 一样静默渲染） */
+/* 主容器：100% 铺满，交给 <vibe-shell> shadow DOM 内部定位 */
+.app{width:100vw;height:100vh}
+
+/* 启动失败横幅（成功就不显示；对齐 dsh：只有异常才出现显眼横幅，平时无任何 splash） */
 .boot-error{
-  position:fixed;right:16px;bottom:calc(var(--status-h) + 16px);z-index:99;
+  position:fixed;right:16px;bottom:16px;z-index:99;
   max-width:min(92vw,720px);padding:12px 14px;
   background:#2a1616;color:#ffd2d2;border:1px solid #5a2a2a;border-radius:var(--radius);
   font:12px/1.55 var(--mono);box-shadow:0 2px 0 rgba(0,0,0,.25);
@@ -47,6 +58,21 @@ button:hover{border-color:var(--accent-line)}
 .boot-error pre{margin-top:8px;max-height:40vh;overflow:auto;font-size:11px;color:#ffc9c9;
   background:#1a0f0f;padding:8px 10px;border:1px solid #4a2424;border-radius:2px;white-space:pre-wrap;word-break:break-word}
 
-/* 主工作台 */
-.app{width:100vw;height:100vh;display:flex;flex-direction:column}
-.workbench{flex:1;display:flex;min-height:0}
+/* 插件面板表单的通用样式（shadow DOM 内部会穿透 host 用不上，为插件 WC self-scope 准备）
+ * 插件 WC 应该把这些类复制到自己的 shadow <style>；为了调试时全局兜底也留一份 */
+.form{max-width:640px}
+.form .actions{display:flex;gap:8px;margin-top:8px}
+.form .ok{color:var(--accent);font-size:12px;margin-left:8px}
+.form .err{color:var(--danger);font-size:12px;margin-left:8px}
+
+/* Feed timeline（MVP 纯 line 几何） */
+.tl{list-style:none;padding:0}
+.tl li{display:grid;grid-template-columns:32px 1fr auto;gap:10px;padding:12px 0;border-bottom:1px dashed var(--line);align-items:start}
+.tl li:last-child{border-bottom:none}
+.tl .dot{width:32px;height:32px;border:1px solid var(--line-strong);background:var(--panel);
+  display:flex;align-items:center;justify-content:center;color:var(--accent);border-radius:50%}
+.tl .dot svg{width:14px;height:14px}
+.tl h4{font-size:12px;color:var(--fg);letter-spacing:.3px;margin-bottom:4px;font-weight:600}
+.tl h4 b{color:var(--accent);font-weight:600}
+.tl p{font-size:12px;color:var(--dim);margin:0}
+.tl time{font-size:11px;color:var(--dim);letter-spacing:.5px;white-space:nowrap}

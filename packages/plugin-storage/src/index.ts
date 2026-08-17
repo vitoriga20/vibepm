@@ -21,6 +21,10 @@ export class DatabaseService {
   listTodos(pid: string): TodoRow[] { return this.db.listTodos(pid); }
   recordSync(repo: string, at: string, act = ""): void { this.db.recordSync(repo, at, act); }
   lastSync(repo: string): string | null { return this.db.lastSync(repo); }
+  getSetting<T = unknown>(key: string): T | null { return this.db.getSetting(key); }
+  setSetting<T = unknown>(key: string, value: T): void { this.db.setSetting(key, value); }
+  listSettings(): Record<string, unknown> { return this.db.listSettings(); }
+  deleteSetting(key: string): void { this.db.deleteSetting(key); }
   close(): void { this.db.close(); }
 }
 

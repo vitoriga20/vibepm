@@ -66,6 +66,11 @@ export class Database {
         last_sync_at TEXT,
         last_activity_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
     `);
   }
 
@@ -137,5 +142,40 @@ export class Database {
 
   close(): void {
     this.conn.close();
+  }
+
+  /**
+   * Settings：统一 JSON 字符串存储；getSetting 会 JSON.parse，非法 JSON → null（视为未设置）。
+   * 设计对齐 dsh：配置表 key-value + 更新时间。
+   */
+  getSetting<T = unknown>(key: string): T | null {
+    const row = this.conn.prepare("SELECT value FROM settings WHERE key=?").get(key) as
+      | { value: string }
+      | undefined;
+    if (!row) return null;
+    try { return JSON.parse(row.value) as T; } catch { return null; }
+  }
+
+  setSetting<T = unknown>(key: string, value: T): void {
+    const json = JSON.stringify(value);
+    const now = new Date().toISOString();
+    this.conn.prepare(`
+      INSERT INTO settings (key, value, updated_at) VALUES (?,?,?)
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
+    `).run(key, json, now);
+  }
+
+  listSettings(): Record<string, unknown> {
+    const rows = this.conn.prepare("SELECT key, value FROM settings").all() as
+      Array<{ key: string; value: string }>;
+    const out: Record<string, unknown> = {};
+    for (const r of rows) {
+      try { out[r.key] = JSON.parse(r.value); } catch { out[r.key] = null; }
+    }
+    return out;
+  }
+
+  deleteSetting(key: string): void {
+    this.conn.prepare("DELETE FROM settings WHERE key=?").run(key);
   }
 }

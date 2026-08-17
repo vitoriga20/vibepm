@@ -14,7 +14,11 @@ export const DEFAULT_BUNDLES: Record<string, string[]> = {
     "plugin-storage",
     "plugin-web-ui",
     "plugin-ide-view",
-    // TODO: 下面老插件独立出 packages/ 后再加入（过渡期通过 direct plugins 或 config.plugins 手动指定）
+    // dsh 风格核心 4 件套（均为插件；不想用只需移出 bundle）
+    "plugin-onboarding",
+    "plugin-github-auth",
+    "plugin-settings",
+    "plugin-repo-feed",
   ],
 };
 

@@ -3,20 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>vibepm · IDE</title>
+  <title>vibepm · minimal</title>
   <link rel="stylesheet" href="/static/shell.css" />
 </head>
 <body>
-  <div id="app" class="app">
-    <vibe-topbar></vibe-topbar>
-    <div class="workbench">
-      <vibe-activity-bar></vibe-activity-bar>
-      <vibe-sidebar></vibe-sidebar>
-      <vibe-editor></vibe-editor>
-      <vibe-right-panel></vibe-right-panel>
-    </div>
-    <vibe-statusbar></vibe-statusbar>
-  </div>
+  <div id="app" class="app"><vibe-shell></vibe-shell></div>
   <div id="boot-error" class="boot-error hidden" role="alert" aria-live="assertive"></div>
   <script>/*__BOOT__*/</script>
   <script>/*__SLOTS__*/</script>

@@ -36,6 +36,15 @@ async function readBody(req: IncomingMessage): Promise<Record<string, any>> {
   try { return JSON.parse(Buffer.concat(chunks).toString("utf-8")); } catch { return {}; }
 }
 
+export { sendJson, readBody };
+
+export interface ApiRouteCtx {
+  req: IncomingMessage;
+  res: ServerResponse;
+  path: string;
+  url: URL;
+}
+
 /** 路由分发器 */
 async function router(req: IncomingMessage, res: ServerResponse, staticDir: string, ctx: Context): Promise<void> {
   const url = new URL(req.url ?? "/", "http://local");
@@ -43,6 +52,11 @@ async function router(req: IncomingMessage, res: ServerResponse, staticDir: stri
   const slots = ctx.has("slots") ? ctx.get("slots") as SlotService : null;
   const boot = ctx.has("bootGraph") ? ctx.get("bootGraph") as ClientModuleHost : null;
   const db = ctx.has("db") ? ctx.get("db") as any : null;
+
+  // 扩展路由：事件 "web-api/route" —— 返回 true 表示该插件已接管（已经 end 响应）
+  // 这样其他插件 inject webApp 即可通过 ctx.on("web-api/route", handler) 自注册 API
+  const taken = ctx.bail("web-api/route", { req, res, path, url });
+  if (taken === true) return;
 
   // --- /api/slots: slots snapshot ---
   if (path === "/api/slots") { sendJson(res, 200, slots?.snapshot() ?? {}); return; }
