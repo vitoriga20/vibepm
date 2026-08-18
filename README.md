@@ -26,6 +26,7 @@ vibepm web
 
 - `vibepm setup` 初始化配置
 - `vibepm web` 启动本地服务并打开浏览器
+- `vibepm plugin <pnpm args...>` 管理三方插件（见「安装三方插件」）
 - `vibepm sync` 手动同步 GitHub 数据（开发中）
 - `vibepm status` 查看配置状态
 
@@ -79,6 +80,54 @@ pnpm workspaces 管理 `packages/*` 多包：
 - 持久化：写入 settings 键 `plugins.enabled`（`{name: bool}`）
 - 生效：`loader.boot()` 读取该键，跳过失配插件的加载（对齐 dsh 的 profile user-layer patch）
 - 保护：`PROTECTED_CORE`（storage / web-ui / ide-view）在 `/api/plugins` 标记 locked，后端拒绝关闭
+
+## 安装三方插件
+
+`vibepm plugin` 是一个薄转发器：把参数原样交给 pnpm，在全局插件目录 `~/.vibepm/plugins` 里执行，装完自动把「声明了 `vibepm.bundle` 的组合层插件」收进 layer 栈，下次启动 `vibepm web` 即生效。
+
+```bash
+# 从一个 npm 包安装（需已发布，含 vibepm.bundle 声明）
+vibepm plugin add @my-org/my-plugin
+
+# 从本地目录/git 安装
+vibepm plugin add ../my-plugin
+vibepm plugin add git+https://github.com/my-org/my-plugin.git
+
+# 更新 / 移除
+vibepm plugin update
+vibepm plugin remove @my-org/my-plugin
+```
+
+### 第三方插件长什么样
+
+一个可安装的三方插件包需在 `package.json` 声明两件事：
+
+1. `vibepm.bundle.patch` —— 指向一个 patch 文件（默认 `./vibepm.patch.json`），描述它往内核组合里加了什么、覆盖了什么：
+
+```json
+{
+  "name": "@my-org/my-plugin",
+  "vibepm": {
+    "bundle": { "patch": "./vibepm.patch.json" }
+  }
+}
+```
+
+2. patch 文件本身（JSON 数组，行语义）：
+
+```json
+[
+  { "insert": [{ "id": "my-plugin", "name": "@my-org/my-plugin", "config": {} }] },
+  { "id": "plugin-repo-feed", "config": { "fast": true } },
+  { "id": "another-plugin", "disabled": true }
+]
+```
+
+行语义：`insert` 插入新行；`id + config` 整体替换既有行配置；`id + disabled` 禁用行。未声明 `vibepm.bundle` 的依赖会被当成普通库安装，**不会**构成组合层。
+
+> 提示：git 依赖的构建脚本会被 pnpm 阻断，把 pnpm 打印的条目加进 `~/.vibepm/plugins/pnpm-workspace.yaml` 的 `allowBuilds` 后重跑。
+>
+> 说明：patch 默认文件名是 `vibepm.patch.json`（JSON，少依赖）；若 `insert` 出未安装到插件目录的行，该插件会在启动时被安全跳过（进 skipped，不崩整链）。
 
 ## 开发
 
