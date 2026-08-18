@@ -16,7 +16,13 @@ export function run(argv = process.argv.slice(2)): void {
     .command("web")
     .description("启动本地服务并自动打开浏览器")
     .option("--patch <file>", "临时配置覆盖 JSON")
-    .action((opts: { patch?: string }) => void web(opts.patch));
+    .option("--port <n>", "自定义端口（如 --port 5100）")
+    .option("--next", "自动换端口：探测空闲端口启动，避免端口被占")
+    .action((opts: { patch?: string; port?: string; next?: boolean }) => {
+      const o: { patch?: string; port?: number; next?: boolean } = { patch: opts.patch, next: opts.next };
+      if (opts.port) o.port = Number(opts.port);
+      void web(o);
+    });
 
   program
     .command("plugin")

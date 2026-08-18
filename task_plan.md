@@ -122,3 +122,108 @@
 - [ ] schema 校验失败只跳过该插件，不炸整链
 - [ ] `pnpm run build` + Playwright 全过；对外（README/npm 描述/注释）不提 dsh
 - [ ] 完成一次 git commit（每验收一提交，便于回滚）
+
+---
+
+# 阶段 v4 · 框架与插件解耦（对齐 dsh 分层）
+
+> 决策：dsh 怎么拆，我们就怎么拆。全部对齐 dsh 参考源码（deepseek-harness-master）的分层模型。
+> 目标：`@vibepm/core` 纯内核不认任何插件 id；webServer 变哑载体（业务 API 归各插件）；client 模块系统上移、插件不再 import 壳 URL；shell 面板渲染数据驱动；CLI 只认结构化错误；plugin-manager 目录动态生成。
+> 状态：方案已与用户对齐（「dsh 怎么样我们就怎么样」），本阶段只落盘计划，P1 起才改代码。
+
+## 现状耦合盘点（已源码级核实）
+
+| 位置 | 耦合点 |
+|---|---|
+| `core/src/loader.ts` | `DEFAULT_BUNDLES` 硬编码 9 内置插件、`PROTECTED_CORE` 硬编码 3（storage/web-ui/ide-view）、`LEGACY_ENTRY_DIR` 死代码（vibepm-ts 已无 `src/`） |
+| `core/src/slots.ts` | `SlotName` 硬编码 4 个 `shell.*` + 9 个旧 IDE 槽位（无人注册） |
+| `core/src/config.ts` | `defaultProfile()` 硬编码 github/storage/web_ui 业务段 |
+| `core/src/client-modules.ts` | 注释把浏览器模块系统实现指向 plugin-ide-view |
+| `plugin-web-ui/src/index.ts` | 路由写业务 API（`/api/projects` `/api/todos` `/api/sync` `/field`），直连 `db` / `repoStore` / `config.github` |
+| `plugin-web-ui/static/index.html` | `/*__BOOT__*/` 模板替换 + 硬编码 `/plugins/plugin-ide-view/client.js` |
+| `plugin-ide-view/client/components.ts` | `renderPrimary` switch 硬编码 panel kind→element（github-auth-panel/settings-panel/feed-panel/plugin-manager-panel）；`iconFor` 硬编码 route；`asciiBanner` 硬编码排除自身 id |
+| `plugin-ide-view/client/module-system.ts` | 框架级浏览器模块系统住在插件里；6 个 client 插件 `import /plugins/plugin-ide-view/module-system.js`；`normSlots` 硬编码 9 旧槽 |
+| `cli/src/cli/commands.ts` | `web()` 正则 `/web-ui\|端口\|EADDRINUSE/` 认错误；查 `ctx.has("webUrl")` 认插件 |
+| `plugin-plugin-manager/src/index.ts` | 硬编码 10 插件 display/desc 目录（未从 manifest 动态生成） |
+
+## dsh 对齐目标（分层）
+
+```
+浏览器端
+┌ 前端 dist（壳内核，static 兜底托管）──────────┐
+│ index.html 只留 <vibe-shell> + 内核 script  │
+│ module-system（构造 window.__VIBEPM_MODULES__）│ ← 从 ide-view 上移
+│ VibeShell（布局/导航/面板查 registry 渲染）    │ ← ide-view 变 app，不再插件行
+│ panel registry（kind→element，插件自注册）    │
+└───────────────┬────────────────────────────┘
+  动态 import bootGraph（tapIndex 注入 __VIBEPM_BOOT__）
+┌ client 插件层（vibepm.client 行）──────────────┐
+│ onboarding/settings/github-auth/feed/       │
+│ plugin-manager/ambient/skin-rhine           │ ← 用 window.__VIBEPM_MODULES__
+└───────────────┬────────────────────────────┘
+
+Node 端
+┌ 运行时 vibepm CLI（profile/bundle 组合）────────┐
+│ bundles 默认集（原 DEFAULT_BUNDLES 迁这）       │
+│ 结构化 boot 错误码 + 端口                        │
+└───────────────┬────────────────────────────┘
+┌ 框架层 @vibepm/core（纯内核，零插件 id）─────────┐
+│ ctx/eventbus/service/loader/manifest/patch    │
+│ slots（只 shell.*）                            │
+│ client-modules（双面：Node 半扫 roster + serve │
+│   /plugins + tapIndex 注入；浏览器半=内核）      │
+│ webServer（register/registerFallback/        │
+│   tapIndex，哑载体，无业务）                    │
+└──────┬──────────────┬────────────────────────┘
+       │register 路由  │register 路由
+┌ 系统壳插件 ────────┐ ┌ 业务插件 ──────────────┐
+│ storage(db)        │ │ github-auth/settings │
+│ static 兜底        │ │ repo-feed/onboarding │
+│ (web-ui 拆)        │ │ plugin-manager       │
+└────────────────────┘ └──────────────────────┘
+```
+
+## 步骤（P1-P5，每阶段 build + 真机验证 + 一提交）
+
+### P1 · core 去插件知识
+- `DEFAULT_BUNDLES` / `PROTECTED_CORE` / `LEGACY_ENTRY_DIR` 移出 core → 运行时/CLI 层（bundle 定义注入 loader 的 `bundles` 参数，loader 已有该维度）
+- `defaultProfile()` 减到通用；github/storage/web_ui 业务默认值进各插件 config schema
+- `slots.ts` 删 9 旧 IDE 槽位，只留 `shell.*`
+- 影响面：loader / core/index / plugin-plugin-manager（读 PROTECTED_CORE）/ cli
+- 验收：core 无 `plugin-xxx` 字面量；`pnpm run build` exit 0；`vibepm web` 照常起
+
+### P2 · webServer 化 + 业务 API 迁移
+- web-ui 拆 `webServer` 服务：`register(route)`（exact/prefix 命名路由）/ `registerFallback`（唯一兜底座位）/ `tapIndex`（纯 html 变换），对齐 dsh-host-webserver
+- `/api/projects` `/api/todos` `/api/sync` `/field` 迁到 storage / repo-feed 插件自注册路由
+- 影响面：全部业务插件（github/settings/repo-feed/onboarding 都注册 API）+ client fetch 路径
+- 验收：全部 `/api/*` 真机可用（curl + 浏览器）
+
+### P3 · client 模块系统上移 + tapIndex 注入
+- module-system 浏览器半挪 core/modules；壳内核构造 `window.__VIBEPM_MODULES__`
+- 6 个 client 插件改 `window.__VIBEPM_MODULES__.register`，删 `/plugins/plugin-ide-view/module-system.js` import
+- boot/slots 注入改 `tapIndex`，index.html 只留 `<vibe-shell>` + 内核 script
+- 影响面：全部 client 插件、web-ui、ide-view
+- 验收：浏览器全插件加载 / 皮肤开关 / 禁用逻辑无回归
+
+### P4 · shell 面板数据驱动
+- client 侧 panel registry（kind→element，面板插件自注册）
+- VibeShell 删 switch + 硬编码 route/self-id/文案
+- 影响面：ide-view + 4 面板插件（github/settings/feed/plugin-manager）
+- 验收：新面板插件不碰壳即可加面板；旧面板无回归
+
+### P5 · CLI 结构化 + plugin-manager 动态化
+- CLI 认结构化 boot 错误码，不按插件名正则；bundle 默认集走运行时
+- plugin-manager 目录从 `enumerateAllEntries` 动态生成（对齐 dsh-host-plugin-inventory）
+- 影响面：cli / plugin-plugin-manager
+- 验收：插件列表动态；disable 逻辑照常
+
+## 待确认的设计点
+- ide-view 壳身份转 app dist（vibe-shell / module-system / icons / boot 编排整体移到 static 兜底托管），对齐 dsh「前端 dist = 内核、ui-* 全是 client 插件行」。P3/P4 落地前与用户确认。
+
+## 影响面检查清单
+- [ ] core 去插件 id 后：`plugin-plugin-manager` 冷启动 `plugins.enabled` 读取序不变（db 最先加载）
+- [ ] webServer 化后：`web-api/route` bail 事件与命名路由二者取舍（保留 bail 或改 register，任选其一，链路统一）
+- [ ] client 模块系统上移后：禁用插件（`excludeMany`）仍能从 client bootGraph 剔除，皮肤/装饰不残留
+- [ ] shell 面板数据驱动后：旧 `kind` 值（github-auth-panel 等）迁移到 registry 注册，避免面板丢渲染
+- [ ] `pnpm run build` + 真机浏览器全过；对外（README/npm 描述/注释）不提 dsh
+- [ ] 每阶段完成一次 git commit（每验收一提交，便于回滚）

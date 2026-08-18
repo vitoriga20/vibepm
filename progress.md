@@ -17,3 +17,10 @@
   - `cli/src/cli/plugin.ts`：`vibepm plugin <pnpm args...>` forwarder + reconcilePlugins（按已安装态维护 vibepm.pluginLayers）；注册进 commander
 - 验证：全 workspace build exit 0；boot 冒烟 8 插件原序装载无 skip/error；buildBootConfig patch 层覆盖/禁用/插入/顺序全对；CLI help 正常。
 - 待办：commit + push；README 提及 `vibepm plugin` 安装三方插件。
+
+## 2026-08-18 会话 3（解耦方案对齐 + 落盘，未改代码）
+- 用户要求框架与插件解耦，先给方案对齐颗粒度；答复「dsh 怎么样我们就怎么样」，先落盘不改代码。
+- 完成源码级耦合盘点：core 硬编码插件 id（DEFAULT_BUNDLES / PROTECTED_CORE / LEGACY 死代码）、slots 9 旧槽、config 业务段、web-ui 路由写业务 API + `/*__BOOT__*/` 替换、module-system 住在 ide-view 且 6 插件 import 其 URL、VibeShell switch 硬编码 panel、CLI 正则认错误、plugin-manager 硬编码目录。
+- 研读 dsh 参考源码确认对齐模型：webServer 哑载体（register / registerFallback / tapIndex）、frontend-static 占兜底座位、client-modules 双面插件（tapIndex 注入 + 内核构造 `__DSH_MODULES__`）、shell = 前端 dist + ui-* client 插件行、plugin-inventory 动态投影、profile/bundle 数据驱动组合。
+- 产出 5 阶段解耦计划（P1 core 去插件知识 → P2 webServer 化+业务 API 迁移 → P3 client 模块系统上移 → P4 shell 面板数据驱动 → P5 CLI 结构化+plugin-manager 动态化），落盘 task_plan.md「阶段 v4」。
+- 待办：用户确认后从 P1 开干；每阶段 build + 真机验证 + git commit。

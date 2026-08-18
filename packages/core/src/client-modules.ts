@@ -65,6 +65,21 @@ export class ClientModuleHost {
     this._rev = this._graph.rev;
   }
 
+  /**
+   * 冷启动禁用的插件：从 entries/bootGraph 整体剔除（对齐 dsh 组合层禁用=plugin 消失）。
+   * 前端壳依 window.__VIBEPM_BOOT__.entries 动态 import client 半，剔除后不再加载 → 彻底不生效。
+   */
+  excludeMany(ids: Iterable<string>): void {
+    let changed = false;
+    for (const id of ids) {
+      if (this._entries.delete(id)) changed = true;
+    }
+    if (changed) {
+      this._graph = buildBootGraph(this._entries);
+      this._rev = this._graph.rev;
+    }
+  }
+
   graph(): BootGraph {
     return this._graph;
   }

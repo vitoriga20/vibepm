@@ -33,7 +33,9 @@ class StoragePlugin {
   provide = ["db"];
 
   apply(ctx: Context): () => void {
-    const cfg = ctx.mergedConfig("plugin-storage") ?? ctx.mergedConfig("storage");
+    // 配置规范键为短名（storage），loader 内部按 entry id（plugin-storage）记录；
+    // 合并两层：以短名为基，entry-id 层若覆盖则优先生效，避免空对象短路 misses。
+    const cfg = { ...ctx.mergedConfig("storage"), ...ctx.mergedConfig("plugin-storage") };
     let dbPath = cfg.path ?? "vibepm.db";
     const parent = dirname(dbPath);
     if (parent) mkdirSync(parent, { recursive: true });

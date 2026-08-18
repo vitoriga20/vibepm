@@ -1,0 +1,7 @@
+[
+  {
+    "_note": "组合层把本插件自己加进 bootGraph。等价于 dsh bundle patch 的 mode=insert；mode 缺省即 insert。",
+    "id": "plugin-hello",
+    "name": "@vibepm-contrib/plugin-hello"
+  }
+]

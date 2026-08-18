@@ -31,6 +31,7 @@ export const DEFAULT_BUNDLES: Record<string, string[]> = {
     "plugin-settings",
     "plugin-repo-feed",
     "plugin-plugin-manager",
+    "plugin-ambient",
   ],
 };
 
@@ -75,6 +76,68 @@ export function availableEntries(workspaceRoot?: string): string[] {
   const fromLegacy = Object.keys(LEGACY_ENTRY_DIR);
   const s = new Set<string>([...fromWs, ...fromLegacy]);
   return [...s];
+}
+
+/** 插件可见元信息（给 UI 插件管理 / 外部工具枚举） */
+export type EntryMeta = {
+  /** entryId（组合层/列表的稳定键） */
+  id: string;
+  /** npm 包名（如 @vibepm-contrib/plugin-hello） */
+  pkgName: string;
+  /** 包的绝对目录（扫到才给；老 legacy 没有） */
+  pkgDir: string | null;
+  /** package.json.description，供 UI 做显示回退 */
+  description: string | null;
+};
+
+/**
+ * 枚举「所有内核能识别的可见插件」= 三源合并去重。
+ * 顺序不保证；UI 端自己按业务排序。
+ *
+ * 源 1) workspace packages/* + src/plugins legacy（manifest 扫描，同 availableEntries 数据源）
+ * 源 2) 用户全局 pluginsDir（~/.vibepm/plugins）中 config.vibepm.pluginLayers 已声明的三方包
+ * 源 3) DEFAULT_BUNDLES.minimal 兜底（保持与 builtin 组合层一致）
+ */
+export function enumerateAllEntries(workspaceRoot?: string): EntryMeta[] {
+  const out = new Map<string, EntryMeta>();
+
+  // 源 1：workspace（packages/* + legacy）
+  const ws = scanWorkspace(workspaceRoot);
+  for (const [id, info] of ws) {
+    const pkgDir: string | null = info.pkgDir ?? null;
+    const pkgJson = pkgDir ? readJson(join(pkgDir, "package.json")) : null;
+    const pkgName: string = (pkgJson && typeof (pkgJson as any).name === "string") ? (pkgJson as any).name : info.pkgName || id;
+    const desc: string | null = (pkgJson && typeof (pkgJson as any).description === "string") ? (pkgJson as any).description : null;
+    if (!out.has(id)) out.set(id, { id, pkgName, pkgDir, description: desc });
+  }
+
+  // 源 2：pluginsDir 中已声明的三方包（vibepm.pluginLayers）
+  const pj = readJson(join(pluginsDir(), "package.json"));
+  const layersAny: any = pj?.vibepm?.pluginLayers;
+  const layers: string[] = Array.isArray(layersAny) ? layersAny.filter((x: any) => typeof x === "string") : [];
+  for (const name of layers) {
+    const pkgDir = join(pluginsDir(), "node_modules", name);
+    const pkgJson = readJson(join(pkgDir, "package.json"));
+    if (!pkgJson || typeof pkgJson !== "object") continue;
+    const id = entryIdFromPkgName(name);
+    if (out.has(id)) continue;
+    const pkgNameOut: string = typeof pkgJson.name === "string" ? pkgJson.name : name;
+    const descOut: string | null = typeof pkgJson.description === "string" ? pkgJson.description : null;
+    out.set(id, {
+      id,
+      pkgName: pkgNameOut,
+      pkgDir,
+      description: descOut,
+    });
+  }
+
+  // 源 3：DEFAULT_BUNDLES.minimal 兜底
+  for (const id of DEFAULT_BUNDLES.minimal) {
+    if (out.has(id)) continue;
+    out.set(id, { id, pkgName: id, pkgDir: null, description: null });
+  }
+
+  return [...out.values()];
 }
 
 /**
@@ -290,20 +353,24 @@ export async function boot(
   const host = ctx.get(ClientModuleHost.NAME) as ClientModuleHost | undefined;
   if (host && installed.entries.length) host.mergeEntries(new Map(installed.entries.map((e) => [e.id, e])));
   // 冷启动开关：storage(提供 db) 是最先的插件，load 它之后再读 plugins.enabled
+  // disabled 来源 = 全部 enabledMap[id]===false 且非内核（不只限 order：游离的 client-only 皮肤等也要剔除）
   let dbReady = false;
+  const startupDisabled = new Set<string>();
   for (const entry of order) {
     if (ctx.has("db") && !dbReady) {
       dbReady = true;
       const db = ctx.get("db") as any;
       const enabledMap: Record<string, boolean> | null =
         typeof db?.getSetting === "function" ? db.getSetting(PLUGINS_ENABLED_KEY) ?? null : null;
-      for (const e of order) {
-        if (enabledMap && enabledMap[e] === false && !PROTECTED_CORE.has(e) && e !== entry && !disabled.includes(e)) {
-          disabled.push(e);
+      if (enabledMap && typeof enabledMap === "object") {
+        for (const [id, on] of Object.entries(enabledMap)) {
+          if (on === false && !PROTECTED_CORE.has(id) && id !== entry && !startupDisabled.has(id)) {
+            startupDisabled.add(id);
+          }
         }
       }
     }
-    if (disabled.includes(entry)) continue;
+    if (disabled.includes(entry) || startupDisabled.has(entry)) continue;
     const wsEntry = wsEntries.get(entry) ?? installedEntriesMap(installed).get(entry);
     const schema: PluginSchema | undefined = wsEntry?.manifest?.node?.schema;
     const configErr = validatePluginConfig(entry, per[entry] ?? {}, schema);
@@ -314,7 +381,12 @@ export async function boot(
     }
     try {
       const directPlugin = direct?.[entry];
-      const { mod } = await importFromWorkspace(entry, wsEntries, directPlugin);
+      const merged: Array<[string, ResolvedEntry]> = [
+        ...(wsEntries as Map<string, ResolvedEntry>),
+        ...installed.entries.map<[string, ResolvedEntry]>((e) => [e.id, e]),
+      ];
+      const allWs = new Map<string, ResolvedEntry>(merged);
+      const { mod } = await importFromWorkspace(entry, allWs, directPlugin);
       const { plugin } = resolvePluginObject(mod as any, entry);
       ctx.plugin(plugin, per[entry], entry);
     } catch (e) {
@@ -323,7 +395,10 @@ export async function boot(
     }
   }
   ctx.settle();
-  return { ctx, order, skipped, disabled, errors: ctx.bootErrors, workspaceEntries: wsEntries };
+  // 冷启动 disabled 的插件 → 一并从 client bootGraph 剔除（对齐 dsh：禁用=组合层整体消失，client 半不再加载）
+  const allDisabled = Array.from(new Set([...disabled, ...startupDisabled]));
+  if (host && allDisabled.length) host.excludeMany(allDisabled);
+  return { ctx, order, skipped, disabled: allDisabled, errors: ctx.bootErrors, workspaceEntries: wsEntries };
 }
 
 function installedEntriesMap(installed: { entries: ResolvedEntry[] }): Map<string, ResolvedEntry> {

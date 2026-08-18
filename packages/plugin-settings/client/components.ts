@@ -5,28 +5,30 @@
 
 const CSS = /* css */`
 :host{display:block}
-h1{font-size:14px;letter-spacing:1.5px;color:#d6dbe1;margin:0 0 6px 0;font-weight:700;text-transform:uppercase}
-.desc{font-size:12px;color:#7a828c;margin-bottom:18px}
-.kv{border:1px solid #262c33;background:#161a1e;border-radius:4px;overflow:hidden}
+h1{font-size:16px;letter-spacing:1.5px;color:#f6f7f3;margin:0 0 6px 0;font-weight:900;text-transform:uppercase;font-family:var(--display-cjk, sans-serif)}
+.desc{font-size:12px;color:#9aa0a7;margin-bottom:18px}
+.kv{border:1px solid #3a4046;background:#16191c;overflow:hidden;box-shadow:4px 4px 0 rgba(0,0,0,.4)}
 table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #262c33;vertical-align:top}
-th{background:#1b2025;color:#7a828c;font-weight:500;letter-spacing:.8px;text-transform:uppercase;font-size:10px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #2a2f34;vertical-align:top}
+th{background:#20242a;color:#9aa0a7;font-weight:700;letter-spacing:.8px;text-transform:uppercase;font-size:10px;font-family:var(--mono, monospace)}
 tr:last-child td{border-bottom:none}
-.k{font-family:"JetBrains Mono",Consolas,monospace;color:#d6dbe1}
-.v{font-family:"JetBrains Mono",Consolas,monospace;color:#2ba77d;white-space:pre-wrap;word-break:break-word;max-width:520px;display:inline-block}
+.k{font-family:var(--mono, monospace);color:#f6f7f3}
+.v{font-family:var(--mono, monospace);color:var(--yellow,#fff44f);white-space:pre-wrap;word-break:break-word;max-width:520px;display:inline-block}
 .tool{display:flex;gap:6px}
-button{border:1px solid #262c33;background:#1b2025;color:#d6dbe1;padding:3px 8px;border-radius:2px;cursor:pointer;font-size:11px;letter-spacing:.5px}
-button:hover{border-color:#2f8566;color:#2ba77d}
-button.primary{background:#16392e;border-color:#2f8566;color:#2ba77d}
-.form{margin-top:18px;border:1px dashed #262c33;padding:12px;border-radius:4px;background:#161a1e}
-.form h3{font-size:11px;color:#7a828c;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 10px 0;font-weight:600}
+button{border:1px solid #5f656b;background:#303438;color:#f6f7f3;padding:4px 10px;cursor:pointer;
+  font:700 10px/1 var(--display-cjk, sans-serif);letter-spacing:.5px;box-shadow:2px 2px 0 #050607;transition:color .18s,box-shadow .18s}
+button:hover{border-color:var(--yellow,#fff44f);color:var(--yellow,#fff44f)}
+button.primary{border-color:#4d5257;border-left-color:var(--yellow,#fff44f)}
+.form{margin-top:18px;border:1px dashed #3c4147;border-left:3px solid var(--yellow,#fff44f);padding:14px;background:#16191c}
+.form h3{font-size:10px;color:#9aa0a7;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 10px 0;font-weight:700;font-family:var(--mono, monospace)}
 .row{display:grid;grid-template-columns:160px 1fr auto;gap:8px;align-items:start}
-input[type=text],textarea{background:#0f1215;border:1px solid #262c33;color:#d6dbe1;font-family:"JetBrains Mono",Consolas,monospace;font-size:11px;padding:6px 8px;border-radius:2px;resize:vertical}
+input[type=text],textarea{background:#0d0f11;border:1px solid #383d43;color:#f6f7f3;font-family:var(--mono, monospace);font-size:11px;padding:6px 8px;resize:vertical}
+input[type=text]:focus,textarea:focus{outline:none;border-color:var(--yellow,#fff44f)}
 textarea{min-height:64px}
 .status{font-size:11px;margin-top:8px;min-height:14px}
-.status.ok{color:#2ba77d}
-.status.err{color:#b24a4a}
-.empty{padding:18px;color:#7a828c;font-size:12px;text-align:center}
+.status.ok{color:var(--yellow,#fff44f)}
+.status.err{color:#ff9c98}
+.empty{padding:18px;color:#9aa0a7;font-size:12px;text-align:center}
 `;
 
 export class SettingsPanel extends HTMLElement {

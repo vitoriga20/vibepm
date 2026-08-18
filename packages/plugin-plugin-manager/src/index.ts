@@ -12,7 +12,7 @@
  * PROTECTED_CORE(三件套) 在此处 locked，前端禁改。
  */
 import type { Context } from "@vibepm/core";
-import { DEFAULT_BUNDLES, PROTECTED_CORE, PLUGINS_ENABLED_KEY } from "@vibepm/core";
+import { DEFAULT_BUNDLES, PROTECTED_CORE, PLUGINS_ENABLED_KEY, enumerateAllEntries, type EntryMeta } from "@vibepm/core";
 import { readBody, sendJson, type ApiRouteCtx } from "@vibepm/plugin-web-ui";
 import type { SlotService } from "@vibepm/plugin-ide-view";
 
@@ -22,7 +22,10 @@ type DbLike = {
   deleteSetting(k: string): void;
 };
 
-/** 可见插件描述表：name → 展示名/一句话描述 */
+/**
+ * 官方插件 display/描述（优先于 package.json.description）。
+ * 新的官方插件可加这里；第三方/没写的自动走 fallback。
+ */
 const PLUGIN_META: Record<string, { display: string; desc: string }> = {
   "plugin-storage": { display: "Storage", desc: "本地 SQLite 数据库（设置/项目/同步元数据）" },
   "plugin-web-ui": { display: "Web UI", desc: "内置 HTTP 服务器与静态壳（页面入口）" },
@@ -32,7 +35,32 @@ const PLUGIN_META: Record<string, { display: string; desc: string }> = {
   "plugin-settings": { display: "Settings", desc: "通用设置面板（键值存储）" },
   "plugin-repo-feed": { display: "Feed", desc: "仓库动态 / received_events 列表" },
   "plugin-plugin-manager": { display: "插件管理", desc: "本面板：设置里开关插件（冷启动生效）" },
+  "plugin-skin-rhine": { display: "终末地皮肤", desc: "莱茵科技风格皮肤（暗墨蓝金属 + 柠檬黄光；组合层覆盖 --skin-* token）" },
+  "plugin-ambient": { display: "Ambient", desc: "主区背景科技球 + 氛围动画（纯装饰）" },
 };
+
+/** entryId → 显示名 fallback：@scope/plugin-name → Plugin Name / plugin-xxx → Xxx */
+function displayFromId(id: string): string {
+  const raw = id.replace(/^@[^/]+\//, "").replace(/^plugin-/, "");
+  return raw
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(" ") || id;
+}
+
+/** 排序：内核三件套在前（按 PROTECTED_CORE 的稳定序）→ 其余按 display 字母序 */
+function sortEntries(rows: Array<EntryMeta & { locked: boolean }>): typeof rows {
+  const coreOrder = [...PROTECTED_CORE];
+  return [...rows].sort((a, b) => {
+    const ai = coreOrder.indexOf(a.id);
+    const bi = coreOrder.indexOf(b.id);
+    if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    const da = displayFromId(a.id);
+    const db = displayFromId(b.id);
+    return da.localeCompare(db);
+  });
+}
 
 class PluginManagerPlugin {
   name = "plugin-plugin-manager";
@@ -44,7 +72,11 @@ class PluginManagerPlugin {
     const slots = ctx.get("slots") as any as SlotService;
     const disposers: Array<() => void> = [];
 
-    const allIds = Array.from(new Set(DEFAULT_BUNDLES.minimal));
+    // 数据源改为「所有内核能识别的 entry」（workspace + 三方安装 + builtin 兜底），与 bootGraph 保持一致
+    const readAllIds = (): Array<EntryMeta & { locked: boolean }> =>
+      sortEntries(
+        enumerateAllEntries().map((e) => ({ ...e, locked: PROTECTED_CORE.has(e.id) })),
+      );
 
     const readEnabledMap = (): Record<string, boolean> => {
       const m = db.getSetting<Record<string, boolean>>(PLUGINS_ENABLED_KEY);
@@ -59,14 +91,16 @@ class PluginManagerPlugin {
       // GET /api/plugins → 列表
       if ((sub === "" || sub === "/") && rctx.req.method === "GET") {
         const enabled = readEnabledMap();
-        const list = allIds.map((name) => {
-          const meta = PLUGIN_META[name] ?? { display: name, desc: "" };
+        const all = readAllIds();
+        const list = all.map((e) => {
+          const meta = PLUGIN_META[e.id];
           return {
-            name,
-            display: meta.display,
-            desc: meta.desc,
-            locked: PROTECTED_CORE.has(name),
-            enabled: PROTECTED_CORE.has(name) ? true : !(enabled[name] === false),
+            name: e.id,
+            pkgName: e.pkgName,
+            display: meta?.display ?? displayFromId(e.id),
+            desc: meta?.desc ?? e.description ?? "—",
+            locked: e.locked,
+            enabled: e.locked ? true : !(enabled[e.id] === false),
           };
         });
         sendJson(rctx.res, 200, { ok: true, data: list });

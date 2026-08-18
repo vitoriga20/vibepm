@@ -1,7 +1,7 @@
 {
-  "name": "@vibepm/plugin-onboarding",
+  "name": "@vibepm/plugin-ambient",
   "version": "0.1.0",
-  "description": "dsh-style onboarding cards for the vibepm minimal shell (\"get started\" quick links).",
+  "description": "Ambient animated background for the vibepm shell (algorithmic canvas: slow-shifting grid, drifting cross-stars, meteors).",
   "private": true,
   "type": "module",
   "main": "dist/src/index.js",
@@ -34,13 +34,13 @@
     "typescript": "^5.7.3"
   },
   "vibepm": {
-    "id": "plugin-onboarding",
-    "display": "Onboarding",
+    "id": "plugin-ambient",
+    "display": "Ambient Background",
     "role": "ui",
-    "order": 10,
+    "order": 15,
     "node": {
       "immediately": true,
-      "inject": ["slots"],
+      "inject": [],
       "provide": []
     },
     "client": {

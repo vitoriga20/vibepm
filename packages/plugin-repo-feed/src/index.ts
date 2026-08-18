@@ -131,6 +131,20 @@ class RepoFeedPlugin {
         route: "feed",
       },
     }));
+
+    // --- 首页导航卡：#feed 入口（本插件自注册，项随插件装卸而出现/消失，对齐 dsh）---
+    disposers.push(slots.register("shell.nav", {
+      id: "feed/nav",
+      label: "仓库动态",
+      order: 30,
+      payload: {
+        kind: "nav-card",
+        icon: "feed",
+        desc: "关注仓库的 push / PR / issue / release timeline",
+        hash: "#feed",
+        orderHint: 30,
+      },
+    }));
     return () => { for (const f of disposers.reverse()) try { f(); } catch { /* noop */ } };
   }
 }

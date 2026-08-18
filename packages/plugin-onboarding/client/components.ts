@@ -9,27 +9,28 @@
 const CSS = /* css */`
 :host{display:block}
 .card{
-  position:relative;border:1px solid #262c33;background:#161a1e;border-radius:4px;
-  padding:14px 16px;cursor:pointer;transition:border-color .1s linear,background .1s linear;
-  user-select:none;
+  position:relative;border:1px solid #3a4046;border-left:4px solid #626970;background:#1d2126;
+  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%);
+  padding:14px 16px;cursor:pointer;transition:border-color .1s linear,background .1s linear,transform .1s linear;
+  user-select:none;box-shadow:3px 4px 0 #050607;
 }
-.card:hover{border-color:#2f8566;background:#1b2025}
-.card:active{background:#12161a}
+.card:hover{border-color:var(--yellow,#fff44f);border-left-color:var(--yellow,#fff44f);background:#262b31;transform:translate(-1px,-1px)}
+.card:active{background:#16191c}
 .card::after{
-  content:"";position:absolute;right:12px;top:50%;transform:translateY(-50%);
-  width:6px;height:6px;border-top:1px solid #7a828c;border-right:1px solid #7a828c;
+  content:"";position:absolute;right:14px;top:50%;
+  width:6px;height:6px;border-top:1px solid #9aa0a7;border-right:1px solid #9aa0a7;
   transform-origin:center;transform:translateY(-50%) rotate(45deg);
 }
 .head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.icon{width:28px;height:28px;border:1px solid #313840;background:#1b2025;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;color:#2ba77d;flex:0 0 auto}
+.icon{width:28px;height:28px;border:1px solid #7b8188;background:#15181b;
+  display:flex;align-items:center;justify-content:center;color:var(--yellow,#fff44f);flex:0 0 auto}
 .icon svg{width:14px;height:14px}
-.title{font-size:12px;color:#d6dbe1;letter-spacing:.4px;font-weight:600}
-.status{margin-left:auto;font-size:10px;letter-spacing:1px;padding:2px 6px;border-radius:2px;
-  border:1px solid #262c33;color:#7a828c;text-transform:uppercase}
-.status.active{color:#2ba77d;border-color:#2f8566;background:#16392e}
-.status.completed{color:#7a828c;border-color:#262c33;background:#161a1e}
-.desc{font-size:11px;color:#7a828c;line-height:1.55;letter-spacing:.15px;margin-right:14px}
+.title{font-size:12px;color:#f6f7f3;letter-spacing:.4px;font-weight:700;font-family:var(--display-cjk, sans-serif)}
+.status{margin-left:auto;font-size:9px;letter-spacing:1px;padding:3px 7px;
+  border:1px solid #5f656b;color:#9aa0a7;text-transform:uppercase;font:700 9px/1 var(--mono, monospace)}
+.status.active{color:#111;border-color:var(--yellow,#fff44f);background:var(--yellow,#fff44f);box-shadow:2px 2px 0 rgba(0,0,0,.5)}
+.status.completed{color:#9aa0a7;border-color:#5f656b;background:#161a1e}
+.desc{font-size:11px;color:#9aa0a7;line-height:1.55;letter-spacing:.15px;margin-right:14px}
 `;
 
 const icons: Record<string, string> = {

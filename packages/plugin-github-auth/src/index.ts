@@ -85,8 +85,9 @@ class GithubAuthPlugin {
     const slots = ctx.get("slots") as any;
     const disposers: Array<() => void> = [];
 
-    // 允许配置 api_base（config 优先；无则 settings 里允许覆盖）
-    const cfg = (ctx.mergedConfig("plugin-github-auth") ?? {}) as { api_base?: string };
+    // 允许配置 api_base（config 优先；无则 settings 里允许覆盖）。
+    // 合并短名（github）与 entry id（plugin-github-auth）两层，避免空对象短路 misses。
+    const cfg = { ...ctx.mergedConfig("github"), ...ctx.mergedConfig("plugin-github-auth") } as { api_base?: string };
     const service = new GitHubService(db as DbLike, cfg.api_base ?? "https://api.github.com");
     ctx.provide("github", service);
 
@@ -181,6 +182,20 @@ class GithubAuthPlugin {
         title: "连接 GitHub",
         desc: "Personal Access Token (classic) 请勾选 repo + read:user + read:org；只存本地 SQLite。",
         route: "auth",
+      },
+    }));
+
+    // --- 首页导航卡：#auth 入口（本插件自注册，项随插件装卸而出现/消失，对齐 dsh）---
+    disposers.push(slots.register("shell.nav", {
+      id: "github/nav",
+      label: "连接 GitHub",
+      order: 10,
+      payload: {
+        kind: "nav-card",
+        icon: "github",
+        desc: "填写 Personal Access Token，让 vibepm 为你抓仓库与动态",
+        hash: "#auth",
+        orderHint: 10,
       },
     }));
 

@@ -36,6 +36,28 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
+  packages/plugin-ambient:
+    dependencies:
+      '@vibepm/core':
+        specifier: workspace:*
+        version: link:../core
+      '@vibepm/plugin-ide-view':
+        specifier: workspace:*
+        version: link:../plugin-ide-view
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.10
+        version: 22.20.1
+      esbuild:
+        specifier: ^0.24.2
+        version: 0.24.2
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.1.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/plugin-github-auth:
     dependencies:
       '@vibepm/core':
@@ -153,6 +175,28 @@ importers:
       '@vibepm/plugin-web-ui':
         specifier: workspace:*
         version: link:../plugin-web-ui
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.10
+        version: 22.20.1
+      esbuild:
+        specifier: ^0.24.2
+        version: 0.24.2
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.1.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  packages/plugin-skin-rhine:
+    dependencies:
+      '@vibepm/core':
+        specifier: workspace:*
+        version: link:../core
+      '@vibepm/plugin-ide-view':
+        specifier: workspace:*
+        version: link:../plugin-ide-view
     devDependencies:
       '@types/node':
         specifier: ^22.10.10

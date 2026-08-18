@@ -4,26 +4,27 @@
  */
 const CSS = /* css */`
 :host{display:block}
-h1{font-size:14px;letter-spacing:1.5px;color:#d6dbe1;margin:0 0 6px 0;font-weight:700;text-transform:uppercase}
-.desc{font-size:12px;color:#7a828c;margin-bottom:18px;line-height:1.6}
-.tip{border:1px dashed #262c33;background:#161a1e;padding:10px 12px;border-radius:4px;font-size:11px;color:#7a828c;margin-bottom:16px;line-height:1.6}
-.list{border:1px solid #262c33;background:#161a1e;border-radius:4px;overflow:hidden}
-.row{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #262c33}
+h1{font-size:16px;letter-spacing:1.5px;color:#f6f7f3;margin:0 0 6px 0;font-weight:900;text-transform:uppercase;font-family:var(--display-cjk, sans-serif)}
+.desc{font-size:12px;color:#9aa0a7;margin-bottom:18px;line-height:1.6}
+.tip{border:1px dashed #3c4147;border-left:3px solid var(--yellow,#fff44f);background:#16191c;padding:10px 12px;font-size:11px;color:#9aa0a7;margin-bottom:16px;line-height:1.6}
+.list{border:1px solid #3a4046;background:#16191c;overflow:hidden;box-shadow:4px 4px 0 rgba(0,0,0,.4)}
+.row{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid #2a2f34}
 .row:last-child{border-bottom:none}
+.row:hover{background:#1d2126}
 .row .info{flex:1;min-width:0}
-.row .nm{font-size:12px;color:#d6dbe1;font-weight:600;display:flex;align-items:center;gap:8px}
-.row .nm code{font-family:"JetBrains Mono",Consolas,monospace;font-size:10px;color:#7a828c;letter-spacing:.3px}
-.row .ds{font-size:11px;color:#7a828c;margin-top:3px;line-height:1.5}
-.badge{display:inline-block;padding:1px 6px;font-size:9px;letter-spacing:1px;text-transform:uppercase;border:1px solid #262c33;border-radius:2px;color:#7a828c}
-.badge.locked{border-color:#2f8566;color:#2ba77d;background:#16392e}
-.empty{padding:18px;color:#7a828c;font-size:12px;text-align:center}
+.row .nm{font-size:13px;color:#f6f7f3;font-weight:700;display:flex;align-items:center;gap:8px;font-family:var(--display-cjk, sans-serif)}
+.row .nm code{font-family:var(--mono, monospace);font-size:10px;color:#9aa0a7;letter-spacing:.3px}
+.row .ds{font-size:11px;color:#9aa0a7;margin-top:3px;line-height:1.5}
+.badge{display:inline-block;padding:2px 7px;font:700 8px/1 var(--mono, monospace);letter-spacing:1px;text-transform:uppercase;border:1px solid #5f656b;color:#9aa0a7}
+.badge.locked{color:#111;border-color:var(--yellow,#fff44f);background:var(--yellow,#fff44f)}
+.empty{padding:18px;color:#9aa0a7;font-size:12px;text-align:center}
 .status{font-size:11px;margin-top:10px;min-height:14px}
-.status.ok{color:#2ba77d}.status.err{color:#b24a4a}
+.status.ok{color:var(--yellow,#fff44f)}.status.err{color:#ff9c98}
 /* switch */
-.sw{position:relative;width:34px;height:18px;flex-shrink:0;border-radius:999px;background:#2a3038;border:1px solid #333b45;cursor:pointer;transition:background .15s}
-.sw.on{background:#1f6f52;border-color:#2f8566}
-.sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#d6dbe1;transition:transform .15s}
-.sw.on::after{transform:translateX(16px);background:#fff}
+.sw{position:relative;width:36px;height:20px;flex-shrink:0;border:1px solid #3c4147;background:#20242a;cursor:pointer;transition:background .15s;box-shadow:2px 2px 0 #050607}
+.sw.on{background:var(--yellow,#fff44f);border-color:var(--yellow,#fff44f)}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;background:#9aa0a7;transition:transform .15s,background .15s}
+.sw.on::after{transform:translateX(16px);background:#0a0b0d}
 .sw.locked{cursor:not-allowed;opacity:.5}
 `;
 export class PluginManagerPanel extends HTMLElement {

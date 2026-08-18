@@ -1,0 +1,31 @@
+{
+  "name": "@vibepm-contrib/plugin-hello",
+  "version": "0.1.0",
+  "description": "第三方插件最小模板 — 演示如何为 vibepm 生态写一个可被 `vibepm plugin` 安装的组合层插件(node 半 + client 半 + bundle)。clone 改 name/字段即用。",
+  "private": true,
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js"
+  },
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build:node": "node -e \"require('node:fs').existsSync('node_modules/esbuild')||require('child_process').execSync('npm i -D esbuild --no-save',{stdio:'inherit'})\" && npx esbuild src/index.ts --bundle --format=cjs --platform=node --outfile=dist/index.js",
+    "build:client": "npx esbuild src/client.ts --bundle --format=esm --platform=browser --external:/plugins/plugin-ide-view/module-system.js --outfile=dist/client.js",
+    "build": "npm run clean && npm run build:node && npm run build:client"
+  },
+  "vibepm": {
+    "node": {
+      "inject": [],
+      "provide": [],
+      "immediately": true
+    },
+    "client": {
+      "inject": [],
+      "provide": [],
+      "immediately": true,
+      "entry": "./dist/client.js"
+    },
+    "bundle": { "patch": "./vibepm.patch.json" }
+  }
+}

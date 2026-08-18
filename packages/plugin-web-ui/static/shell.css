@@ -1,78 +1,193 @@
-/* 全局 tokens（墨绿单一强调色；硬分割线；小圆角；等宽字体；无渐变无大阴影无发光） */
+/* ============================================================
+   vibepm · Research/工业黄黑基调（科研工作台复刻）
+   - 深墨轨道(外壳) + 米白内容面板 + 警示黄强调
+   - 硬阴影(位移实影)、割角 clip-path、网格/扫描底纹
+   - 静默渲染：无 boot，无 splash
+   ============================================================ */
+@font-face{font-family:"HarmonyOS Sans SC";src:url("/static/fonts/HarmonyOS_Sans_SC_Regular.3848ad.woff2")format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"HarmonyOS Sans SC";src:url("/static/fonts/HarmonyOS_Sans_SC_Medium.fa43c4.woff2")format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"HarmonyOS Sans SC";src:url("/static/fonts/HarmonyOS_Sans_SC_Bold.50b93a.woff2")format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"HarmonyOS Sans SC";src:url("/static/fonts/HarmonyOS_Sans_SC_Black.e135b0.woff2")format("woff2");font-weight:900;font-display:swap}
+@font-face{font-family:"Novecento Wide";src:url("/static/fonts/Novecentosanswide-Medium.748604.woff2")format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"Novecento Wide";src:url("/static/fonts/Novecentosanswide-DemiBold.089c2d.woff2")format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"Novecento Wide";src:url("/static/fonts/Novecentosanswide-Bold.7ac6f1.woff2")format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"Gilroy";src:url("/static/fonts/Gilroy-Light.9981d6.woff2")format("woff2");font-weight:300;font-display:swap}
+@font-face{font-family:"Gilroy";src:url("/static/fonts/Gilroy-Medium.376b06.woff2")format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url("/static/fonts/SpaceGrotesk.edd157.woff2")format("woff2");font-weight:400 700;font-display:swap}
+
+/* 全局 tokens（黄黑科研；保留旧 token 名映射以兼容插件 WC） */
 :root{
-  --bg:          #0f1215;
-  --panel:       #161a1e;
-  --panel-alt:   #1b2025;
-  --line:        #262c33;
-  --line-strong: #313840;
-  --fg:          #d6dbe1;
-  --dim:         #7a828c;
-  --accent:      #2ba77d;
-  --accent-dim:  #16392e;
-  --accent-line: #2f8566;
-  --warn:        #c69a3a;
-  --danger:      #b24a4a;
+  /* 学术纸感基调：暖白纸面 + 深墨文字 + 单一克制强调（深青） */
+  --bg:          #f4f3ee;
+  --bg-deep:     #ecebe5;
+  --panel-dark:  #e9e8e1;
+  --line:        #dcdad1;
+  --line-strong: #cfccc2;
+
+  /* 纸面内容面板 */
+  --panel:       #ffffff;
+  --panel-alt:   #f1f0ea;
+  --panel-2:     #ffffff;
+  --ink:         #22252a;
+
+  /* 文字（纸底上的深字） */
+  --fg:          #22252a;
+  --text:        #33363b;
+  --muted:       #6b6f76;
+  --dim:         #858a91;
+
+  /* 深层底（少数仍深底处，如 footer）上覆盖用亮字 */
+  --on-ink:      #eef0ec;
+
+  /* 单一克制强调（accent → 深青，兼容旧插件 var(--accent)） */
+  --yellow:      #147d78;   /* 语义约等于 accent */
+  --yellow-2:    #0e6a66;
+  --accent:      #147d78;
+  --accent-dim:  #e3efee;
+  --accent-line: #0f6a66;
+  --warn:        #a16207;
+  --danger:      #b3402e;
+  --ink-ok:      #4d7a5e;
+
+  /* 字体角色 */
+  --display-cjk: "HarmonyOS Sans SC","PingFang SC",sans-serif;
+  --display-wide:"Novecento Wide","Arial Narrow",sans-serif;
+  --sans:        "HarmonyOS Sans SC","PingFang SC",sans-serif;
+  --latin:       "Gilroy","Roboto Endfield",sans-serif;
+  --numeric:     "Space Grotesk","Novecento Wide",sans-serif;
+  --mono:        "Space Grotesk","Cascadia Code",ui-monospace,Consolas,monospace;
+
+  /* 圆角 => 学术纸感小圆角 */
   --radius:      4px;
-  --mono:        "JetBrains Mono", Consolas, ui-monospace, "Cascadia Code", monospace;
+  --radius-s:    3px;
+
+  /* 轻阴影（纸张层叠，无位移实影） */
+  --shadow-panel: 0 1px 2px rgba(31,34,40,.06), 0 8px 24px rgba(31,34,40,.07);
+  --shadow-dark:  0 1px 0 rgba(255,255,255,.5) inset, 0 10px 30px rgba(31,34,40,.1);
+}
+
+/* @VIBE-SKIN (皮肤插件契约)：这一组 --skin-* 默认值 =「科研黄黑」现状。
+   皮肤插件（如 plugin-skin-rhine）向 :root 覆盖同名 token 即可整皮切换；
+   不装任何皮肤插件时，以下即最终外观（与旧版完全一致）。值均为 CSS 颜色/梯度。 */
+:root{
+  /* 顶栏 hd：暖白，非深墨 */
+  --skin-header:          #f7f6f2;
+  --skin-header-shadow:   #dddbd2;
+  /* 品牌条（纸白） */
+  --skin-brand-bg1:       rgba(255,255,255,.6);
+  --skin-brand-bg2:       rgba(247,246,242,.8);
+  --skin-brand-base:      #f7f6f2;
+  --skin-brand-ink:       #22252a;
+  --skin-brand-sub:       #7b8087;
+  --skin-brand-border:    #dcdad1;
+  /* 顶栏导航项 */
+  --skin-navlink:         #5a5f66;
+  --skin-navbar-hover-bg: #eceae3;
+  --skin-navbar-hover-bd: #cfccc2;
+  /* 侧边栏 .nav：暖白纸面 */
+  --skin-nav-base:        #efeee9;
+  --skin-nav-scrim:       rgba(180,200,180,.05);
+  --skin-nav-edge:        rgba(20,125,120,.05);
+  --skin-nav-line:        rgba(40,46,50,.08);
+  --skin-nav-border:      rgba(120,125,120,.4);
+  --skin-nav-hi:          rgba(255,255,255,.7);
+  --skin-nav-shadow:      #e3e1d9;
+  --skin-nav-ink:         #22252a;
+  --skin-nav-texture:     rgba(12,14,16,.015);
+  /* 折叠把手 toggle-bar：朴素窄条，纸灰 */
+  --skin-toggle-bg1:      #e4e3dc;
+  --skin-toggle-bg2:      #dddcd4;
+  --skin-toggle-border:   #c9c7bd;
+  --skin-toggle-accent:   rgba(20,125,120,.06);
+  --skin-toggle-mark:     #9a9ea5;
+  --skin-grip-bg1:        #ffffff;
+  --skin-grip-bg2:        #f1f0ea;
+  --skin-grip-border:     #c9c7bd;
+  --skin-grip-h1:         #ffffff;
+  --skin-grip-h2:         #eceae3;
+  /* 导航卡片 card-nav：纸白 */
+  --skin-card-bg1:        #ffffff;
+  --skin-card-bg2:        #efeee9;
+  --skin-card-border:     #e4e2da;
+  --skin-card-ink:        #22252a;
+  --skin-card-ic-bg:      rgba(0,0,0,.04);
+  --skin-card-ic-bd:      rgba(0,0,0,.1);
+  --skin-card-sub:        #6b6f76;
+  --skin-card-cta:        #147d78;
+  /* 主区 primary：暖白 */
+  --skin-primary-grid:    rgba(120,125,130,.03);
+  --skin-primary-glow:    rgba(20,125,120,.04);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;width:100%}
 body{
-  background:var(--bg);color:var(--fg);
-  font:13px/1.55 var(--mono);
-  overflow:hidden;user-select:none;
+  background:var(--bg-deep);color:var(--text);
+  font:13.5px/1.5 var(--sans);
+  overflow:hidden;user-select:none;-webkit-font-smoothing:antialiased;
 }
 button,input,textarea,select{font:inherit;color:var(--fg);background:transparent}
-button{border:1px solid var(--line);padding:6px 14px;border-radius:var(--radius);cursor:pointer;background:var(--panel);
-  font-size:12px;letter-spacing:.5px}
-button:hover{border-color:var(--accent-line)}
-button.primary{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
-button.primary:hover{background:var(--panel-alt)}
-input[type=text],input[type=password],textarea{
-  border:1px solid var(--line);background:var(--panel);padding:8px 10px;border-radius:var(--radius);
-  font-size:12px;width:100%}
-input[type=text]:focus,input[type=password]:focus,textarea:focus{outline:none;border-color:var(--accent-line)}
-label{font-size:12px;color:var(--dim);display:block;margin-bottom:6px;letter-spacing:.5px}
-.field{margin-bottom:16px}
-.row{display:flex;gap:12px}
-.row .field{flex:1}
-.hidden{display:none!important}
-code{font-family:var(--mono);font-size:11px;background:var(--panel);padding:1px 6px;border-radius:2px;
-  border:1px solid var(--line)}
-::-webkit-scrollbar{width:10px;height:10px}
-::-webkit-scrollbar-track{background:var(--panel)}
-::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:2px}
-::-webkit-scrollbar-thumb:hover{background:var(--accent-dim)}
+button{cursor:pointer}
 
-/* 主容器：100% 铺满，交给 <vibe-shell> shadow DOM 内部定位 */
+/* 滚动条：浅轨 + 灰青滑块 */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#c9c7bd;border:3px solid var(--bg-deep);border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:#a9b0a8}
+
+/* 主容器 */
 .app{width:100vw;height:100vh}
 
-/* 启动失败横幅（成功就不显示；对齐 dsh：只有异常才出现显眼横幅，平时无任何 splash） */
+/* 启动失败横幅（仅异常才出现；对齐 dsh 静默） */
 .boot-error{
   position:fixed;right:16px;bottom:16px;z-index:99;
   max-width:min(92vw,720px);padding:12px 14px;
-  background:#2a1616;color:#ffd2d2;border:1px solid #5a2a2a;border-radius:var(--radius);
-  font:12px/1.55 var(--mono);box-shadow:0 2px 0 rgba(0,0,0,.25);
+  background:#fdf3f2;color:#8a2f24;border:1px solid #e3b7b1;border-radius:var(--radius);
+  font:12px/1.55 var(--mono);box-shadow:var(--shadow-panel);
 }
-.boot-error b{display:block;margin-bottom:4px;color:#fff;letter-spacing:1px}
-.boot-error pre{margin-top:8px;max-height:40vh;overflow:auto;font-size:11px;color:#ffc9c9;
-  background:#1a0f0f;padding:8px 10px;border:1px solid #4a2424;border-radius:2px;white-space:pre-wrap;word-break:break-word}
+.boot-error b{display:block;margin-bottom:4px;color:#7a2118;letter-spacing:.5px}
+.boot-error pre{margin-top:8px;max-height:40vh;overflow:auto;font-size:11px;color:#7a2118;
+  background:#fbeae8;padding:8px 10px;border:1px solid #e8c3be;border-radius:var(--radius-s);white-space:pre-wrap;word-break:break-word}
 
-/* 插件面板表单的通用样式（shadow DOM 内部会穿透 host 用不上，为插件 WC self-scope 准备）
- * 插件 WC 应该把这些类复制到自己的 shadow <style>；为了调试时全局兜底也留一份 */
-.form{max-width:640px}
-.form .actions{display:flex;gap:8px;margin-top:8px}
-.form .ok{color:var(--accent);font-size:12px;margin-left:8px}
-.form .err{color:var(--danger);font-size:12px;margin-left:8px}
+.hidden{display:none!important}
+form, fieldset{font-family:var(--sans)}
+code{font-family:var(--mono);font-size:11px;color:var(--accent)}
 
-/* Feed timeline（MVP 纯 line 几何） */
+/* ---------------- 通用控件（学术纸感） ---------------- */
+button{
+  min-height:36px;padding:8px 18px;
+  border:1px solid var(--line-strong);border-radius:var(--radius);
+  background:var(--panel);color:var(--ink);
+  font:600 12px/1.2 var(--display-cjk);letter-spacing:.03em;
+  box-shadow:var(--shadow-panel);
+  transition:background .15s ease,border-color .15s ease,color .15s ease;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.primary:hover{background:var(--accent-line)}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+input[type=text],input[type=password],input[type=number],input[type=date],input[type=time],input[type=url],textarea,select{
+  min-height:36px;padding:8px 12px;
+  border:1px solid var(--line-strong);border-radius:var(--radius);
+  background:var(--panel);color:var(--ink);outline:none;
+  box-shadow:inset 0 1px 2px rgba(31,34,40,.04);
+}
+input[type=text]::placeholder,input[type=password]::placeholder,textarea::placeholder{color:var(--dim)}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+label{font-size:11px;color:var(--muted);display:block;margin-bottom:6px;letter-spacing:.3px}
+.field{margin-bottom:16px}
+.row{display:flex;gap:12px}
+.row .field{flex:1}
+
+/* ============================================================
+   Feed timeline（学术纸感：细线时间轴）
+   ============================================================ */
 .tl{list-style:none;padding:0}
-.tl li{display:grid;grid-template-columns:32px 1fr auto;gap:10px;padding:12px 0;border-bottom:1px dashed var(--line);align-items:start}
-.tl li:last-child{border-bottom:none}
-.tl .dot{width:32px;height:32px;border:1px solid var(--line-strong);background:var(--panel);
+.tl li{display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:14px 0;align-items:start;position:relative}
+.tl li+li::before{content:"";position:absolute;left:17px;top:0;bottom:0;width:1px;background:var(--line)}
+.tl .dot{width:34px;height:34px;border:1px solid var(--accent);background:var(--accent-dim);
   display:flex;align-items:center;justify-content:center;color:var(--accent);border-radius:50%}
 .tl .dot svg{width:14px;height:14px}
-.tl h4{font-size:12px;color:var(--fg);letter-spacing:.3px;margin-bottom:4px;font-weight:600}
-.tl h4 b{color:var(--accent);font-weight:600}
-.tl p{font-size:12px;color:var(--dim);margin:0}
-.tl time{font-size:11px;color:var(--dim);letter-spacing:.5px;white-space:nowrap}
+.tl h4{font-size:13px;color:var(--ink);letter-spacing:.2px;margin-bottom:4px;font-weight:700;font-family:var(--display-cjk)}
+.tl h4 b{color:var(--accent);font-weight:700}
+.tl p{font-size:12px;color:var(--muted);margin:0;line-height:1.6}
+.tl time{font-size:11px;color:var(--dim);letter-spacing:.3px;white-space:nowrap;font-family:var(--mono)}

@@ -1,7 +1,7 @@
 {
-  "name": "@vibepm/plugin-onboarding",
+  "name": "@vibepm/plugin-skin-rhine",
   "version": "0.1.0",
-  "description": "dsh-style onboarding cards for the vibepm minimal shell (\"get started\" quick links).",
+  "description": "Rhine/终末地工业皮肤 for the vibepm shell — 暗色金属 + 柠檬黄。向 :root 覆盖 @VIBE-SKIN token，装上即整皮切换为终末地风，卸载即撤回科研黄黑。",
   "private": true,
   "type": "module",
   "main": "dist/src/index.js",
@@ -34,13 +34,13 @@
     "typescript": "^5.7.3"
   },
   "vibepm": {
-    "id": "plugin-onboarding",
-    "display": "Onboarding",
+    "id": "plugin-skin-rhine",
+    "display": "Rhine // Endfield Skin",
     "role": "ui",
-    "order": 10,
+    "order": 12,
     "node": {
       "immediately": true,
-      "inject": ["slots"],
+      "inject": [],
       "provide": []
     },
     "client": {

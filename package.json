@@ -13,6 +13,8 @@
     "clean": "pnpm -r --filter \"./packages/*\" run clean",
     "test": "pnpm -r --filter \"./packages/*\" run test",
     "lint": "tsc -p tsconfig.base.json --noEmit",
+    "lint:hardcolor": "node scripts/verify-no-hardcolor.mjs",
+    "lint:all": "pnpm run lint && pnpm run lint:hardcolor",
     "prepare": "pnpm run build"
   },
   "devDependencies": {

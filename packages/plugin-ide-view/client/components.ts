@@ -28,86 +28,188 @@ const CSS = `
 *, *::before, *::after{box-sizing:border-box}
 :host *{color:inherit}
 .host{width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg);color:var(--fg);
-  font:13px/1.55 var(--mono);}
+  font:12.5px/1.55 var(--sans);}
 
-/* Header */
-.hd{display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 20px;
-  border-bottom:1px solid var(--line-strong);background:var(--panel);flex-shrink:0}
-.hd .brand{display:flex;align-items:center;gap:10px;color:var(--fg)}
-.hd .brand i{color:var(--accent);width:22px;height:22px;display:inline-block}
-.hd .brand b{letter-spacing:2px;font-weight:600}
-.hd .brand small{color:var(--dim);letter-spacing:1px;margin-left:6px}
-.hd nav{display:flex;align-items:center;gap:2px}
-.hd nav a{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius);
-  color:var(--dim);text-decoration:none;font-size:12px;cursor:pointer;border:1px solid transparent}
-.hd nav a i{width:14px;height:14px;display:inline-block}
-.hd nav a:hover{color:var(--fg);background:var(--panel-alt)}
-.hd nav a.active{color:var(--accent);border-color:var(--accent-line);background:var(--accent-dim)}
+/* ======= 顶部：品牌条（纸白） ======= */
+.hd{flex-shrink:0;display:flex;align-items:stretch;justify-content:space-between;
+  height:52px;border-bottom:1px solid var(--skin-header-shadow,#dddbd2);background:var(--skin-header,#f7f6f2);
+  position:relative;z-index:10}
+.hd .brand{display:flex;align-items:center;gap:12px;padding:0 20px;min-width:240px;
+  background:
+    linear-gradient(90deg, var(--skin-brand-bg1,rgba(255,255,255,.6)), var(--skin-brand-bg2,rgba(247,246,242,.8))),
+    var(--skin-brand-base,#f7f6f2);color:var(--skin-brand-ink,var(--ink));border-right:1px solid var(--skin-brand-border,#dcdad1)}
+.hd .brand i{color:var(--skin-brand-ink,var(--ink));width:24px;height:24px;display:inline-block;filter:contrast(1)}
+.hd .brand b{letter-spacing:2px;font-weight:800;font-family:var(--display-cjk);font-size:15px}
+.hd .brand small{color:var(--skin-brand-sub,#7b8087);letter-spacing:1px;margin-left:6px;font:600 9px/1 var(--display-wide);text-transform:uppercase}
+.hd .brand .brand-logo{width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;
+  border:1px solid var(--skin-brand-border,#dcdad1);box-shadow:0 1px 2px rgba(31,34,40,.08)}
+.hd nav{display:flex;align-items:center;gap:4px;padding:0 16px}
+.hd nav a{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;
+  color:var(--skin-navlink,#5a5f66);text-decoration:none;font:600 11px/1 var(--display-cjk);
+  letter-spacing:.04em;cursor:pointer;border:1px solid transparent;border-radius:var(--radius)}
+.hd nav a i{width:15px;height:15px;display:inline-block}
+.hd nav a:hover{color:var(--ink);border-color:var(--skin-navbar-hover-bd,#cfccc2);background:var(--skin-navbar-hover-bg,#eceae3)}
+.hd nav a.active{color:var(--accent);background:var(--accent-dim,#e3efee);border-color:var(--accent-line,#0f6a66);font-weight:700}
 
-/* Main grid */
-.main{flex:1;min-height:0;display:grid;grid-template-columns: 360px 1fr;grid-template-rows: 1fr auto;gap:1px;background:var(--line-strong);}
-.nav{background:var(--bg);overflow:auto;padding:28px 22px;grid-row: 1 / 2;grid-column: 1 / 2;}
-.primary{background:var(--bg);overflow:auto;padding:28px 32px;grid-row:1 / 3;grid-column: 2 / 3;}
-.secondary{background:var(--bg);grid-row: 2 / 3;grid-column: 1 / 2;padding:14px 22px;
-  border-top:1px solid var(--line-strong);color:var(--dim);font-size:12px}
+/* ======= 主区：左侧满高折叠把手 + 左导航(纸面) + 可缩放分隔条 + 右内容 ======= */
+.main{flex:1;min-height:0;display:grid;
+  grid-template-columns: [toggle] 12px [nav] var(--nav-w, 300px) [resizer] 8px [primary] 1fr;
+  grid-template-rows: 1fr auto;background:var(--bg);position:relative}
+.main.collapsed{grid-template-columns: [toggle] 12px [nav] 0 [resizer] 0 [primary] 1fr}
+.main.collapsed .nav,.main.collapsed .resizer{display:none;visibility:hidden;overflow:hidden}
+.main.collapsed .secondary{display:none}
 
-/* Cards（shell.nav 大卡） */
-.card{display:flex;flex-direction:column;gap:12px;padding:22px;border-radius:var(--radius);
-  background:var(--panel);border:1px solid var(--line);cursor:pointer;margin-bottom:14px;transition:border-color .15s,transform .15s}
-.card:hover{border-color:var(--accent-line);transform:translateY(-1px)}
-.card .top{display:flex;align-items:center;gap:14px}
-.card .ic{width:40px;height:40px;color:var(--accent);flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;border-radius:var(--radius);
-  background:var(--accent-dim);border:1px solid var(--accent-line)}
-.card .ic i{width:22px;height:22px;display:block}
-.card h3{font-size:14px;color:var(--fg);letter-spacing:.5px;margin:0;font-weight:600}
-.card p{margin:0;color:var(--dim);font-size:12px;line-height:1.55}
-.card .cta{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;
-  margin-top:4px;color:var(--accent);font-size:12px;letter-spacing:.5px}
+/* ---- 左侧满高折叠把手（朴素窄条） ---- */
+.toggle-bar{grid-column: toggle / span 1;grid-row: 1 / 3;position:relative;
+  background:var(--skin-toggle-bg1,#e4e3dc);border-right:1px solid var(--skin-toggle-border,#c9c7bd);
+  cursor:pointer;user-select:none;overflow:hidden}
+.toggle-bar::before{content:"";position:absolute;left:0;right:0;top:0;bottom:0;pointer-events:none;z-index:0;
+  background:linear-gradient(180deg, transparent, var(--skin-toggle-accent,rgba(20,125,120,.06)) 50%, transparent)}
+/* 上下简单刻度装饰（克制） */
+.toggle-bar .tb-mark{position:absolute;left:0;right:0;text-align:center;color:var(--skin-toggle-mark,#9a9ea5);font:600 7px/1 var(--mono);
+  letter-spacing:.03em;pointer-events:none;z-index:1}
+.toggle-bar .tb-mark.top{top:18px;display:flex;flex-direction:column;gap:9px;align-items:center}
+.toggle-bar .tb-mark.bot{bottom:18px;display:flex;flex-direction:column;gap:9px;align-items:center}
+.toggle-bar .tb-mark i{font-style:normal;display:block;opacity:.7}
+.toggle-bar .tb-mark i.y{color:var(--accent);opacity:1}
+/* 中间 grip：轻微右突，包裹 »« */
+.tb-grip{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%) translateX(2px);z-index:3;
+  height:70px;display:grid;place-items:center;cursor:pointer}
+.tb-grip::before{content:"";position:absolute;inset:4px -2px 4px 0;background:
+    linear-gradient(180deg, var(--skin-grip-bg1,#fff), var(--skin-grip-bg2,#f1f0ea) 50%, var(--skin-grip-bg1,#fff));
+  border:1px solid var(--skin-grip-border,#c9c7bd);border-radius:var(--radius);
+  box-shadow:0 1px 3px rgba(31,34,40,.12);transition:all .15s}
+.tb-grip:hover::before{background:linear-gradient(180deg,var(--skin-grip-h1,#fff),var(--skin-grip-h2,#eceae3) 50%,var(--skin-grip-h1,#fff));border-color:var(--accent)}
+.tb-grip .tb-arrow{position:relative;z-index:2;color:var(--accent,#147d78);font:700 13px/1 var(--display-wide);
+  writing-mode:vertical-rl;text-orientation:upright;letter-spacing:0}
+
+/* ---- 导航区：暖白纸面 ---- */
+.nav{overflow:auto;padding:22px 18px 24px;grid-row:1 / 2;grid-column:nav / span 1;position:relative;
+  background:var(--skin-nav-base,#efeee9);color:var(--skin-nav-ink,var(--ink));
+  border-right:1px solid var(--skin-nav-border,rgba(120,125,120,.4));
+  box-shadow:inset 1px 0 0 var(--skin-nav-hi, rgba(255,255,255,.7)), 1px 0 0 var(--skin-nav-shadow,#e3e1d9)}
+
+.resizer{grid-row:1 / 3;grid-column:resizer / span 1;position:relative;cursor:col-resize;touch-action:none;
+  background:var(--bg);border-left:1px solid var(--line)}
+.resizer::after{content:"";position:absolute;inset:0 auto;width:2px;top:0;bottom:0;left:50%;transform:translateX(-50%);
+  background:transparent;transition:background .1s}
+.resizer:hover::after,.resizer.active::after{background:var(--accent,#147d78)}
+.resizer .grip{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:4px;height:30px;
+  display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;pointer-events:none}
+.resizer .grip::before,.resizer .grip::after{content:"";width:2px;height:3px;background:var(--line-strong)}
+.resizer{--grip-color:#9aa0a5}
+.primary{background:var(--bg);overflow:auto;padding:30px 34px 48px;grid-row:1 / 3;grid-column:primary / span 1;position:relative}
+.primary::before{content:"";position:absolute;left:0;right:0;top:0;height:70%;pointer-events:none;z-index:0;
+  background:
+    linear-gradient(var(--skin-primary-grid,rgba(120,125,130,.03)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--skin-primary-grid,rgba(120,125,130,.03)) 1px, transparent 1px);
+  background-size:auto, 42px 42px, 42px 42px;
+  -webkit-mask-image:radial-gradient(ellipse at center top, #000 30%, transparent 78%);
+  mask-image:radial-gradient(ellipse at center top, #000 30%, transparent 78%)}
+.primary > canvas.ambient-bg{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;pointer-events:none!important;z-index:0!important}
+.primary > :not(canvas.ambient-bg){position:relative;z-index:1}
+.secondary{background:var(--bg);grid-row:2 / 3;grid-column:nav / span 1;padding:12px 18px;
+  border-top:1px solid var(--line);color:var(--dim);font-size:11px;letter-spacing:.2px}
+.secondary code{color:var(--muted)}
+
+/* ======= 导航大卡：纸白 + 细边框 ======= */
+.nav-item{display:block;width:100%;margin-bottom:12px;text-align:left;clip-path:none}
+.card-nav{display:flex;flex-direction:column;gap:12px;padding:18px 18px 16px;position:relative;overflow:hidden;
+  background:linear-gradient(135deg, var(--skin-card-bg1,#fff) 0 78%, var(--skin-card-bg2,#efeee9) 78%);
+  color:var(--skin-card-ink,var(--ink));
+  border:1px solid var(--skin-card-border,#e4e2da);border-left:3px solid var(--accent);
+  border-radius:var(--radius);box-shadow:var(--shadow-panel);
+  transition:transform .15s ease,box-shadow .15s ease,background .15s ease}
+.card-nav:hover{background:var(--skin-card-bg1,#fff);transform:translateY(-1px);box-shadow:0 3px 10px rgba(31,34,40,.1)}
+.card-nav .top{display:flex;align-items:center;gap:14px}
+.card-nav .ic{width:40px;height:40px;color:var(--skin-card-ink,var(--ink));flex-shrink:0;position:relative;
+  display:grid;place-items:center;background:var(--skin-card-ic-bg,rgba(0,0,0,.04));
+  border:1px solid var(--skin-card-ic-bd,rgba(0,0,0,.1));border-radius:var(--radius)}
+.card-nav .ic i{width:22px;height:22px;display:block}
+.card-nav h3{font-size:14px;color:var(--skin-card-ink,var(--ink));letter-spacing:.3px;margin:0;font-weight:700;font-family:var(--display-cjk)}
+.card-nav p{margin:0;color:var(--skin-card-sub,#6b6f76);font-size:12px;line-height:1.6}
+.card-nav .cta{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;margin-top:4px;
+  color:var(--skin-card-cta,#147d78);font:700 10px/1 var(--display-wide);letter-spacing:.08em;text-transform:uppercase}
+.card-nav .cta::after{content:"›";font-size:18px;line-height:.8}
 
 /* Panels（shell.primary 里的面板） */
-.panel > .hd2{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.panel > .hd2 h2{font-size:16px;margin:0;letter-spacing:1px;font-weight:600}
-.panel > .hd2 small{color:var(--dim);font-size:11px;letter-spacing:.5px}
+.panel > .hd2{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;
+  border-bottom:1px solid var(--line)}
+.panel > .hd2 h2{font-size:22px;margin:0;letter-spacing:.3px;font-weight:800;font-family:var(--display-cjk);line-height:.9;color:var(--ink)}
+.panel > .hd2 small{color:var(--dim);font-size:10px;letter-spacing:.06em;font-family:var(--mono);text-transform:uppercase}
 
-/* Secondary 条目 */
-.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);
-  border-radius:999px;font-size:11px;background:var(--panel);margin-right:6px;margin-bottom:4px}
-.pill.ok{color:#2f8566;border-color:#2f8566;background:#16392e}
-.pill.warn{color:var(--warn);border-color:var(--warn);background:#30271a}
-.pill.err{color:var(--danger);border-color:var(--danger);background:#3a1f1f}
+/* Secondary / status pill（小圆角徽章） */
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line-strong);
+  border-radius:var(--radius);font:600 9px/1 var(--mono);letter-spacing:.04em;background:var(--panel);color:var(--muted);
+  margin-right:6px;margin-bottom:4px}
+.pill.ok{color:var(--ink-ok);border-color:#9cbca8;background:rgba(77,122,94,.1)}
+.pill.warn{color:var(--warn);border-color:#c9a86b;background:rgba(161,98,7,.08)}
+.pill.err{color:var(--danger);border-color:#cfa39b;background:rgba(179,64,46,.08)}
 
-/* Footer */
-.ft{height:28px;flex-shrink:0;border-top:1px solid var(--line-strong);
+/* Footer：浅状态条 */
+.ft{height:30px;flex-shrink:0;border-top:1px solid var(--line);
   background:var(--panel-alt);display:flex;align-items:center;justify-content:space-between;
-  padding:0 20px;color:var(--dim);font-size:11px;letter-spacing:1px}
-.ft .items{display:flex;gap:14px}
+  padding:0 20px;color:var(--dim);font:600 9px/1 var(--display-wide);letter-spacing:.1em}
+.ft .items{display:flex;gap:16px}
+.ft .items span{position:relative}
+.ft .items span+span::before{content:"·";margin-right:16px;color:var(--line-strong)}
 
 /* Empty state */
-.empty{padding:60px 22px;text-align:center;color:var(--dim);font-size:12px;letter-spacing:1px}
-.empty b{display:block;color:var(--fg);font-size:14px;margin-bottom:8px;letter-spacing:1px}
+.empty{padding:60px 22px;text-align:center;color:var(--dim);font-size:12px;letter-spacing:.6px}
+.empty b{display:block;color:var(--ink);font-size:14px;margin-bottom:8px;letter-spacing:.6px}
 
-/* Onboarding: shell.nav 2x2 grid 样式（外层 nav + nav-grid + nav-card 已经带 shadow DOM 内部样式；壳只负责 grid） */
-.nav-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0 0 10px 0}
+/* Onboarding nav grid（外包壳只铺 grid，卡片自身 shadow 内联样式） */
+.nav-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:0 0 10px 0}
+.nav-grid > *{position:relative}
 @media (max-width: 860px){ .nav-grid{grid-template-columns:1fr} }
-.nav-empty{color:var(--dim);font-size:12px;padding:14px 2px;letter-spacing:1px;border:1px dashed var(--line);border-radius:var(--radius);background:var(--panel);padding:18px}
+.nav-empty{color:var(--muted);font-size:12px;letter-spacing:.6px;border:1px dashed var(--line-strong);
+  background:rgba(241,240,234,.5);padding:18px;border-radius:var(--radius)}
 
-/* Primary 里首页默认 fallback */
+/* Primary 首页 fallback */
 .primary-empty{margin-bottom:16px}
-.primary-empty .title{font-size:16px;letter-spacing:1.5px;font-weight:700;color:var(--fg);margin:0 0 6px 0;text-transform:uppercase}
-.primary-empty .sub{color:var(--dim);font-size:12px;line-height:1.6;margin:0 0 16px 0}
+.primary-empty .title{font-size:34px;letter-spacing:-.02em;font-weight:800;color:var(--ink);margin:0 0 10px 0;
+  font-family:var(--display-cjk);line-height:.9;display:flex;align-items:center;gap:16px}
+.primary-empty .welcome-logo{width:48px;height:48px;object-fit:cover;flex-shrink:0;
+  border:1px solid var(--skin-nav-border,rgba(120,125,120,.4));border-radius:var(--radius);
+  box-shadow:0 1px 3px rgba(31,34,40,.1)}
+.primary-empty .sub{color:var(--muted);font-size:12px;line-height:1.7;margin:0 0 20px 0;max-width:640px}
+.ascii-banner{margin:0 0 20px 0;color:var(--accent);font:12px/1.6 var(--mono);white-space:pre;letter-spacing:.04em;
+  background:var(--panel);padding:9px 14px;border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:var(--radius);width:fit-content}
 .primary-card{display:block;max-width:960px}
-.primary-card .primary-head{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.primary-card .primary-head .title{font-size:16px;letter-spacing:1.5px;color:var(--fg);font-weight:700;margin:0;text-transform:uppercase}
-.primary-card .primary-head .sub{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.6}
-.sec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
-.sec-item{padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--fg);font-size:11px;letter-spacing:.5px}
+.primary-card .primary-head{margin-bottom:18px;padding:6px 0 18px 20px;border-left:3px solid var(--accent);
+  border-bottom:1px solid var(--line-strong);position:relative}
+.primary-card .primary-head .title{font-size:30px;letter-spacing:-.02em;color:var(--ink);font-weight:800;margin:0;
+  font-family:var(--display-cjk);line-height:1}
+.primary-card .primary-head .sub{color:var(--muted);font:500 10px/1.4 var(--latin);margin-top:12px;letter-spacing:.06em;text-transform:uppercase}
+.sec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.sec-item{padding:9px 10px;border:1px solid var(--line);border-left:3px solid var(--line-strong);
+  background:var(--panel);color:var(--ink);border-radius:var(--radius);box-shadow:var(--shadow-panel);
+  font-size:11px;letter-spacing:.3px;font-family:var(--display-cjk)}
+
+/* ======= 折叠动画：朴素淡入淡出（去机械/扫描特效） ======= */
 `;
 
 type Slots = Record<string, SlotItem[]>;
 interface SlotItem {
   id: string; label?: string; order?: number; icon?: string;
   payload?: Record<string, any>;
+}
+
+function asciiBanner(): string {
+  const w = window as any;
+  const boot = w.__VIBEPM_BOOT__ ?? { rev: "0", entries: [] };
+  const entries: Array<{ id?: string }> = Array.isArray(boot.entries) ? boot.entries : [];
+  const plugins = entries.filter((e) => (e?.id ?? "") !== "plugin-ide-view").length;
+  const rev = String(boot.rev ?? "");
+  const ver = rev.length > 8 ? rev.slice(0, 8) : (rev || "dev");
+  const lines = [
+    "┌─────────────────────────────────────┐",
+    `│  VIBEPM // PROJECT CONSOLE   ${ver.padEnd(4, " ")} │`,
+    `│  CORE ONLINE · PLUGINS ${String(plugins).padEnd(2, " ")} · OK     │`,
+    "└─────────────────────────────────────┘",
+  ];
+  return lines.join("\n");
 }
 
 function getSlots(): Slots {
@@ -134,10 +236,12 @@ export class VibeShell extends HTMLElement {
   private _unhash = (): void => {};
   private _root: ShadowRoot | null = null;
   private _currentRoute = "";
+  private collapsed = false;
 
   connectedCallback(): void {
     this.attachShadow({ mode: "open" });
     this._root = this.shadowRoot!;
+    this.collapsed = localStorage.getItem("vibepm.nav.collapsed") === "1";
     const st = document.createElement("style");
     st.textContent = CSS;
     const host = document.createElement("div");
@@ -151,6 +255,22 @@ export class VibeShell extends HTMLElement {
 
   disconnectedCallback(): void {
     this._unhash();
+  }
+
+  private toggleCollapse(_slots: Slots, _route: string): void {
+    // ---- 朴素折叠：仅切换状态 + 更新箭头（无机械/扫描/解锁特效） ----
+    const host = this._root!.querySelector<HTMLDivElement>(".host")!;
+    const main = host.querySelector<HTMLDivElement>(".main")!;
+    const tbar = main.querySelector<HTMLDivElement>(".toggle-bar")!;
+    const nextState = !this.collapsed;
+
+    const grip = tbar.querySelector<HTMLDivElement>(".tb-grip");
+    this.collapsed = nextState;
+    localStorage.setItem("vibepm.nav.collapsed", this.collapsed ? "1" : "0");
+    main.classList.toggle("collapsed", this.collapsed);
+    main.style.setProperty("--nav-w", this.collapsed ? "0px" : null);
+    const arrow = grip?.querySelector<HTMLElement>(".tb-arrow");
+    if (arrow) arrow.textContent = this.collapsed ? "»" : "«";
   }
 
   private render(): void {
@@ -169,7 +289,11 @@ export class VibeShell extends HTMLElement {
     hd.className = "hd";
     const brand = document.createElement("div");
     brand.className = "brand";
-    brand.appendChild(iconEl("vibepm-logo", 22));
+    const logo = document.createElement("img");
+    logo.className = "brand-logo";
+    logo.src = "/static/img/logo-snake.jpg";
+    logo.alt = "vibepm";
+    brand.appendChild(logo);
     const b = document.createElement("b");
     b.textContent = "vibepm";
     brand.appendChild(b);
@@ -212,18 +336,94 @@ export class VibeShell extends HTMLElement {
 
   private mkMain(slots: Slots, route: string): HTMLElement {
     const main = document.createElement("div");
-    main.className = "main";
+    main.className = this.collapsed ? "main collapsed" : "main";
+    if (this.collapsed) main.style.setProperty("--nav-w", "0px");
+
+    // --- 左侧满高折叠把手 toggle-bar ---
+    const tbar = document.createElement("div");
+    tbar.className = "toggle-bar";
+    tbar.title = this.collapsed ? "展开侧边栏 (ASCII · Rhine Latch)" : "折叠侧边栏 (ASCII · Rhine Latch)";
+    // 顶部 ASCII 装饰
+    const markTop = document.createElement("div");
+    markTop.className = "tb-mark top";
+    markTop.innerHTML = `<i>·</i><i class="y">●</i><i>│</i><i>0</i><i>1</i><i>┤</i><i>·</i>`;
+    // 底部 ASCII 装饰
+    const markBot = document.createElement("div");
+    markBot.className = "tb-mark bot";
+    markBot.innerHTML = `<i>·</i><i>├</i><i>│</i><i>F</i><i>3</i><i class="y">●</i><i>·</i>`;
+    // 中间 grip（»« 微突起）
+    const grip = document.createElement("div");
+    grip.className = "tb-grip";
+    const arrow = document.createElement("span");
+    arrow.className = "tb-arrow";
+    arrow.textContent = this.collapsed ? "»" : "«";
+    grip.appendChild(arrow);
+    grip.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.toggleCollapse(slots, route);
+    });
+    // 整条 bar 都能点（但 grip 为主）
+    tbar.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).closest(".tb-grip")) return;
+      this.toggleCollapse(slots, route);
+    });
+    tbar.append(markTop, grip, markBot);
+
     const navSec = document.createElement("section");
     navSec.className = "nav";
     this.renderNav(navSec, slots);
     const primary = document.createElement("section");
     primary.className = "primary";
     this.renderPrimary(primary, slots, route);
+    const resizer = document.createElement("div");
+    resizer.className = "resizer";
+    const gripR = document.createElement("div");
+    gripR.className = "grip";
+    resizer.appendChild(gripR);
+    this.bindResizer(resizer, main);
     const secondary = document.createElement("section");
     secondary.className = "secondary";
     this.renderSecondary(secondary, slots);
-    main.append(navSec, primary, secondary);
+    main.append(tbar, navSec, resizer, primary, secondary);
     return main;
+  }
+
+  private bindResizer(handle: HTMLElement, main: HTMLElement): void {
+    const KEY = "vibepm.navw";
+    const MIN = 210, MAX = 560;
+    let dragging = false;
+    let finalW = 330;
+    const init = (): void => {
+      const saved = Number.parseInt(localStorage.getItem(KEY) ?? "330", 10);
+      finalW = Math.min(MAX, Math.max(MIN, Number.isFinite(saved) ? saved : 330));
+      main.style.setProperty("--nav-w", `${finalW}px`);
+    };
+    init();
+    const onMove = (e: MouseEvent): void => {
+      if (!dragging) return;
+      const r = main.getBoundingClientRect();
+      finalW = Math.min(MAX, Math.max(MIN, e.clientX - r.left));
+      main.style.setProperty("--nav-w", `${finalW}px`);
+    };
+    const onUp = (): void => {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove("active");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      localStorage.setItem(KEY, String(Math.round(finalW)));
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    handle.addEventListener("mousedown", (e) => {
+      dragging = true;
+      handle.classList.add("active");
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      e.preventDefault();
+    });
   }
 
   private renderNav(box: HTMLElement, slots: Slots): void {
@@ -260,7 +460,8 @@ export class VibeShell extends HTMLElement {
     if (!p) {
       const wrap = document.createElement("div");
       wrap.className = "primary-empty";
-      wrap.innerHTML = `<div class="title">Welcome</div>
+      wrap.innerHTML = `<pre class="ascii-banner">${asciiBanner()}</pre>
+        <div class="title"><img class="welcome-logo" src="/static/img/logo-snake.jpg" alt="">Welcome</div>
         <div class="sub">从上方导航条（Home / Feed / GitHub / Settings）或下方卡片进入功能。所有功能均按插件方式装卸。</div>`;
       box.appendChild(wrap);
       const secondary = document.createElement("div");

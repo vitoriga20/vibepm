@@ -85,6 +85,20 @@ class SettingsPlugin {
       },
     }));
 
+    // --- 首页导航卡：#settings 入口（本插件自注册，项随插件装卸而出现/消失，对齐 dsh）---
+    disposers.push(slots.register("shell.nav", {
+      id: "settings/nav",
+      label: "偏好设置",
+      order: 20,
+      payload: {
+        kind: "nav-card",
+        icon: "settings",
+        desc: "外观、默认工作目录、GitHub 用户名等（插件化、按需加字段）",
+        hash: "#settings",
+        orderHint: 20,
+      },
+    }));
+
     return () => { for (const off of disposers.reverse()) try { off(); } catch { /* noop */ } };
   }
 }
