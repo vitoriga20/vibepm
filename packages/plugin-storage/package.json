@@ -1,6 +1,7 @@
 {
   "name": "@vibepm/plugin-storage",
   "version": "0.1.0",
+  "description": "本地 SQLite 数据库服务（db）：设置/项目/同步元数据存取。",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

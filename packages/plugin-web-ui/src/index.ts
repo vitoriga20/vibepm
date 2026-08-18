@@ -8,12 +8,13 @@ import { dirname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import type { Context, SlotService, ClientModuleHost } from "@vibepm/core";
+import { BootError } from "@vibepm/core";
 
 export const PLUGIN_NAME = "plugin-web-ui";
 
-export class PortBusyError extends Error {
+export class PortBusyError extends BootError {
   constructor(host: string, port: number, cause: unknown) {
-    super(`端口 ${host}:${port} 绑定失败（${String(cause)}）。可能已有进程占用，或改用 0 让系统自动分配(web_ui.port=0)。`);
+    super("web.listen_failed", `端口 ${host}:${port} 绑定失败（${String(cause)}）。可能已有进程占用，或改用 0 让系统自动分配(web_ui.port=0)。`);
     this.name = "PortBusyError";
   }
 }

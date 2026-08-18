@@ -1,6 +1,7 @@
 {
   "name": "@vibepm/plugin-ide-view",
   "version": "0.1.0",
+  "description": "极简壳内核：VibeShell 容器 + 浏览器模块表，面板/卡片按渲染注册表数据驱动。",
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",

@@ -1,6 +1,7 @@
 {
   "name": "@vibepm/plugin-web-ui",
   "version": "0.1.0",
+  "description": "webServer 哑载体 + 静态壳：命名路由/兜底座位/index 变换，业务 API 由各插件注册。",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

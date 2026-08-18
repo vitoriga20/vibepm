@@ -22,24 +22,7 @@ type DbLike = {
   deleteSetting(k: string): void;
 };
 
-/**
- * 官方插件 display/描述（优先于 package.json.description）。
- * 新的官方插件可加这里；第三方/没写的自动走 fallback。
- */
-const PLUGIN_META: Record<string, { display: string; desc: string }> = {
-  "plugin-storage": { display: "Storage", desc: "本地 SQLite 数据库（设置/项目/同步元数据）" },
-  "plugin-web-ui": { display: "Web UI", desc: "内置 HTTP 服务器与静态壳（页面入口）" },
-  "plugin-ide-view": { display: "Shell", desc: "极简单壳容器（header/nav/面板/底栏）" },
-  "plugin-onboarding": { display: "Onboarding", desc: "首屏引导：连接 GitHub / 打开设置 / 查看动态" },
-  "plugin-github-auth": { display: "GitHub", desc: "GitHub PAT 连接与用户态校验" },
-  "plugin-settings": { display: "Settings", desc: "通用设置面板（键值存储）" },
-  "plugin-repo-feed": { display: "Feed", desc: "仓库动态 / received_events 列表" },
-  "plugin-plugin-manager": { display: "插件管理", desc: "本面板：设置里开关插件（冷启动生效）" },
-  "plugin-skin-rhine": { display: "终末地皮肤", desc: "莱茵科技风格皮肤（暗墨蓝金属 + 柠檬黄光；组合层覆盖 --skin-* token）" },
-  "plugin-ambient": { display: "Ambient", desc: "主区背景科技球 + 氛围动画（纯装饰）" },
-};
-
-/** entryId → 显示名 fallback：@scope/plugin-name → Plugin Name / plugin-xxx → Xxx */
+/** entryId → 显示名：@scope/plugin-name → Plugin Name / plugin-xxx → Xxx */
 function displayFromId(id: string): string {
   const raw = id.replace(/^@[^/]+\//, "").replace(/^plugin-/, "");
   return raw
@@ -99,21 +82,18 @@ class PluginManagerPlugin {
         const rctx = routeCtx(req, res);
         const sub = rctx.path.slice("/api/plugins".length);
 
-        // GET /api/plugins → 列表
+        // GET /api/plugins → 列表（目录动态生成：display 由 id 派生，desc 取各插件自声明 description）
         if ((sub === "" || sub === "/") && rctx.req.method === "GET") {
           const enabled = readEnabledMap();
           const all = readAllIds();
-          const list = all.map((e) => {
-            const meta = PLUGIN_META[e.id];
-            return {
-              name: e.id,
-              pkgName: e.pkgName,
-              display: meta?.display ?? displayFromId(e.id),
-              desc: meta?.desc ?? e.description ?? "—",
-              locked: e.locked,
-              enabled: e.locked ? true : !(enabled[e.id] === false),
-            };
-          });
+          const list = all.map((e) => ({
+            name: e.id,
+            pkgName: e.pkgName,
+            display: displayFromId(e.id),
+            desc: e.description ?? "—",
+            locked: e.locked,
+            enabled: e.locked ? true : !(enabled[e.id] === false),
+          }));
           sendJson(rctx.res, 200, { ok: true, data: list });
           return;
         }

@@ -105,7 +105,8 @@ export async function web(opts: WebOptions = {}): Promise<void> {
   const ctx = result.ctx;
   // 让事件循环推进：等待 web-ui 的 listening/error 绑定事件落定(端口占用在此浮现)
   await new Promise((r) => setTimeout(r, 400));
-  const fatal = result.errors.filter((e) => /web-ui|端口|EADDRINUSE/i.test(String(e.message)));
+  // 结构化判 fatal：只认 BootError.code === "web.listen_failed"（端口绑定失败），不按插件名/文案正则
+  const fatal = result.errors.filter((e) => (e as { code?: string })?.code === "web.listen_failed");
   for (const err of result.errors) {
     if (!fatal.includes(err)) console.log(`[警告] ${err.message}`);
   }
