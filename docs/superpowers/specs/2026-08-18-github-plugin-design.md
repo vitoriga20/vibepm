@@ -112,7 +112,7 @@ packages/plugin-github/
 
 - `listRepos(): Promise<RepoMeta[]>`：`GET /user/repos?per_page=100&sort=updated` 分页合并全量。
 - `repoEvents(owner, repo): Promise<GhEvent[]>`：`GET /repos/:owner/:repo/events?per_page=100`。
-- `commitFrequency(events): { commits7d, commits30d }`：从 events 中累加 PushEvent 的 `distinct_size`（去重提交数），分 7 天 / 30 天两档统计。
+- `commitFrequency(events): number`：从 events 中累加近 30 天 PushEvent 的 `distinct_size`（去重提交数），得到 `commits30d`。
 - 内存 TTL 缓存：repos 与单仓 events 各缓存 `cache_ttl`（默认 60s）；缓存 key 含 token 归属，logout 清空。
 
 ## 8. API 设计（统一前缀 /api/github/*）
@@ -135,13 +135,9 @@ packages/plugin-github/
 
 1. `GET /user/repos` 取我的全部仓库（分页合并，按 updated 排序）。
 2. 并行拉取每仓 `GET /repos/:owner/:repo/events?per_page=100`，并发上限 5，单仓失败跳过并标记。
-3. 从每仓 events 计算提交频率（PushEvent distinct_size 累加）：
-   - `commits7d`：近 7 天去重提交数。
-   - `commits30d`：近 30 天去重提交数。
-4. 分区判据（**待用户确认**）：`commits7d >= 5` → 活跃区；否则 → 尘封区。
-5. 返回：`{ ok, repos: [{ ...RepoMeta, commits7d, commits30d, active }], activeCount, dustyCount }`。
-
-> 理解标注：用户给出两个数字"30"与"7天5次"，本设计采用——统计展示窗口 30 天（commits30d），分区判据近 7 天 ≥ 5 次提交（commits7d >= 5）。若两者应统一为同一窗口，请在 review 时指出。
+3. 从每仓 events 计算提交频率（PushEvent distinct_size 累加）：`commits30d` = 近 30 天去重提交数。
+4. 分区判据（已确认）：`commits30d > 60` → 活跃区；否则 → 尘封区。
+5. 返回：`{ ok, repos: [{ ...RepoMeta, commits30d, active }], activeCount, dustyCount }`。
 
 ### 9.2 单仓动态（GET /repos/:owner/:repo/events）
 
@@ -159,8 +155,8 @@ packages/plugin-github/
 ### 10.2 #repos 仓库列表页（新 github-repos-panel，入口默认页）
 
 - 顶部：连接状态条（已连接：账号 + 来源 + 退出；未连接守卫已强制跳 #auth）+ 仓库总数 + 刷新。
-- **活跃区**（标题 + 计数，可折叠）：按 `commits7d` 降序的仓库行。
-- **尘封区**（标题 + 计数，**默认折叠**沉底）：低活跃仓库，按 `commits7d` 降序。
+- **活跃区**（标题 + 计数，可折叠）：按 `commits30d` 降序的仓库行。
+- **尘封区**（标题 + 计数，**默认折叠**沉底）：低活跃仓库，按 `commits30d` 降序。
 - 仓库行字段：名称 + 描述 + 语言色点 + star/fork + "近 30 天提交 N 次" + 最近更新时间 + 打开链接。点行进 `#repo?name=owner/repo`。
 
 ### 10.3 #repo?name=owner/repo 仓库详情页（新 github-repo-detail-panel）
@@ -202,5 +198,5 @@ packages/plugin-github/
 - GitHub Events API 90 天 / 300 条上限：UI 文案需说明"近 30 天提交"，避免"所有"误导。
 - Device Flow 需真实 OAuth App client_id：实现时需用户在 GitHub 创建 OAuth App（callback 可任意填写，Device Flow 不回调）。
 - 影响面 7 处需一次改全（loader / plugin-manager / ide-view / workspace / tsconfig / 删两包），避免残留引用导致构建或加载失败。
-- 分区判据两窗口（统计 30 天 / 判据 7 天）为待确认项，见 §9.1。
+- 分区判据已确认：统一 30 天窗口，近 30 天提交 > 60 次为活跃（见 §9.1）。
 - 对外可见内容（README / package.json 描述 / 仓库文档）不出现任何历史借鉴痕迹。
