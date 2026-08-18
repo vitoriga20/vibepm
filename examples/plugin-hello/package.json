@@ -11,7 +11,7 @@
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build:node": "node -e \"require('node:fs').existsSync('node_modules/esbuild')||require('child_process').execSync('npm i -D esbuild --no-save',{stdio:'inherit'})\" && npx esbuild src/index.ts --bundle --format=cjs --platform=node --outfile=dist/index.js",
-    "build:client": "npx esbuild src/client.ts --bundle --format=esm --platform=browser --external:/plugins/plugin-ide-view/module-system.js --outfile=dist/client.js",
+    "build:client": "npx esbuild src/client.ts --bundle --format=esm --platform=browser --outfile=dist/client.js",
     "build": "npm run clean && npm run build:node && npm run build:client"
   },
   "vibepm": {

@@ -13,8 +13,7 @@
 - **阶段 4 4 个新插件**:
   1. `plugin-onboarding`（Node + Client）：无 settings.token 时向 `shell.nav` / `shell.primary` 注册「欢迎 + 连接 GitHub + 打开设置」3 张卡
   2. `plugin-settings`（Node + Client + `/api/settings`）：设置表单 → 读写 settings 表，向 `shell.primary` 注册 settings 面板路由
-  3. `plugin-github-auth`（Node + Client + `/api/github/auth/*`）：OAuth 设备码或 PAT 两种握手方式，token 存 settings，提供 `github` service（rest 客户端），向 `shell.nav` 注册「已连接 / 连接中 / 失败」状态卡
-  4. `plugin-repo-feed`（Node + Client + `/api/feed`）：拿 `github` service → 拉 watched repos 的事件流（WatchEvent / PushEvent / PullRequestEvent / IssuesEvent），向 `shell.primary` 注册 feed 面板
+  3. `plugin-github`（Node + Client + `/api/github`）：三源连接（gh CLI / Device Flow / PAT），token 存 settings，提供 `github` service（rest 客户端）+ 自有仓库列表（活跃/尘封分区）+ 仓库详情动态（commits 为主），向 `shell.primary` / `shell.nav` 注册 3 面板 + 2 导航卡
 - **阶段 5 构建链路**: 新 4 插件加入 `packages/*`，pnpm-workspace（已天然 `packages/*` 全包），根/包内 tsconfig 补 references，`vibepm` 字段 manifest 完整
 - **阶段 6 验证**: Playwright 无头过断言 → build 无错 → commit + push
 
@@ -31,8 +30,7 @@
 | 3.2 | `plugin-storage/src/index.ts` DatabaseService 包装 3 个新方法 | 3.1 | |
 | 4.1 | 生成 `plugin-onboarding` Node + Client 目录结构 | 3.2 done | |
 | 4.2 | 生成 `plugin-settings` Node + Client + `/api/settings GET/POST` | 3.2, web-ui 路由通用 | |
-| 4.3 | 生成 `plugin-github-auth` Node + Client + OAuth 设备码握手（避免 GitHub App 配置复杂度），写 settings `github.token`，提供 `github` 服务封装 Octokit-free fetch | 3.2 | 设备码 flow 需要 `/login/device/code` + `/login/oauth/access_token` 公开端点 → 不需要 Client ID？不对，需要 Client ID，但可以让用户在设置里填 —— MVP 退化成 PAT 输入框（用户自己到 GitHub → Settings → Developer settings → Personal access tokens → Fine-grained token，scope: repo + notifications），更简单对齐 dsh 的「输入 token → 连接」 |
-| 4.4 | 生成 `plugin-repo-feed` Node + Client，读 `github.token` → `GET /user/repos?per_page=100` 拿 1 页 + `/user/received_events?per_page=50` 做 feed（MVP，分页后续加） | 4.3 | |
+| 4.3 | 生成 `plugin-github` Node + Client + `/api/github`：三源认证（gh CLI / Device Flow / PAT 兜底），写 settings `github.token`，提供 `github` 服务（fetchJson/me/listRepos/repoEvents/commitFrequency），`/repos` 逐仓并行统计提交数并分区（活跃≥阈值/尘封） | 3.2 | 设备码 flow 需要 Client ID，可让用户在配置里填 —— 兜底 PAT 输入框（用户自己到 GitHub → Settings → Developer settings → Personal access tokens，scope: repo + read:user + read:org），更简单对齐 dsh 的「输入 token → 连接」 |
 | 5.1 | 4 新插件每个：package.json（`name: "@vibepm/plugin-xxx"`、`vibepm.node.inject` / `vibepm.client.entry`、scripts、deps `@vibepm/core`、`@vibepm/plugin-storage` 如果 inject db）、tsconfig.json（references 到 core、storage）、client/index.ts | 无 | manifest.scanWorkspace 扫 packages/* 下所有带 vibepm 字段的 package.json，不用手动加；但要注意 `tsconfig.base.json` 无 references 字段（当前 composite 项目靠每个包自己的 tsconfig references） |
 | 5.2 | 根 `pnpm install` → 生成 workspace symlinks → `pnpm run build` 看全链路 | 5.1 | |
 | 6.1 | Playwright 验证：首屏 `#app` 下有 `vibe-shell`；无 settings 时显示 onboarding 3 卡；点 settings 路由到设置表单（hash `#settings`）；点 GitHub 连接跳输入 token 表单（hash `#auth`）；保存 token 后出现 feed 面板入口 | 5.2 | |
@@ -90,7 +88,7 @@
 - 定义 patch 行格式（对齐 dsh cordis.patch.yml 思想，用 JSON/YAML 均可，先 JSON 少依赖）：
   - 覆盖已有行：`{ id: "plugin-settings", config: {...} }`
   - 插入新行：`{ insert: { id: "my-plugin", name: "@my/pkg", config: {...} } }`
-  - 禁用：`{ id: "plugin-repo-feed", disabled: true }`
+  - 禁用：`{ id: "my-plugin", disabled: true }`
 - 新增 `packages/core/src/patches.ts`：
   - `parsePatchLayer(raw): PatchRow[]`
   - `resolvePluginRows(layers): { order, per }` —— 按「base 行 ← 各 bundle 按 dependency 顺序 ← profile 覆盖 ← CLI --patch」层叠：

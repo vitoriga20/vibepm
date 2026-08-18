@@ -1,7 +1,7 @@
 {
-  "name": "@vibepm/plugin-repo-feed",
+  "name": "@vibepm/plugin-github",
   "version": "0.1.0",
-  "description": "Repository dynamic/feed plugin (dashboard events). Calls GitHubService for received_events.",
+  "description": "GitHub 连接 + 自有仓库动态管理（gh CLI / Device Flow / PAT 三源，活跃/尘封分区）。",
   "private": true,
   "type": "module",
   "main": "dist/src/index.js",
@@ -25,7 +25,6 @@
   },
   "dependencies": {
     "@vibepm/core": "workspace:*",
-    "@vibepm/plugin-github-auth": "workspace:*",
     "@vibepm/plugin-ide-view": "workspace:*",
     "@vibepm/plugin-web-ui": "workspace:*"
   },
@@ -36,14 +35,14 @@
     "typescript": "^5.7.3"
   },
   "vibepm": {
-    "id": "plugin-repo-feed",
-    "display": "Repo Feed",
-    "role": "panel",
-    "order": 30,
+    "id": "plugin-github",
+    "display": "GitHub",
+    "role": "service+panel",
+    "order": 20,
     "node": {
       "immediately": true,
-      "inject": ["github", "slots"],
-      "provide": []
+      "inject": ["db", "slots", "webServer"],
+      "provide": ["github"]
     },
     "client": {
       "entry": "./client-dist/client.js",

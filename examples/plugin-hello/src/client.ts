@@ -1,12 +1,14 @@
 /**
  * plugin-hello · Client 半（最小模板）
- *  - 经 ide-view 的 module-system 注册；apply 时向页面做两件可观测的副作用：
+ *  - 经 ide-view 的 module-system 注册（window.__VIBEPM_MODULES__，壳内核构造）；apply 时向页面做两件可观测的副作用：
  *      1) documentElement 写 --third-party-hello=loaded（探针可读，证明 client 半已被 bootGraph 动态 import 与 apply）
  *      2) body 右下角插一个状态角标（肉眼可验证「第三方插件是活的」）
  *  - dispose 时全部还原。第三方替换 apply() 内的业务即可。
  */
-// @ts-ignore TS 无法识别浏览器专用的 URL 模块
-import { modules } from "/plugins/plugin-ide-view/module-system.js";
+// 浏览器模块表由壳内核（ide-view client）构造到 window.__VIBEPM_MODULES__，不再 import 壳 URL
+const modules = (window as any).__VIBEPM_MODULES__ as {
+  register(id: string, factory: () => unknown): void;
+};
 
 const SELF = "plugin-hello";
 

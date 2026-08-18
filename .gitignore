@@ -1,6 +1,7 @@
 node_modules/
 dist/
 client-dist/
+*.tsbuildinfo
 .pnpm-store/
 *.tgz
 .DS_Store

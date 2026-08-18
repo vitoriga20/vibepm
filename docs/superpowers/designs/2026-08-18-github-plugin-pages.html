@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  plugin-github 三面板页面原型 v2（实现蓝本）
+  ------------------------------------------------------------
+  v2 变更（用户反馈）：
+   1. 登录后顶栏右侧放头像，表示已登录；点击头像看账号详情
+      （含设置入口 + 退出）。原 A2 账号卡片并入头像下拉。
+   2. 仓库行右列显示「最近提交」日期（最后一次 push 时间，
+      后端下发 lastPushAt）。
+   3. 分区设置不再放仓库页顶部，改为头像下拉 →「设置」弹层。
+   4. 头像位置：面板内容区 h1 标题行的右侧（等高，非顶栏 tab，
+      非悬浮；登录后各面板同位置）。
+   5. 登录时 #auth 页面/导航不存在（头像接管状态表达，登录后
+      #auth 从顶栏消失，强制回 #repos）。
+  其余：CSS 变量复用壳科研纸感 token（--bg/--panel/--ink/
+  --accent/--line/--mono 等），移植进 <github-*-panel> Shadow
+  DOM 时视觉一致。
+
+  对应实现映射：
+    #auth    → GithubAuthPanel     → "github-auth-panel"
+    #repos   → GithubReposPanel    → "github-repos-panel"
+    #repo    → GithubRepoDetailPanel → "github-repo-detail-panel"
+   头像     → 壳级（登录后由 github 插件注入到壳 header 右上角
+              slot；下拉菜单含账号详情/设置/退出）
+  ============================================================
+-->
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>plugin-github · 三面板页面原型 v2</title>
+<style>
+/* ---------- 复用壳 token（科研纸感：暖白纸 + 深墨 + 深青强调） ---------- */
+:root{
+  --bg:#f4f3ee; --bg-deep:#ecebe5; --panel-dark:#e9e8e1;
+  --line:#dcdad1; --line-strong:#cfccc2;
+  --panel:#ffffff; --panel-alt:#f1f0ea;
+  --ink:#22252a; --fg:#22252a; --text:#33363b;
+  --muted:#6b6f76; --dim:#858a91; --on-ink:#eef0ec;
+  --accent:#147d78; --accent-2:#0e6a66; --accent-dim:#e3efee; --accent-line:#0f6a66;
+  --warn:#a16207; --danger:#b3402e; --ink-ok:#4d7a5e;
+  --display-cjk:"HarmonyOS Sans SC","PingFang SC",sans-serif;
+  --mono:"Space Grotesk","Cascadia Code",ui-monospace,Consolas,monospace;
+  --radius:4px; --radius-s:3px;
+  --shadow-panel:0 1px 2px rgba(31,34,40,.06),0 8px 24px rgba(31,34,40,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg-deep);color:var(--text);font:13.5px/1.55 var(--display-cjk);min-height:100vh}
+code{font-family:var(--mono);font-size:11px;color:var(--accent)}
+
+/* ---------- 页面壳模拟（对应 vibe-shell：header + 主区） ---------- */
+.shell{max-width:1080px;margin:0 auto;padding:20px 20px 80px}
+.shell-hd{
+  display:flex;align-items:center;gap:18px;padding:12px 16px;margin-bottom:18px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow-panel);
+}
+.brand{font:900 13px/1 var(--display-cjk);letter-spacing:2px;color:var(--ink)}
+.brand b{color:var(--accent)}
+.nav{display:flex;gap:6px;margin-left:8px}
+.nav a{
+  padding:6px 12px;font:600 12px/1 var(--display-cjk);color:var(--muted);
+  text-decoration:none;border:1px solid transparent;border-radius:var(--radius-s);cursor:pointer;
+}
+.nav a:hover{color:var(--accent)}
+.nav a.on{color:var(--ink);border-color:var(--line-strong);background:var(--panel-alt)}
+.hint{margin-left:auto;font:11px/1 var(--mono);color:var(--dim)}
+.hint b{color:var(--accent)}
+.demo-toggle{margin-left:12px}
+.demo-toggle button{min-height:28px;padding:4px 10px;font-size:11px}
+
+/* ---------- 主区（一次只显示一个 page） ---------- */
+.page{display:none}
+.page.on{display:block;animation:pop .18s ease}
+@keyframes pop{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---------- 面板通用 ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px 22px 10px;box-shadow:var(--shadow-panel)}
+.panel h1{font-size:16px;letter-spacing:1.5px;color:var(--ink);font-weight:900;text-transform:uppercase}
+.panel .desc{font-size:12px;color:var(--dim);margin:6px 0 16px;line-height:1.6}
+
+/* ---------- 组件标注 ---------- */
+.c{position:relative;border:1px dashed var(--line-strong);border-radius:var(--radius);padding:14px 14px 10px;margin-bottom:14px;background:var(--panel-alt)}
+.c::before{
+  content:attr(data-n);position:absolute;top:-9px;right:8px;
+  min-width:18px;height:18px;padding:0 4px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--accent);color:#fff;border-radius:50%;
+  font:700 10px/1 var(--mono);letter-spacing:0;
+}
+.c .cname{position:absolute;top:-8px;left:8px;background:var(--panel-alt);padding:0 6px;font:600 10px/16px var(--mono);color:var(--accent);letter-spacing:.5px}
+.c:hover{outline:2px solid var(--accent-line);outline-offset:1px;cursor:help}
+
+/* ---------- 状态条（A1） ---------- */
+.status{display:inline-block;padding:4px 9px;font:700 9px/1 var(--mono);letter-spacing:1px;border:1px solid var(--line-strong);color:var(--dim);text-transform:uppercase;background:var(--panel)}
+.status.on{color:#fff;border-color:var(--accent);background:var(--accent)}
+.status.off{color:var(--warn);border-color:var(--warn);background:var(--panel-alt)}
+
+/* ---------- 表单（A3 A4 / 设置弹层） ---------- */
+.form{border:1px dashed var(--line-strong);border-left:3px solid var(--accent);background:var(--panel);padding:14px 16px;margin-top:8px;border-radius:var(--radius-s)}
+label{font:600 10px/1 var(--mono);color:var(--dim);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:6px}
+input[type=text],input[type=password],input[type=number]{
+  width:100%;background:var(--panel);border:1px solid var(--line-strong);border-left:3px solid var(--accent);
+  color:var(--ink);font:12px/1 var(--mono);padding:8px 10px;border-radius:var(--radius-s);outline:none;
+}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+button{
+  border:1px solid var(--line-strong);border-left:3px solid var(--accent);background:var(--panel);
+  color:var(--ink);padding:7px 14px;cursor:pointer;font:700 11px/1 var(--display-cjk);letter-spacing:.5px;
+  border-radius:var(--radius-s);transition:color .18s,border-color .18s;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);border-left-color:var(--accent-2);color:#fff}
+button.primary:hover{background:var(--accent-2);color:#fff}
+button.ghost{border-style:dashed}
+.btnrow{display:flex;gap:8px;align-items:center;margin-top:10px}
+.row{display:flex;gap:12px}
+.row .field{flex:1}
+code.big{font:700 18px/1 var(--mono);color:var(--accent);letter-spacing:2px}
+a.link{color:var(--accent);font-size:12px;text-decoration:none}
+a.link:hover{text-decoration:underline}
+.msg{font:11px/1 var(--mono);color:var(--muted)}
+.msg.ok{color:var(--accent)} .msg.err{color:var(--danger)}
+
+/* ---------- 面板标题行（h1 + 右侧头像同高） ---------- */
+.ptitle{display:flex;align-items:center;gap:12px;margin-bottom:2px}
+.ptitle h1{flex:0 0 auto}
+/* ---------- 全局头像（面板 h1 右侧等高，登录后显示） ---------- */
+.avatar-wrap{position:relative;z-index:60;display:none;align-items:center;margin-left:auto}
+body.logged .avatar-wrap{display:flex}
+.avatar-btn{
+  width:38px;height:38px;border-radius:50%;border:2px solid var(--accent);background:var(--accent-dim);
+  color:var(--accent);font:900 15px/1 var(--mono);display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--shadow-panel);cursor:pointer;position:relative;
+}
+.avatar-btn .dot{position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;background:var(--ink-ok);border:2px solid #fff}
+.avatar-menu{
+  position:absolute;top:46px;right:0;width:240px;background:var(--panel);border:1px solid var(--line-strong);
+  border-left:4px solid var(--accent);border-radius:var(--radius);box-shadow:var(--shadow-panel);display:none;overflow:hidden;
+}
+.avatar-wrap.open .avatar-menu{display:block}
+.am-user{padding:12px 14px;border-bottom:1px solid var(--line);background:var(--panel-alt)}
+.am-user .am-name{font:700 13px/1.4 var(--display-cjk);color:var(--ink)}
+.am-user .am-name span{color:var(--dim);font-weight:400;font-family:var(--mono);font-size:11px}
+.am-user .am-src{font:11px/1 var(--mono);color:var(--muted);margin-top:4px}
+.am-item{
+  display:block;width:100%;text-align:left;border:none;border-bottom:1px solid var(--line);
+  background:var(--panel);color:var(--ink);padding:10px 14px;font:600 12px/1 var(--display-cjk);border-radius:0;
+}
+.am-item:hover{background:var(--accent-dim);color:var(--accent)}
+.am-item.am-danger{color:var(--danger)}
+.am-item.am-danger:hover{background:#f8ece9;color:var(--danger)}
+
+/* ---------- 设置弹层（头像 → 设置） ---------- */
+.modal-mask{position:fixed;inset:0;background:rgba(31,34,40,.35);display:none;align-items:center;justify-content:center;z-index:70}
+.modal-mask.open{display:flex}
+.modal{
+  width:min(420px,90vw);background:var(--panel);border:1px solid var(--line-strong);border-top:4px solid var(--accent);
+  border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-panel);
+}
+.modal h3{font:900 13px/1 var(--display-cjk);color:var(--ink);letter-spacing:1px;margin-bottom:6px}
+.modal .desc{font-size:12px;color:var(--dim);margin-bottom:14px;line-height:1.6}
+
+/* ---------- 仓库列表（R1 / R4 / R6 / R5） ---------- */
+.statline{display:flex;gap:8px;align-items:center;margin:14px 0 12px;font:600 12px/1 var(--display-cjk);color:var(--muted)}
+.statline b{color:var(--accent);font-family:var(--mono)}
+.zhead{display:flex;align-items:baseline;gap:8px;margin:16px 0 8px;padding-left:10px;border-left:3px solid var(--accent);cursor:pointer}
+.zhead h2{font:700 12px/1 var(--mono);color:var(--ink);letter-spacing:1px}
+.zhead .cnt{font:11px/1 var(--mono);color:var(--dim)}
+.zhead .caret{color:var(--dim);font-size:10px;transition:transform .15s}
+.zhead.open .caret{transform:rotate(90deg)}
+.repo{
+  border:1px solid var(--line);background:var(--panel);padding:10px 12px;margin-bottom:6px;cursor:pointer;
+  display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-radius:var(--radius-s);
+  transition:border-color .15s;
+}
+.repo:hover{border-color:var(--accent)}
+.repo .nm{font:700 12px/1 var(--mono);color:var(--ink)}
+.repo .nm .tag{font:600 9px/1 var(--mono);color:var(--dim);border:1px solid var(--line);padding:1px 4px;margin-left:4px;border-radius:2px}
+.repo .ds{font-size:11px;color:var(--dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.repo .meta{font:11px/1.6 var(--mono);color:var(--dim);text-align:right}
+.repo .meta .acc{color:var(--accent)}
+.repo .meta .push{color:var(--ink)}
+.lang{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.zb{overflow:hidden;transition:max-height .18s}
+.zb.hidden{display:none}
+
+/* ---------- 仓库详情（D1-D4） ---------- */
+.dhead{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.dhead h1{text-transform:none;letter-spacing:.5px}
+.tl{list-style:none;padding:0}
+.tl li{display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:14px 0;align-items:start;position:relative;border-bottom:1px solid var(--line)}
+.tl li:last-child{border-bottom:none}
+.tl .dot{width:34px;height:34px;border:1px solid var(--accent);background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent);border-radius:50%}
+.tl .dot svg{width:14px;height:14px}
+.tl h4{font:700 12px/1.4 var(--display-cjk);color:var(--ink);margin:0 0 3px}
+.tl h4 b{color:var(--accent)}
+.tl p{font-size:12px;color:var(--muted);margin:0;line-height:1.5}
+.tl time{font:11px/1 var(--mono);color:var(--dim);white-space:nowrap;padding-top:3px}
+.commit{font:11px/1.7 var(--mono);color:var(--muted);margin:4px 0 0;padding-left:10px;border-left:1px dashed var(--line-strong)}
+.commit b{color:var(--accent);font-weight:600}
+.empty{padding:24px;text-align:center;color:var(--dim);font-size:12px;border:1px dashed var(--line-strong);border-radius:var(--radius-s);background:var(--panel-alt)}
+
+/* ---------- 图例（固定右下角） ---------- */
+.legend{
+  position:fixed;right:16px;bottom:16px;z-index:50;width:310px;
+  background:var(--panel-dark);border:1px solid var(--line-strong);border-left:4px solid var(--accent);
+  border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow-panel);
+  font-size:11px;color:var(--text);max-height:60vh;overflow:auto;
+}
+.legend h3{font:900 11px/1 var(--mono);color:var(--ink);letter-spacing:1.2px;margin-bottom:8px;text-transform:uppercase}
+.legend .lg{margin-bottom:6px;display:flex;gap:8px}
+.legend .n{flex:0 0 20px;height:18px;border-radius:9px;background:var(--accent);color:#fff;font:700 10px/18px var(--mono);text-align:center}
+.legend .t b{color:var(--accent)}
+.legend .t{line-height:1.5}
+.legend .sub{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- ============ 壳顶栏（模拟 vibe-shell header） ============ -->
+  <div class="shell-hd">
+    <div class="brand">vibe<b>pm</b> · github</div>
+    <nav class="nav">
+      <a data-nav="auth" class="on" id="navAuth">连接 GitHub <code>#auth</code></a>
+      <a data-nav="repos">我的仓库 <code>#repos</code></a>
+      <a data-nav="repo">仓库动态 <code>#repo?name=…</code></a>
+    </nav>
+    <div class="hint">原型 v2 · 模拟登录开关在右侧</div>
+    <div class="demo-toggle"><button id="toggleLogin">模拟：已登录</button></div>
+  </div>
+
+  <!-- ============================================================
+       PAGE 1 · #auth  连接 GitHub（GithubAuthPanel）
+       ============================================================ -->
+  <section class="page on" data-page="auth">
+    <div class="panel">
+      <h1>连接 GitHub</h1>
+      <p class="desc">gh CLI 直连 / Device Flow / PAT 三源。只读自己仓库动态，不做拉取推送。</p>
+
+      <!-- A1 · 连接状态条：未登录时显示；登录后右上角头像接管状态表达 -->
+      <div class="c" data-n="1"><span class="cname">A1 · 状态条（未登录）</span>
+        <span class="status off">未连接</span>
+        <p class="msg" style="margin-top:6px">GET <code>/api/github/status</code>。登录成功后本页折叠表单，右上角出现头像（编号 4）表示已连接</p>
+      </div>
+
+      <!-- A3 · Device Flow 区块（未登录态） -->
+      <div class="c" data-n="2"><span class="cname">A3 · Device Flow 授权</span>
+        <div class="form">
+          <h3 style="font:700 10px/1 var(--mono);color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px">浏览器授权（Device Flow）</h3>
+          <p class="msg" style="margin-bottom:12px">点下方按钮开始，浏览器打开后输入授权码。</p>
+          <div class="btnrow">
+            <button class="primary">通过浏览器授权</button>
+            <code class="big">ABCD-EFGH</code>
+            <a class="link" href="#">打开授权页 ↗</a>
+          </div>
+          <p class="msg" style="margin-top:8px"><code>POST /api/github/device/start</code> 拿授权码 → 展示 + 每 interval 秒 <code>POST /device/poll</code> 自动轮询；成功→写 token → 右上角出现头像</p>
+        </div>
+      </div>
+
+      <!-- A4 · PAT 兜底折叠表单 -->
+      <div class="c" data-n="3"><span class="cname">A4 · PAT 兜底表单</span>
+        <div class="form">
+          <h3 style="font:700 10px/1 var(--mono);color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px">手动 Token（兜底）</h3>
+          <label>GitHub 用户名</label>
+          <input type="text" placeholder="vitoriga" />
+          <label style="margin-top:10px">Personal Access Token (classic)</label>
+          <input type="password" placeholder="ghp_••••••••••••" />
+          <div class="btnrow">
+            <button class="primary">连接</button>
+            <span class="msg">POST <code>/api/github/login</code> {username, token} → 校验 me() 写 settings</span>
+          </div>
+        </div>
+        <div class="btnrow"><button class="ghost">显示 / 隐藏手动表单</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PAGE 2 · #repos  我的仓库（GithubReposPanel）
+       入口守卫：GET /status 未连接 → 强制 location.hash="#auth"
+       ============================================================ -->
+  <section class="page" data-page="repos">
+    <div class="panel">
+      <div class="ptitle">
+        <h1>我的仓库</h1>
+        <!-- 头像：面板 h1 右侧等高（登录后显示；实现时各登录态面板同位置） -->
+        <div class="avatar-wrap" id="avatarWrap">
+          <button class="avatar-btn" id="avatarBtn" title="账号详情"><span>v</span><span class="dot"></span></button>
+          <div class="avatar-menu" id="avatarMenu">
+            <div class="am-user">
+              <div class="am-name">vitoriga <span>@vitoriga</span></div>
+              <div class="am-src">来源 <code>gh</code> · <code>POST /status</code></div>
+            </div>
+            <button class="am-item" id="amSettings">设置 · 分区阈值</button>
+            <button class="am-item am-danger" id="amLogout">退出</button>
+          </div>
+        </div>
+      </div>
+      <p class="desc">自有仓库，按近 30 天提交（≥ 60 为活跃）分区：活跃区 / 尘封区。</p>
+
+      <!-- R1 · 统计行 + 刷新（分区设置已移入头像下拉 → 设置弹层，编号 5） -->
+      <div class="c" data-n="6"><span class="cname">R1 · 统计 + 刷新</span>
+        <div class="statline">
+          <span>共 <b>12</b></span><span>·</span>
+          <span>活跃 <b>8</b></span><span>·</span>
+          <span>尘封 <b>4</b></span>
+          <span style="margin-left:auto"><button class="primary">刷新</button></span>
+        </div>
+        <p class="msg">刷新=重新 <code>GET /repos</code>；数字来自后端 <code>activeCount / dustyCount</code>；「分区阈值」改到右上角头像 → 设置（编号 5）</p>
+      </div>
+
+      <!-- R4 · 活跃区（默认展开） -->
+      <div class="c" data-n="7"><span class="cname">R4 · 活跃区</span>
+        <div class="zhead open"><h2>活跃区</h2><span class="cnt">8</span><span class="caret">▶</span></div>
+        <div class="zb">
+          <!-- R5 · 仓库行：右列含「最近提交」日期；点击 → #repo?name=owner/repo -->
+          <div class="repo">
+            <div><div class="nm">vibe-core<span class="tag">私有</span></div><div class="ds">vibepm 核心基座：loader / registry / eventbus</div></div>
+            <div class="meta"><span class="lang" style="background:#3178c6"></span>TypeScript</div>
+            <div class="meta"><span class="acc">★24</span> <span class="acc">⑂3</span><br />提交 <b>312</b> / 30d<br />最近提交 <span class="push">2 小时前</span></div>
+          </div>
+          <div class="repo">
+            <div><div class="nm">vibe-shell</div><div class="ds">科研纸感外壳：header / 侧栏 / 皮肤变量</div></div>
+            <div class="meta"><span class="lang" style="background:#3178c6"></span>TypeScript</div>
+            <div class="meta"><span class="acc">★9</span> <span class="acc">⑂1</span><br />提交 <b>98</b> / 30d<br />最近提交 <span class="push">6 小时前</span></div>
+          </div>
+          <div class="repo">
+            <div><div class="nm">data-lab</div><div class="ds">数据分析工作台：pandas 流水线 + 图表</div></div>
+            <div class="meta"><span class="lang" style="background:#3572A5"></span>Python</div>
+            <div class="meta"><span class="acc">★31</span> <span class="acc">⑂7</span><br />提交 <b>74</b> / 30d<br />最近提交 <span class="push">1 天前</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- R6 · 尘封区（默认折叠） -->
+      <div class="c" data-n="8"><span class="cname">R6 · 尘封区（默认折叠）</span>
+        <div class="zhead"><h2>尘封区</h2><span class="cnt">4</span><span class="caret">▶</span></div>
+        <div class="zb hidden">
+          <div class="repo">
+            <div><div class="nm">old-blog</div><div class="ds">个人博客 v1（已停更）</div></div>
+            <div class="meta"><span class="lang" style="background:#e34c26"></span>HTML</div>
+            <div class="meta"><span class="acc">★2</span> <span class="acc">⑂0</span><br />提交 <b>1</b> / 30d<br />最近提交 <span class="push">87 天前</span></div>
+          </div>
+          <div class="repo">
+            <div><div class="nm">sandbox-go</div><div class="ds">Go 练习沙盒</div></div>
+            <div class="meta"><span class="lang" style="background:#00ADD8"></span>Go</div>
+            <div class="meta"><span class="acc">★0</span> <span class="acc">⑂0</span><br />提交 <b>0</b> / 30d<br />最近提交 <span class="push">210 天前</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PAGE 3 · #repo?name=owner/repo  仓库详情（GithubRepoDetailPanel）
+       ============================================================ -->
+  <section class="page" data-page="repo">
+    <div class="panel">
+      <div class="dhead">
+        <h1>vibe-core</h1>
+        <a class="link" href="#">打开 GitHub ↗</a>
+      </div>
+
+      <!-- D1 · meta 行 -->
+      <div class="c" data-n="9"><span class="cname">D1 · Meta 行</span>
+        <div class="statline">
+          <span>近 30 天提交 <b>312</b> 次</span><span>·</span>
+          <span>共 <b>87</b> 条事件</span>
+          <span style="margin-left:auto" class="msg">GET <code>/api/github/repos/owner/repo/events</code> → 近 30 天由后端下发 <code>statsWindowDays</code> 决定</span>
+        </div>
+      </div>
+
+      <!-- D2 · timeline -->
+      <div class="c" data-n="10"><span class="cname">D2 · 动态 timeline</span>
+        <ul class="tl">
+          <li>
+            <div class="dot">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 12 h10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M11 7 l5 5 l-5 5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h4><b>vitoriga</b> · 推送 5 个提交</h4>
+              <p class="commit"><b>3f9a2c1</b> feat(github): 阈值三级可配 + 头像设置入口</p>
+              <p class="commit"><b>7b2e01a</b> refactor(core): loader 解耦 webServer 路由</p>
+              <p class="commit"><b>c44d9f0</b> fix(storage): setSetting null 覆盖语义</p>
+            </div>
+            <time>2 小时前</time>
+          </li>
+          <li>
+            <div class="dot">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 3 a2 2 0 1 0 0 4 2 2 0 0 0 0 -4 z"/><circle cx="18" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 7 v10 M10 10 h4 a4 4 0 0 1 4 4 v3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+            <div><h4><b>vitoriga</b> · PR opened · feat: 插件热装卸增强</h4></div>
+            <time>昨天</time>
+          </li>
+          <li>
+            <div class="dot">
+              <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.5 v5.5 M12 16.2 v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div><h4><b>vitoriga</b> · Issue closed · 低活跃仓库应进尘封区</h4></div>
+            <time>3 天前</time>
+          </li>
+          <li>
+            <div class="dot">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 v4 M12 17 v4 M5 9 l-3.5 -2 M22 9 l-3.5 -2 M5 15 l-3.5 2 M22 15 l-3.5 2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            </div>
+            <div><h4><b>vitoriga</b> · 发布 v0.6.0</h4></div>
+            <time>1 周前</time>
+          </li>
+        </ul>
+        <p class="msg" style="margin-top:8px">事件类型 → 图标映射（push/pr/issue/release/star/fork/create/watch/other）；push 才展开 commit 列表，无文件 diff</p>
+      </div>
+
+      <!-- 空态 -->
+      <div class="c" data-n="11"><span class="cname">D4 · 空态</span>
+        <div class="empty">（近期无动态）</div>
+        <p class="msg" style="margin-top:6px">无事件 / 无仓库名（#repo 不带 ?name=）时显示</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ 设置弹层（头像 → 设置：分区阈值三级可配） ============ -->
+<div class="modal-mask" id="settingMask">
+  <div class="modal">
+    <h3>分区设置</h3>
+    <p class="desc">活跃 = 近 N 天提交 ≥ M 次，其余进尘封区。三级可配：settings(运行时) &gt; vibepm.json(重启) &gt; 默认 60。</p>
+    <div class="form" style="margin-top:0">
+      <div class="row">
+        <div class="field"><label>活跃窗口（天）</label><input type="number" value="30" /></div>
+        <div class="field"><label>活跃提交数（≥）</label><input type="number" value="60" /></div>
+      </div>
+      <div class="btnrow">
+        <button class="primary">保存</button>
+        <span class="msg">POST <code>/api/settings</code> {batch} 写 <code>github.active_window_days / github.active_min_commits</code>，随后 <code>GET /repos?refresh=1</code> 强刷</span>
+      </div>
+    </div>
+    <div class="btnrow" style="justify-content:flex-end"><button class="ghost" id="closeSetting">关闭</button></div>
+  </div>
+</div>
+
+<!-- ============ 图例：每个标注编号的功能说明 ============ -->
+<div class="legend">
+  <h3>组件位置 · 功能说明（v2）</h3>
+  <div class="lg"><div class="n">1</div><div class="t"><b>A1 状态条</b><div class="sub">仅未登录时存在（#auth 页面登录后整体消失）；由顶栏头像(4)接管状态表达</div></div></div>
+  <div class="lg"><div class="n">2</div><div class="t"><b>A3 Device Flow</b><div class="sub">POST /device/start 拿授权码→展示+打开授权页→每 interval 秒 POST /device/poll 轮询</div></div></div>
+  <div class="lg"><div class="n">3</div><div class="t"><b>A4 PAT 兜底</b><div class="sub">折叠表单：username + classic token → POST /login 校验写 settings</div></div></div>
+  <div class="lg"><div class="n">4</div><div class="t"><b>面板头像（登录后·h1 标题行右侧等高）</b><div class="sub">绿点=已连接；点击弹账号详情（名字+@+来源）+「设置·分区阈值」入口 + 退出；退出=POST /logout 清 token/username/source/device 残留+缓存，头像消失且 #auth 导航恢复</div></div></div>
+  <div class="lg"><div class="n">5</div><div class="t"><b>设置弹层（头像→设置）</b><div class="sub">分区阈值：窗口天 + 活跃提交数；保存走通用 POST /api/settings {batch} → GET /repos?refresh=1 强刷；三级可配(settings&gt;配置&gt;常量60)；从 #repos 顶部移入此处</div></div></div>
+  <div class="lg"><div class="n">6</div><div class="t"><b>R1 统计+刷新</b><div class="sub">共/活跃/尘封计数 + 刷新(GET /repos)；数字来自后端 activeCount/dustyCount</div></div></div>
+  <div class="lg"><div class="n">7</div><div class="t"><b>R4 活跃区</b><div class="sub">默认展开；提交数≥阈值入此区，按提交数降序</div></div></div>
+  <div class="lg"><div class="n">8</div><div class="t"><b>R6 尘封区</b><div class="sub">默认折叠；提交数&lt;阈值入此区</div></div></div>
+  <div class="lg"><div class="n">9</div><div class="t"><b>D1 Meta 行</b><div class="sub">仓库名+打开GitHub外链+近30天提交/事件数（statsWindowDays 后端下发）</div></div></div>
+  <div class="lg"><div class="n">10</div><div class="t"><b>D2 动态 timeline</b><div class="sub">事件流：图标+动作者+描述+相对时间；push 展开 commit 列表(短sha+标题)，无文件 diff</div></div></div>
+  <div class="lg"><div class="n">11</div><div class="t"><b>D4 空态</b><div class="sub">无事件/无仓库名时显示占位提示</div></div></div>
+  <div class="lg"><div class="n">↗</div><div class="t"><b>仓库行（R5）</b><div class="sub">语言色点+名称+归档/私有标记+描述+star/fork+提交N/30d+最近提交日期(后端 lastPushAt)；点击→#repo?name=owner/repo（含在 7/8 区内）</div></div></div>
+</div>
+
+<script>
+// 壳 hash 路由：切页 + 高亮导航
+const navs = document.querySelectorAll(".nav a");
+const pages = document.querySelectorAll(".page");
+function go(p){
+  navs.forEach(a => a.classList.toggle("on", a.dataset.nav === p));
+  pages.forEach(s => s.classList.toggle("on", s.dataset.page === p));
+}
+navs.forEach(a => a.addEventListener("click", () => go(a.dataset.nav)));
+
+// 折叠（模拟 zhead 点击）
+document.querySelectorAll(".zhead").forEach(z => z.addEventListener("click", () => {
+  z.classList.toggle("open");
+  z.nextElementSibling.classList.toggle("hidden");
+}));
+
+// 全局头像：点击开/关下拉（点外部关闭）
+const avatarWrap = document.getElementById("avatarWrap");
+const avatarMenu = document.getElementById("avatarMenu");
+document.getElementById("avatarBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  avatarWrap.classList.toggle("open");
+});
+document.addEventListener("click", () => avatarWrap.classList.remove("open"));
+
+// 设置弹层：头像 → 设置
+const settingMask = document.getElementById("settingMask");
+document.getElementById("amSettings").addEventListener("click", () => {
+  avatarWrap.classList.remove("open");
+  settingMask.classList.add("open");
+});
+document.getElementById("closeSetting").addEventListener("click", () => settingMask.classList.remove("open"));
+settingMask.addEventListener("click", (e) => { if (e.target === settingMask) settingMask.classList.remove("open"); });
+
+// 模拟登录/退出（演示头像显隐 + auth 导航/页面消失）
+const toggleBtn = document.getElementById("toggleLogin");
+const navAuth = document.getElementById("navAuth");
+function setLogged(on){
+  document.body.classList.toggle("logged", on);
+  toggleBtn.textContent = on ? "模拟：退出" : "模拟：已登录";
+  // 登录后 #auth 页面/导航不存在（头像接管状态表达）
+  navAuth.style.display = on ? "none" : "";
+  if (on) {
+    // 若当前在 #auth 页 → 强制回 #repos
+    if (document.querySelector('[data-page="auth"]').classList.contains("on")) go("repos");
+  } else {
+    navAuth.classList.remove("on");
+  }
+}
+document.getElementById("amLogout").addEventListener("click", () => { avatarWrap.classList.remove("open"); setLogged(false); });
+toggleBtn.addEventListener("click", () => setLogged(!document.body.classList.contains("logged")));
+
+// 默认登录态（演示头像 + #auth 消失）
+go("auth");
+setLogged(true);
+</script>
+</body>
+</html>

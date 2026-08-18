@@ -39,10 +39,9 @@ vibepm web
 | 入口 | 路由 | 插件 | 功能 |
 | --- | --- | --- | --- |
 | Home | `/` | plugin-onboarding | 首屏引导大卡（连接 GitHub / 打开设置 / 查看动态） |
-| GitHub | `#auth` | plugin-github-auth | PAT 连接 / 用户态校验 |
+| GitHub | `#auth` | plugin-github | 三源连接（gh / Device Flow / PAT）+ 仓库分区列表 + 仓库详情 |
 | Plugins | `#plugins` | plugin-plugin-manager | **设置里开关插件（冷启动生效）** |
 | Settings | `#settings` | plugin-settings | 通用键值设置面板 |
-| Feed | `#feed` | plugin-repo-feed | GitHub 仓库动态（received_events） |
 
 开关插件：Settings → 插件（或顶栏 Plugins），列表一行一个插件 + 开关。开关写入本地 settings（`plugins.enabled`），**冷启动生效**——重启内核后该插件的界面与后端一起消失/恢复。内核三件套（Storage / Web UI / Shell）不可关。
 
@@ -58,9 +57,8 @@ pnpm workspaces 管理 `packages/*` 多包：
 | `@vibepm/plugin-web-ui` | HTTP 服务 + 静态壳，动态端口，`/api/*` 与 `/plugins/*` 路由 |
 | `@vibepm/plugin-ide-view` | 极简壳 `vibe-shell`（Web Components + Shadow DOM），按 shell 槽渲染 |
 | `@vibepm/plugin-onboarding` | 首屏引导导航卡 |
-| `@vibepm/plugin-github-auth` | GitHub 连接，提供 `github` 服务 |
+| `@vibepm/plugin-github` | GitHub 连接（gh / Device Flow / PAT 三源）+ 仓库分区列表 + 仓库详情，提供 `github` 服务 |
 | `@vibepm/plugin-settings` | 通用设置面板 |
-| `@vibepm/plugin-repo-feed` | 仓库动态 feed 面板 |
 | `@vibepm/plugin-plugin-manager` | 插件开关面板 |
 
 ### Shell 槽位
@@ -72,7 +70,7 @@ pnpm workspaces 管理 `packages/*` 多包：
 - `shell.secondary` — 状态 pill 区
 - `shell.footer` — 底栏（版本号）
 
-插件经 bundle 加载（`minimal = [storage | web-ui | ide-view | onboarding | github-auth | settings | repo-feed | plugin-manager]`）。插件开关在启动时被读取，禁用的插件不加载。
+插件经 bundle 加载（`minimal = [storage | web-ui | ide-view | onboarding | github | settings | plugin-manager]`）。插件开关在启动时被读取，禁用的插件不加载。
 
 ## 插件开关的数据链路
 
@@ -118,7 +116,7 @@ vibepm plugin remove @my-org/my-plugin
 ```json
 [
   { "insert": [{ "id": "my-plugin", "name": "@my-org/my-plugin", "config": {} }] },
-  { "id": "plugin-repo-feed", "config": { "fast": true } },
+  { "id": "my-plugin", "config": { "fast": true } },
   { "id": "another-plugin", "disabled": true }
 ]
 ```
