@@ -1,12 +1,12 @@
 /**
  * 极简版浏览器侧模块系统（对齐 dsh dsh-client-modules 思想，但不做工厂延迟 + HMR）。
- * 由 bootGraph.entries 枚举所有 client 插件；每个 client bundle 在执行末尾调用：
+ * 由壳内核（本 client，即插件行的第一个）构造 window.__VIBEPM_MODULES__；
+ * 每个 client 插件在执行末尾调用：
  *     window.__VIBEPM_MODULES__.register("pkg-id", { apply(ctx) { ... } });
- * （目前 vibepm 不需要跨插件互相 import value；协作全走 slots + 事件）
+ * （插件不再 import 本文件 URL；模块表由内核提供，换壳不换插件。）
  *
  * 本文件直接 define 一个 window.__VIBEPM_MODULES__ 表 + 启动函数 bootstrap()
  * 它按 immediately 标记 + inject 依赖（服务级，非包级）顺序 apply 所有插件。
- * 对当前项目：ide-view 自己就是唯一的 UI client 包，apply 内部 defineCustomElements()。
  */
 
 export interface ClientPluginShape {
@@ -52,9 +52,9 @@ class ClientModuleSystem {
   async bootstrap(): Promise<void> {
     const boot: any = (window as any).__VIBEPM_BOOT__ ?? { rev: "0", entries: [] };
     const slots: any = (window as any).__VIBEPM_SLOTS__ ?? {};
-    // 规范化 slots：空 slot 给 []
+    // 规范化 slots：只保留极简壳 4 槽（shell.*），空 slot 给 []
     const normSlots: any = {};
-    for (const k of ["activity-bar","sidebar-panels","main-tabs","right-panels","topbar-menu","topbar-right","statusbar-left","statusbar-right","editor-widgets"]) {
+    for (const k of ["shell.nav", "shell.primary", "shell.secondary", "shell.footer"]) {
       normSlots[k] = slots[k] ?? [];
     }
     const ctx: ClientContext = { services: this.services, slots: normSlots, boot, events: this.events };

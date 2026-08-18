@@ -4,8 +4,10 @@
  *  - dispose 时 removeProperty 撤回 → 回落 shell.css 默认（科研黄黑）。无需重渲染（CSS 变量天然响应）。
  *  - 顺序：其他 client module 在 ide-view bootstrap 后注入；首帧为默认皮肤，注入完成即自动变化。
  */
-// @ts-ignore TS 无法识别浏览器专用的 URL 模块
-import { modules } from "/plugins/plugin-ide-view/module-system.js";
+// 浏览器模块表由壳内核（ide-view client）构造到 window.__VIBEPM_MODULES__，插件不再 import 壳 URL
+const modules = (window as any).__VIBEPM_MODULES__ as {
+  register(id: string, factory: () => unknown): void;
+};
 
 /** 终末地 (Rhine/Endfield) 工业皮肤 token 覆盖。键 = shell.css :root 里的变量（全局 token + @VIBE-SKIN）。 */
 const RHINE_TOKEN: Record<string, string> = {

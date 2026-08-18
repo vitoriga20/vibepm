@@ -7,8 +7,10 @@
  *      payload.kind === "nav-card" → 产出 <onboarding-nav-card> 即可。
  *  - 所以本 client plugin 只负责把 custom element 注册上去。
  */
-// @ts-ignore TS 无法识别浏览器专用的 URL 模块
-import { modules } from "/plugins/plugin-ide-view/module-system.js";
+// 浏览器模块表由壳内核（ide-view client）构造到 window.__VIBEPM_MODULES__，插件不再 import 壳 URL
+const modules = (window as any).__VIBEPM_MODULES__ as {
+  register(id: string, factory: () => unknown): void;
+};
 import { OnboardingNavCard } from "./components.js";
 
 modules.register("plugin-onboarding", () => ({

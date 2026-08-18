@@ -7,8 +7,10 @@
  *      3. rAF 轮询兜底 → 覆盖 observer 漏事件的边界
  *  - 不加载本插件 → 壳 .primary 保持纯色背景（降级），满足"背景可装卸为插件"。
  */
-// @ts-ignore TS 无法识别浏览器专用的 URL 模块
-import { modules } from "/plugins/plugin-ide-view/module-system.js";
+// 浏览器模块表由壳内核（ide-view client）构造到 window.__VIBEPM_MODULES__，插件不再 import 壳 URL
+const modules = (window as any).__VIBEPM_MODULES__ as {
+  register(id: string, factory: () => unknown): void;
+};
 import { AmbientEngine } from "./sketch.js";
 
 function getPrimary(): HTMLElement | null {
