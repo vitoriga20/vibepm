@@ -146,7 +146,7 @@ class WebUiPlugin {
     const staticDir = resolveStaticDir();
     // 配置规范键为短名（web_ui），loader 内部按 entry id（plugin-web-ui）记录；
     // 合并两层：以短名为基，entry-id 层若覆盖则优先生效，避免空对象短路 misses。
-    const cfg = { ...ctx.mergedConfig("web_ui"), ...ctx.mergedConfig("plugin-web-ui") };
+    const cfg = { host: "127.0.0.1", port: 8080, open_browser: true, ...ctx.mergedConfig("web_ui"), ...ctx.mergedConfig("plugin-web-ui") };
     const host = cfg.host ?? "127.0.0.1";
     const port = Number(cfg.port ?? 0);
     const openBrowser = Boolean(cfg.open_browser ?? true);

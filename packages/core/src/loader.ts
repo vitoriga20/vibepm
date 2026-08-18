@@ -20,48 +20,7 @@ import { resolvePluginRows, configLayerToRows, type PatchRow } from "./patches.j
 import { validatePluginConfig } from "./schema.js";
 import { pluginsDir } from "./config.js";
 
-export const DEFAULT_BUNDLES: Record<string, string[]> = {
-  minimal: [
-    "plugin-storage",
-    "plugin-web-ui",
-    "plugin-ide-view",
-    // dsh 风格核心 4 件套（均为插件；不想用只需移出 bundle）
-    "plugin-onboarding",
-    "plugin-github-auth",
-    "plugin-settings",
-    "plugin-repo-feed",
-    "plugin-plugin-manager",
-    "plugin-ambient",
-  ],
-};
-
-/** 内核三件套：shell 自身依赖，永远不可在设置里关闭 */
-export const PROTECTED_CORE = new Set<string>([
-  "plugin-storage",
-  "plugin-web-ui",
-  "plugin-ide-view",
-]);
-
 export const PLUGINS_ENABLED_KEY = "plugins.enabled";
-
-/** 老 entryId → 旧插件目录相对 src/plugins 的映射（过渡期保留） */
-const LEGACY_ENTRY_DIR: Record<string, string> = {
-  "storage": "storage",
-  "plugin-storage": "storage",
-  "github-source": "github_source",
-  "scheduler": "scheduler",
-  "web-ui": "web_ui",
-  "plugin-web-ui": "web_ui",
-  "minimal-view": "minimal_view",
-  "ide-view": "ide_view",
-  "plugin-ide-view": "ide_view",
-  "field-goal": "fields/goal",
-  "field-priority": "fields/priority",
-  "field-status": "fields/status",
-  "field-tags": "fields/tags",
-  "field-notes": "fields/notes",
-  "field-todo": "fields/todo",
-};
 
 function readJson(abs: string): any {
   try {
@@ -72,10 +31,7 @@ function readJson(abs: string): any {
 }
 
 export function availableEntries(workspaceRoot?: string): string[] {
-  const fromWs = [...scanWorkspace(workspaceRoot).keys()];
-  const fromLegacy = Object.keys(LEGACY_ENTRY_DIR);
-  const s = new Set<string>([...fromWs, ...fromLegacy]);
-  return [...s];
+  return [...scanWorkspace(workspaceRoot).keys()];
 }
 
 /** 插件可见元信息（给 UI 插件管理 / 外部工具枚举） */
@@ -94,11 +50,11 @@ export type EntryMeta = {
  * 枚举「所有内核能识别的可见插件」= 三源合并去重。
  * 顺序不保证；UI 端自己按业务排序。
  *
- * 源 1) workspace packages/* + src/plugins legacy（manifest 扫描，同 availableEntries 数据源）
+ * 源 1) workspace packages/*（manifest 扫描，同 availableEntries 数据源）
  * 源 2) 用户全局 pluginsDir（~/.vibepm/plugins）中 config.vibepm.pluginLayers 已声明的三方包
- * 源 3) DEFAULT_BUNDLES.minimal 兜底（保持与 builtin 组合层一致）
+ * 源 3) 运行时兜底 fallbackIds（默认插件集由运行时提供，保持与组合层一致）
  */
-export function enumerateAllEntries(workspaceRoot?: string): EntryMeta[] {
+export function enumerateAllEntries(workspaceRoot?: string, fallbackIds?: string[]): EntryMeta[] {
   const out = new Map<string, EntryMeta>();
 
   // 源 1：workspace（packages/* + legacy）
@@ -131,8 +87,8 @@ export function enumerateAllEntries(workspaceRoot?: string): EntryMeta[] {
     });
   }
 
-  // 源 3：DEFAULT_BUNDLES.minimal 兜底
-  for (const id of DEFAULT_BUNDLES.minimal) {
+  // 源 3：运行时兜底（默认插件集由运行时提供，内核不持有）
+  for (const id of fallbackIds ?? []) {
     if (out.has(id)) continue;
     out.set(id, { id, pkgName: id, pkgDir: null, description: null });
   }
@@ -141,7 +97,7 @@ export function enumerateAllEntries(workspaceRoot?: string): EntryMeta[] {
 }
 
 /**
- * 把 builtin bundle 名单（DEFAULT_BUNDLES）转成 base patch 层（insert 行）。
+ * 把运行时提供的 bundle 名单（bundles 参数）转成 base patch 层（insert 行）。
  * base 层永远最先，构成插件组合的底座；后续 bundle 层按 id 覆盖它。
  */
 function baseBundleRows(
@@ -269,12 +225,12 @@ export function buildBootConfig(
   bundles?: Record<string, string[]>,
   directPlugins?: Record<string, unknown>,
 ): { order: string[]; per: Record<string, Record<string, any>>; disabled: string[] } {
-  bundles = bundles ?? DEFAULT_BUNDLES;
+  const bundlesTable: Record<string, string[]> = bundles ?? config?.vibepm?.runtime?.bundles ?? {};
   const ws = scanWorkspace();
   // base 层：builtin bundles + 老 config.plugins
   let blist = config.bundles ?? ["minimal"];
   if (typeof blist === "string") blist = [blist];
-  const baseRows = baseBundleRows(bundles, blist as string | string[], ws);
+  const baseRows = baseBundleRows(bundlesTable, blist as string | string[], ws);
   // 老 config.plugins 直列也作为 base 补充行
   baseRows.push(...legacyPluginRows(config));
   // 各层行：base ← workspace bundle 层（依赖序） ← 已安装插件层 ← 用户 patch
@@ -301,7 +257,7 @@ export function buildBootConfig(
   return { order, per, disabled };
 }
 
-async function importFromWorkspace(entry: string, ws: Map<string, ResolvedEntry>, direct?: unknown): Promise<{ mod: unknown; source: "ws" | "legacy" | "direct" }> {
+async function importFromWorkspace(entry: string, ws: Map<string, ResolvedEntry>, direct?: unknown): Promise<{ mod: unknown; source: "ws" | "direct" }> {
   if (direct !== undefined) return { mod: direct, source: "direct" };
   const fromWs = ws.get(entry);
   if (fromWs && fromWs.nodeEntry && existsSync(fromWs.nodeEntry)) {
@@ -309,15 +265,7 @@ async function importFromWorkspace(entry: string, ws: Map<string, ResolvedEntry>
     const mod = await import(specifier);
     return { mod, source: "ws" };
   }
-  // 回退到老 src/plugins/<dir>/index.js（过渡期）
-  const dir = LEGACY_ENTRY_DIR[entry] ?? entry;
-  const legacySpecifier = new URL(`../../../src/plugins/${dir}/index.js`, import.meta.url).href;
-  try {
-    const mod = await import(legacySpecifier);
-    return { mod, source: "legacy" };
-  } catch {
-    throw new Error(`plugin entry not found in workspace or legacy: ${entry}`);
-  }
+  throw new Error(`plugin entry not found in workspace: ${entry}`);
 }
 
 export interface BootResult {
@@ -336,6 +284,7 @@ export async function boot(
   direct?: Record<string, unknown>,
   scope?: string,
   workspaceRoot?: string,
+  protectedCore?: Iterable<string>,
 ): Promise<BootResult> {
   const { order, per, disabled: patchDisabled } = buildBootConfig(config, patchLayers, bundles, direct);
   const wsEntries = scanWorkspace(workspaceRoot);
@@ -344,8 +293,12 @@ export async function boot(
   const ctx = new Context({ config, scope, loader: null });
   const skipped: string[] = [];
   const disabled: string[] = [...patchDisabled];
-  // 内核三件套不可被 patch 禁用
-  for (const p of [...disabled]) if (PROTECTED_CORE.has(p)) disabled.splice(disabled.indexOf(p), 1);
+  // 壳插件不可被 patch 禁用（来源：config.vibepm.runtime.protected，由运行时注入）
+  const protectedSet = new Set<string>([
+    ...(Array.isArray(config?.vibepm?.runtime?.protected) ? config.vibepm.runtime.protected : []),
+    ...(protectedCore ?? []),
+  ]);
+  for (const p of [...disabled]) if (protectedSet.has(p)) disabled.splice(disabled.indexOf(p), 1);
   // Step 0: 先提供 slots + bootGraph（基础服务不属于 bundle 组合）
   ctx.plugin(slotsPlugin(), {}, "slots");
   ctx.plugin(clientModulesPlugin(workspaceRoot), {}, ClientModuleHost.NAME);
@@ -364,7 +317,7 @@ export async function boot(
         typeof db?.getSetting === "function" ? db.getSetting(PLUGINS_ENABLED_KEY) ?? null : null;
       if (enabledMap && typeof enabledMap === "object") {
         for (const [id, on] of Object.entries(enabledMap)) {
-          if (on === false && !PROTECTED_CORE.has(id) && id !== entry && !startupDisabled.has(id)) {
+          if (on === false && !protectedSet.has(id) && id !== entry && !startupDisabled.has(id)) {
             startupDisabled.add(id);
           }
         }

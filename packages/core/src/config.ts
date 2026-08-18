@@ -20,11 +20,9 @@ export function pluginsDir(): string {
 }
 
 export function defaultProfile(): Record<string, any> {
+  // 通用 profile：不含任何业务插件配置段（业务默认值进各插件 config schema）
   return {
     general: { sync_interval_min: 60 },
-    github: { owner: "" },
-    storage: { path: dbPath() },
-    web_ui: { host: "127.0.0.1", port: 8080, open_browser: true },
     bundles: ["minimal"],
   };
 }

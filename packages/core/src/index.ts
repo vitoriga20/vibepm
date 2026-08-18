@@ -12,4 +12,4 @@ export * from "./slots.js";
 export * from "./client-modules.js";
 export * from "./patches.js";
 export * from "./schema.js";
-export { boot, buildBootConfig, availableEntries, enumerateAllEntries, DEFAULT_BUNDLES, PROTECTED_CORE, PLUGINS_ENABLED_KEY, type BootResult, type EntryMeta } from "./loader.js";
+export { boot, buildBootConfig, availableEntries, enumerateAllEntries, PLUGINS_ENABLED_KEY, type BootResult, type EntryMeta } from "./loader.js";

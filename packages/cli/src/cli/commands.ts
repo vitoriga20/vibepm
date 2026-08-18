@@ -12,6 +12,7 @@ import {
   defaultProfile,
   type Context,
 } from "@vibepm/core";
+import { DEFAULT_BUNDLES, PROTECTED_CORE } from "../runtime.js";
 
 export function setup(): void {
   const p = profilePath();
@@ -89,6 +90,11 @@ export async function web(opts: WebOptions = {}): Promise<void> {
 
   const patchObject = readPatchOrDie(opts.patch);
   const config = mergePatch(cfg, patchObject);
+  // 注入运行时组合：内核不持有插件 id，默认插件集/壳列表由运行时提供
+  config.vibepm = {
+    ...(config.vibepm ?? {}),
+    runtime: { bundles: DEFAULT_BUNDLES, protected: PROTECTED_CORE },
+  };
   if (freePort) {
     config.web_ui = { ...(config.web_ui ?? {}), port: freePort };
     // 兼容 loader 按 entry id 记录：同时写 plugin-web-ui，保证 mergedConfig 优先命中

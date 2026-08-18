@@ -20,21 +20,11 @@ export interface SlotItem {
 }
 
 export type SlotName =
-  // === dsh 风格 极简壳 4 个通用槽（本次新引入，作为主渲染槽）===
+  // === dsh 风格 极简壳 4 个通用槽（主渲染槽）===
   | "shell.nav"           // 首页导航卡片区：onboarding / 快捷入口大卡（对应 dsh 首屏 2-3 张大卡）
   | "shell.primary"       // 主面板区：每个 item.payload.route 对应一个 hash 路由，例如 "settings" / "auth" / "feed"
   | "shell.secondary"     // 次面板区：放连接状态、提示、小工具（可空）
-  | "shell.footer"        // 底栏：版本号、连接状态、路径（非必）
-  // === 以下为旧 IDE 式槽位，后续迁移到 shell.* 后再删（暂保留，不影响极简壳渲染）===
-  | "activity-bar"        // 左侧 Activity 图标栏条目
-  | "sidebar-panels"      // 左侧侧边栏面板（对应 activity bar 选中时展开）
-  | "main-tabs"           // 主编区顶部 tabs
-  | "right-panels"        // 右侧面板
-  | "topbar-menu"         // 顶部菜单项
-  | "topbar-right"        // 顶部栏右侧（操作按钮区）
-  | "statusbar-left"      // 底部状态栏左
-  | "statusbar-right"     // 底部状态栏右
-  | "editor-widgets";    // 主编辑区悬浮 widget
+  | "shell.footer";       // 底栏：版本号、连接状态、路径（非必）
 
 export interface SlotServiceShape {
   register(slot: SlotName, item: SlotItem): () => void;

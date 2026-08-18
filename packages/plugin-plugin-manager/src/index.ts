@@ -8,11 +8,11 @@
  *  - shell.primary 注册 plugin-manager-panel（route=plugins）
  *  - shell.nav 注册「插件管理」卡
  *
- * 「全部可见插件」来源 = DEFAULT_BUNDLES.minimal 全集（与 loader 同一数据源，天然一致）。
- * PROTECTED_CORE(三件套) 在此处 locked，前端禁改。
+ * 「全部可见插件」来源 = enumerateAllEntries（workspace + 三方安装 + runtime 兜底，与 bootGraph 同一数据源）。
+ * 壳插件列表（runtime.protected）在此处 locked，前端禁改。
  */
 import type { Context } from "@vibepm/core";
-import { DEFAULT_BUNDLES, PROTECTED_CORE, PLUGINS_ENABLED_KEY, enumerateAllEntries, type EntryMeta } from "@vibepm/core";
+import { PLUGINS_ENABLED_KEY, enumerateAllEntries, type EntryMeta } from "@vibepm/core";
 import { readBody, sendJson, type ApiRouteCtx } from "@vibepm/plugin-web-ui";
 import type { SlotService } from "@vibepm/plugin-ide-view";
 
@@ -49,9 +49,8 @@ function displayFromId(id: string): string {
     .join(" ") || id;
 }
 
-/** 排序：内核三件套在前（按 PROTECTED_CORE 的稳定序）→ 其余按 display 字母序 */
-function sortEntries(rows: Array<EntryMeta & { locked: boolean }>): typeof rows {
-  const coreOrder = [...PROTECTED_CORE];
+/** 排序：壳插件在前（按运行时稳定序）→ 其余按 display 字母序 */
+function sortEntries(rows: Array<EntryMeta & { locked: boolean }>, coreOrder: string[]): typeof rows {
   return [...rows].sort((a, b) => {
     const ai = coreOrder.indexOf(a.id);
     const bi = coreOrder.indexOf(b.id);
@@ -71,11 +70,19 @@ class PluginManagerPlugin {
     const db = ctx.get("db") as any as DbLike;
     const slots = ctx.get("slots") as any as SlotService;
     const disposers: Array<() => void> = [];
+    // 运行时注入：壳插件列表与默认插件集由 config.vibepm.runtime 提供（内核不持有插件 id）
+    const protectedSet = new Set<string>(
+      Array.isArray(ctx.config?.vibepm?.runtime?.protected) ? ctx.config.vibepm.runtime.protected : [],
+    );
+    const runtimeBundles: string[] = Array.isArray(ctx.config?.vibepm?.runtime?.bundles?.minimal)
+      ? ctx.config.vibepm.runtime.bundles.minimal
+      : [];
 
-    // 数据源改为「所有内核能识别的 entry」（workspace + 三方安装 + builtin 兜底），与 bootGraph 保持一致
+    // 数据源改为「所有内核能识别的 entry」（workspace + 三方安装 + runtime 兜底），与 bootGraph 保持一致
     const readAllIds = (): Array<EntryMeta & { locked: boolean }> =>
       sortEntries(
-        enumerateAllEntries().map((e) => ({ ...e, locked: PROTECTED_CORE.has(e.id) })),
+        enumerateAllEntries(undefined, runtimeBundles).map((e) => ({ ...e, locked: protectedSet.has(e.id) })),
+        [...protectedSet],
       );
 
     const readEnabledMap = (): Record<string, boolean> => {
@@ -110,7 +117,7 @@ class PluginManagerPlugin {
       const m = sub.match(/^\/([^/]+)\/?$/);
       if (m && rctx.req.method === "POST") {
         const name = decodeURIComponent(m[1]);
-        if (PROTECTED_CORE.has(name)) {
+        if (protectedSet.has(name)) {
           sendJson(rctx.res, 400, { ok: false, reason: "内核插件不可关闭" });
           return true;
         }

@@ -2,6 +2,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Context } from "@vibepm/core";
+import { dbPath as defaultDbPath } from "@vibepm/core";
 import { Database, type ProjectRow, type TodoRow } from "./db.js";
 
 export { Database } from "./db.js";
@@ -35,11 +36,12 @@ class StoragePlugin {
   apply(ctx: Context): () => void {
     // 配置规范键为短名（storage），loader 内部按 entry id（plugin-storage）记录；
     // 合并两层：以短名为基，entry-id 层若覆盖则优先生效，避免空对象短路 misses。
-    const cfg = { ...ctx.mergedConfig("storage"), ...ctx.mergedConfig("plugin-storage") };
-    let dbPath = cfg.path ?? "vibepm.db";
-    const parent = dirname(dbPath);
+    // 默认 db 路径由本插件持有（内核不写业务默认值）。
+    const cfg = { path: defaultDbPath(), ...ctx.mergedConfig("storage"), ...ctx.mergedConfig("plugin-storage") };
+    const dbFile = cfg.path ?? defaultDbPath();
+    const parent = dirname(dbFile);
     if (parent) mkdirSync(parent, { recursive: true });
-    const db = new Database(dbPath);
+    const db = new Database(dbFile);
     const svc = new DatabaseService(db);
     ctx.provide("db", svc);
     return () => { try { db.close(); } catch { /* noop */ } };
