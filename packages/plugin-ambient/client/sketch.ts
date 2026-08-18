@@ -160,7 +160,7 @@ export class AmbientEngine {
     // 主网格线（渐变淡出左端）
     const grad = ctx.createLinearGradient(0, 0, w, 0);
     grad.addColorStop(0, "rgba(58,64,71,0)");
-    grad.addColorStop(0.35, GRID_MAJOR);
+    grad.addColorStop(0.35, `rgb(${GRID_MAJOR})`);
     grad.addColorStop(1, "rgba(58,64,71,0.35)");
     ctx.strokeStyle = grad;
     ctx.beginPath();

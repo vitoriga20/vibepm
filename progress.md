@@ -24,3 +24,16 @@
 - 研读 dsh 参考源码确认对齐模型：webServer 哑载体（register / registerFallback / tapIndex）、frontend-static 占兜底座位、client-modules 双面插件（tapIndex 注入 + 内核构造 `__DSH_MODULES__`）、shell = 前端 dist + ui-* client 插件行、plugin-inventory 动态投影、profile/bundle 数据驱动组合。
 - 产出 5 阶段解耦计划（P1 core 去插件知识 → P2 webServer 化+业务 API 迁移 → P3 client 模块系统上移 → P4 shell 面板数据驱动 → P5 CLI 结构化+plugin-manager 动态化），落盘 task_plan.md「阶段 v4」。
 - 待办：用户确认后从 P1 开干；每阶段 build + 真机验证 + git commit。
+
+## 2026-08-19 会话 4（P1-P5 解耦全部落地 + 子智能体真机检验）
+- 执行 task_plan 阶段 v4 全部 5 阶段，每阶段 build + 冒烟 + 独立 commit：
+  - P1 `6bc0c09`：DEFAULT_BUNDLES / PROTECTED_CORE / LEGACY_ENTRY_DIR 移出 core → cli/runtime.ts，boot 前注入 config.vibepm.runtime；defaultProfile 减通用（业务默认进 storage/web-ui 插件）；slots 删 9 旧槽只留 shell.*
+  - P2 `3787c89`：web-ui 拆 webServer 哑载体（register/registerFallback/tapIndex，对齐 dsh-host-webserver）；业务 API 全迁所属插件（projects/todos/sync→storage、github→github-auth、settings、feed、plugins）；web-api/route bail 事件退役；Context 增 removeUpdate
+  - P3 `b2dcf0f`：7 个 client 插件改用 window.__VIBEPM_MODULES__，删 /plugins/plugin-ide-view/module-system.js URL import + esbuild external + types.d.ts；module-system normSlots 只留 shell.*
+  - P4 `f1332d0`：RenderRegistry（kind→标签名，插件 apply 自注册）；VibeShell 删 renderPrimary switch / iconFor / selfId 硬编码，改查表渲染；shell.primary 加 icon 数据驱动
+  - P5 `12a5fa3`：core 增 BootError(code)；PortBusyError 继承之（web.listen_failed）；CLI fatal 判定改按 code（去 /web-ui|端口|EADDRINUSE/ 正则）；plugin-manager 删 PLUGIN_META，目录从 id 派生 + 自声明 description 动态生成
+- 子智能体真机检验：
+  - 静态/构建子智能体：build exit 0、core 8 测试全过、8 项静态解耦检查全 PASS（core 无插件 id、web-ui 无业务 API、无壳 URL import、无 switch、CLI 无正则、无 PLUGIN_META、slots 只 shell.*、RenderRegistry 存在）
+  - 浏览器 E2E 子智能体（隔离临时 db）：首页/设置/连接/动态/插件管理五路由全渲染；11 插件动态目录；API 全绿；皮肤开启后重启生效（深色 #111316/#ffd84d）；ambient 禁用后重启从 bootGraph 整体剔除（无画布无资源）
+  - 发现并修复 plugin-ambient 背景画布 bug：`grad.addColorStop(0.35, GRID_MAJOR)` 缺 rgb() 包装导致 addColorStop 解析失败 → 改为 `rgb(${GRID_MAJOR})`，重建 + 浏览器复验无新增报错
+- 待办：commit ambient 修复；README/对外文档不提及 dsh。
