@@ -17,7 +17,7 @@
  *       以后想加密可以只改 github service 的读写位置、无需改面板。
  */
 import type { Context } from "@vibepm/core";
-import { readBody, sendJson, type ApiRouteCtx } from "@vibepm/plugin-web-ui";
+import { readBody, sendJson, routeCtx, type WebServerService } from "@vibepm/plugin-web-ui";
 import type { SlotName, SlotService } from "@vibepm/plugin-ide-view";
 
 type DbLike = {
@@ -78,11 +78,12 @@ export class GitHubService {
 class GithubAuthPlugin {
   name = "plugin-github-auth";
   provide = ["github"];
-  inject = ["db", "slots"] as const;
+  inject = ["db", "slots", "webServer"] as const;
 
   apply(ctx: Context): () => void {
     const db = ctx.get("db") as any;
     const slots = ctx.get("slots") as any;
+    const ws = ctx.get("webServer") as WebServerService;
     const disposers: Array<() => void> = [];
 
     // 允许配置 api_base（config 优先；无则 settings 里允许覆盖）。
@@ -91,86 +92,88 @@ class GithubAuthPlugin {
     const service = new GitHubService(db as DbLike, cfg.api_base ?? "https://api.github.com");
     ctx.provide("github", service);
 
-    // --- API ---
-    // 注：web-api/route 是 bail 事件，listener 必须同步；异步工作用 IIFE + sync return true。
-    const offRoute = ctx.on("web-api/route", (rctx: ApiRouteCtx): boolean | undefined => {
-      if (!rctx.path.startsWith("/api/github")) return;
-      const sub = rctx.path.slice("/api/github".length) || "/";
+    // --- API：webServer 命名路由（prefix /api/github）---
+    const offRoute = ws.register({
+      kind: "prefix",
+      path: "/api/github",
+      handler: (req, res) => {
+        const rctx = routeCtx(req, res);
+        const sub = rctx.path.slice("/api/github".length) || "/";
 
-      if ((sub === "/status" || sub === "/status/") && rctx.req.method === "GET") {
-        const u = service.username();
-        const tok = service.token();
-        if (!u || !tok) { sendJson(rctx.res, 200, { ok: false, connected: false }); return true; }
-        void (async () => {
-          try {
-            const me = await service.me();
-            sendJson(rctx.res, 200, { ok: true, connected: true, username: u, me: me ?? null });
-          } catch (e) {
-            sendJson(rctx.res, 200, { ok: false, connected: false, reason: (e as Error).message });
-          }
-        })();
-        return true;
-      }
-      if ((sub === "/login" || sub === "/login/") && rctx.req.method === "POST") {
-        void (async () => {
-          try {
-            const body = await readBody(rctx.req);
-            const username = String(body.username ?? "").trim();
-            const token = String(body.token ?? "").trim();
-            const apiBase = body.api_base ? String(body.api_base).trim() : undefined;
-            if (!username || !token) { sendJson(rctx.res, 400, { ok: false, reason: "需要 username + token" }); return; }
-            db.setSetting("github.username", username);
-            db.setSetting("github.token", token);
-            if (apiBase) db.setSetting("github.api_base", apiBase);
-            else db.deleteSetting("github.api_base");
+        if ((sub === "/status" || sub === "/status/") && rctx.req.method === "GET") {
+          const u = service.username();
+          const tok = service.token();
+          if (!u || !tok) { sendJson(rctx.res, 200, { ok: false, connected: false }); return; }
+          void (async () => {
             try {
               const me = await service.me();
-              sendJson(rctx.res, 200, { ok: true, me });
+              sendJson(rctx.res, 200, { ok: true, connected: true, username: u, me: me ?? null });
+            } catch (e) {
+              sendJson(rctx.res, 200, { ok: false, connected: false, reason: (e as Error).message });
+            }
+          })();
+          return;
+        }
+        if ((sub === "/login" || sub === "/login/") && rctx.req.method === "POST") {
+          void (async () => {
+            try {
+              const body = await readBody(rctx.req);
+              const username = String(body.username ?? "").trim();
+              const token = String(body.token ?? "").trim();
+              const apiBase = body.api_base ? String(body.api_base).trim() : undefined;
+              if (!username || !token) { sendJson(rctx.res, 400, { ok: false, reason: "需要 username + token" }); return; }
+              db.setSetting("github.username", username);
+              db.setSetting("github.token", token);
+              if (apiBase) db.setSetting("github.api_base", apiBase);
+              else db.deleteSetting("github.api_base");
+              try {
+                const me = await service.me();
+                sendJson(rctx.res, 200, { ok: true, me });
+              } catch (e) {
+                sendJson(rctx.res, 200, { ok: false, reason: (e as Error).message });
+              }
+            } catch (e) {
+              sendJson(rctx.res, 500, { ok: false, reason: (e as Error).message });
+            }
+          })();
+          return;
+        }
+        if ((sub === "/logout" || sub === "/logout/") && rctx.req.method === "POST") {
+          db.deleteSetting("github.token");
+          db.deleteSetting("github.username");
+          db.deleteSetting("github.api_base");
+          sendJson(rctx.res, 200, { ok: true });
+          return;
+        }
+        if ((sub === "/me" || sub === "/me/") && rctx.req.method === "GET") {
+          void (async () => {
+            try {
+              const me = await service.me();
+              sendJson(rctx.res, 200, { ok: true, connected: !!me, me: me ?? null });
             } catch (e) {
               sendJson(rctx.res, 200, { ok: false, reason: (e as Error).message });
             }
-          } catch (e) {
-            sendJson(rctx.res, 500, { ok: false, reason: (e as Error).message });
-          }
-        })();
-        return true;
-      }
-      if ((sub === "/logout" || sub === "/logout/") && rctx.req.method === "POST") {
-        db.deleteSetting("github.token");
-        db.deleteSetting("github.username");
-        db.deleteSetting("github.api_base");
-        sendJson(rctx.res, 200, { ok: true });
-        return true;
-      }
-      // 代理 GET：/api/github/proxy/*；另外插件内部提供 /api/github/me 快捷（对应 components 调用）
-      if ((sub === "/me" || sub === "/me/") && rctx.req.method === "GET") {
-        void (async () => {
-          try {
-            const me = await service.me();
-            sendJson(rctx.res, 200, { ok: true, connected: !!me, me: me ?? null });
-          } catch (e) {
-            sendJson(rctx.res, 200, { ok: false, reason: (e as Error).message });
-          }
-        })();
-        return true;
-      }
-      const proxyM = sub.match(/^\/proxy\/(.+)$/);
-      if (proxyM && rctx.req.method === "GET") {
-        void (async () => {
-          try {
-            const path = "/" + decodeURIComponent(proxyM[1]);
-            const qs = rctx.url.search.toString();
-            const data = await service.fetchJson(path + qs, { timeoutMs: 20000 });
-            sendJson(rctx.res, 200, { ok: true, data });
-          } catch (e) {
-            sendJson(rctx.res, 502, { ok: false, reason: (e as Error).message });
-          }
-        })();
-        return true;
-      }
-      return undefined;
+          })();
+          return;
+        }
+        const proxyM = sub.match(/^\/proxy\/(.+)$/);
+        if (proxyM && rctx.req.method === "GET") {
+          void (async () => {
+            try {
+              const path = "/" + decodeURIComponent(proxyM[1]);
+              const qs = rctx.url.search.toString();
+              const data = await service.fetchJson(path + qs, { timeoutMs: 20000 });
+              sendJson(rctx.res, 200, { ok: true, data });
+            } catch (e) {
+              sendJson(rctx.res, 502, { ok: false, reason: (e as Error).message });
+            }
+          })();
+          return;
+        }
+        sendJson(rctx.res, 404, { ok: false, reason: "not found" });
+      },
     });
-    disposers.push(offRoute as () => void);
+    disposers.push(offRoute);
 
     // --- 面板：#auth ---
     disposers.push(slots.register("shell.primary", {

@@ -216,6 +216,9 @@ importers:
       '@vibepm/core':
         specifier: workspace:*
         version: link:../core
+      '@vibepm/plugin-web-ui':
+        specifier: workspace:*
+        version: link:../plugin-web-ui
 
   packages/plugin-web-ui:
     dependencies:

@@ -13,7 +13,7 @@
  */
 import type { Context } from "@vibepm/core";
 import { PLUGINS_ENABLED_KEY, enumerateAllEntries, type EntryMeta } from "@vibepm/core";
-import { readBody, sendJson, type ApiRouteCtx } from "@vibepm/plugin-web-ui";
+import { readBody, sendJson, routeCtx, type WebServerService } from "@vibepm/plugin-web-ui";
 import type { SlotService } from "@vibepm/plugin-ide-view";
 
 type DbLike = {
@@ -64,11 +64,12 @@ function sortEntries(rows: Array<EntryMeta & { locked: boolean }>, coreOrder: st
 class PluginManagerPlugin {
   name = "plugin-plugin-manager";
   provide: string[] = [];
-  inject = ["db", "slots"] as const;
+  inject = ["db", "slots", "webServer"] as const;
 
   apply(ctx: Context): () => void {
     const db = ctx.get("db") as any as DbLike;
     const slots = ctx.get("slots") as any as SlotService;
+    const ws = ctx.get("webServer") as WebServerService;
     const disposers: Array<() => void> = [];
     // 运行时注入：壳插件列表与默认插件集由 config.vibepm.runtime 提供（内核不持有插件 id）
     const protectedSet = new Set<string>(
@@ -90,55 +91,59 @@ class PluginManagerPlugin {
       return m && typeof m === "object" ? m : {};
     };
 
-    // --- API ---
-    const offRoute = ctx.on("web-api/route", (rctx: ApiRouteCtx): boolean | undefined => {
-      if (!rctx.path.startsWith("/api/plugins")) return;
-      const sub = rctx.path.slice("/api/plugins".length);
+    // --- API：webServer 命名路由（prefix /api/plugins）---
+    const offRoute = ws.register({
+      kind: "prefix",
+      path: "/api/plugins",
+      handler: (req, res) => {
+        const rctx = routeCtx(req, res);
+        const sub = rctx.path.slice("/api/plugins".length);
 
-      // GET /api/plugins → 列表
-      if ((sub === "" || sub === "/") && rctx.req.method === "GET") {
-        const enabled = readEnabledMap();
-        const all = readAllIds();
-        const list = all.map((e) => {
-          const meta = PLUGIN_META[e.id];
-          return {
-            name: e.id,
-            pkgName: e.pkgName,
-            display: meta?.display ?? displayFromId(e.id),
-            desc: meta?.desc ?? e.description ?? "—",
-            locked: e.locked,
-            enabled: e.locked ? true : !(enabled[e.id] === false),
-          };
-        });
-        sendJson(rctx.res, 200, { ok: true, data: list });
-        return true;
-      }
-      // POST /api/plugins/:name { enabled } → 写 settings
-      const m = sub.match(/^\/([^/]+)\/?$/);
-      if (m && rctx.req.method === "POST") {
-        const name = decodeURIComponent(m[1]);
-        if (protectedSet.has(name)) {
-          sendJson(rctx.res, 400, { ok: false, reason: "内核插件不可关闭" });
-          return true;
+        // GET /api/plugins → 列表
+        if ((sub === "" || sub === "/") && rctx.req.method === "GET") {
+          const enabled = readEnabledMap();
+          const all = readAllIds();
+          const list = all.map((e) => {
+            const meta = PLUGIN_META[e.id];
+            return {
+              name: e.id,
+              pkgName: e.pkgName,
+              display: meta?.display ?? displayFromId(e.id),
+              desc: meta?.desc ?? e.description ?? "—",
+              locked: e.locked,
+              enabled: e.locked ? true : !(enabled[e.id] === false),
+            };
+          });
+          sendJson(rctx.res, 200, { ok: true, data: list });
+          return;
         }
-        void (async () => {
-          try {
-            const body = await readBody(rctx.req);
-            const target = Boolean(body.enabled === undefined ? true : body.enabled);
-            const enabled = readEnabledMap();
-            if (target) delete enabled[name];
-            else enabled[name] = false;
-            db.setSetting(PLUGINS_ENABLED_KEY, enabled);
-            sendJson(rctx.res, 200, { ok: true, name, enabled: target, restarted: "冷启动生效：请重启内核" });
-          } catch (e) {
-            sendJson(rctx.res, 500, { ok: false, reason: (e as Error).message });
+        // POST /api/plugins/:name { enabled } → 写 settings
+        const m = sub.match(/^\/([^/]+)\/?$/);
+        if (m && rctx.req.method === "POST") {
+          const name = decodeURIComponent(m[1]);
+          if (protectedSet.has(name)) {
+            sendJson(rctx.res, 400, { ok: false, reason: "内核插件不可关闭" });
+            return;
           }
-        })();
-        return true;
-      }
-      return undefined;
+          void (async () => {
+            try {
+              const body = await readBody(rctx.req);
+              const target = Boolean(body.enabled === undefined ? true : body.enabled);
+              const enabled = readEnabledMap();
+              if (target) delete enabled[name];
+              else enabled[name] = false;
+              db.setSetting(PLUGINS_ENABLED_KEY, enabled);
+              sendJson(rctx.res, 200, { ok: true, name, enabled: target, restarted: "冷启动生效：请重启内核" });
+            } catch (e) {
+              sendJson(rctx.res, 500, { ok: false, reason: (e as Error).message });
+            }
+          })();
+          return;
+        }
+        sendJson(rctx.res, 404, { ok: false, reason: "not found" });
+      },
     });
-    disposers.push(offRoute as () => void);
+    disposers.push(offRoute);
 
     // --- 面板：#plugins ---
     disposers.push(slots.register("shell.primary", {

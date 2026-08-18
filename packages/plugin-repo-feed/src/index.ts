@@ -5,7 +5,7 @@
  *  - slots.register shell.primary → 面板 route=#feed。
  */
 import type { Context } from "@vibepm/core";
-import { sendJson, type ApiRouteCtx } from "@vibepm/plugin-web-ui";
+import { sendJson, routeCtx, type WebServerService } from "@vibepm/plugin-web-ui";
 import type { SlotName, SlotService } from "@vibepm/plugin-ide-view";
 import type { GitHubService } from "@vibepm/plugin-github-auth";
 
@@ -87,38 +87,41 @@ function normalizeEvents(evs: any[]): FeedItem[] {
 class RepoFeedPlugin {
   name = "plugin-repo-feed";
   provide: string[] = [];
-  inject = ["github", "slots"] as const;
+  inject = ["github", "slots", "webServer"] as const;
 
   apply(ctx: Context): () => void {
     const gh = ctx.get("github") as any as GitHubService;
     const slots = ctx.get("slots") as any as SlotService;
+    const ws = ctx.get("webServer") as WebServerService;
     const disposers: Array<() => void> = [];
 
-    // --- API ---
-    // 注：web-api/route 是 bail 事件，listener 必须同步；异步工作用 IIFE + sync return true。
-    const off = ctx.on("web-api/route", (rctx: ApiRouteCtx): boolean | undefined => {
-      if (!rctx.path.startsWith("/api/feed")) return;
-      if (rctx.req.method !== "GET") { sendJson(rctx.res, 405, { ok: false, reason: "method not allowed" }); return true; }
-      if (!gh.token()) { sendJson(rctx.res, 200, { ok: false, connected: false, items: [] }); return true; }
-      void (async () => {
-        try {
-          // 查询参数：?per_page=30 ；默认 30
-          const per = Number(rctx.url.searchParams.get("per_page") ?? 30);
-          const page = Number(rctx.url.searchParams.get("page") ?? 1);
-          const username = gh.username() ?? (await gh.me())?.login;
-          if (!username) { sendJson(rctx.res, 200, { ok: false, reason: "no username" }); return; }
-          const data = await gh.fetchJson(
-            `/users/${encodeURIComponent(username)}/received_events?per_page=${Math.min(per, 100)}&page=${Math.max(page, 1)}`,
-            { timeoutMs: 20000 },
-          );
-          sendJson(rctx.res, 200, { ok: true, connected: true, items: normalizeEvents(data) });
-        } catch (e) {
-          sendJson(rctx.res, 502, { ok: false, reason: (e as Error).message, items: [] });
-        }
-      })();
-      return true;
+    // --- API：webServer 命名路由（prefix /api/feed）---
+    const off = ws.register({
+      kind: "prefix",
+      path: "/api/feed",
+      handler: (req, res) => {
+        const rctx = routeCtx(req, res);
+        if (rctx.req.method !== "GET") { sendJson(rctx.res, 405, { ok: false, reason: "method not allowed" }); return; }
+        if (!gh.token()) { sendJson(rctx.res, 200, { ok: false, connected: false, items: [] }); return; }
+        void (async () => {
+          try {
+            // 查询参数：?per_page=30 ；默认 30
+            const per = Number(rctx.url.searchParams.get("per_page") ?? 30);
+            const page = Number(rctx.url.searchParams.get("page") ?? 1);
+            const username = gh.username() ?? (await gh.me())?.login;
+            if (!username) { sendJson(rctx.res, 200, { ok: false, reason: "no username" }); return; }
+            const data = await gh.fetchJson(
+              `/users/${encodeURIComponent(username)}/received_events?per_page=${Math.min(per, 100)}&page=${Math.max(page, 1)}`,
+              { timeoutMs: 20000 },
+            );
+            sendJson(rctx.res, 200, { ok: true, connected: true, items: normalizeEvents(data) });
+          } catch (e) {
+            sendJson(rctx.res, 502, { ok: false, reason: (e as Error).message, items: [] });
+          }
+        })();
+      },
     });
-    disposers.push(off as () => void);
+    disposers.push(off);
 
     disposers.push(slots.register("shell.primary", {
       id: "feed/panel",

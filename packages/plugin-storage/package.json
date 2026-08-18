@@ -19,6 +19,7 @@
     "test": "node --import tsx --test test/**/*.test.ts || exit 0"
   },
   "dependencies": {
-    "@vibepm/core": "workspace:*"
+    "@vibepm/core": "workspace:*",
+    "@vibepm/plugin-web-ui": "workspace:*"
   }
 }

@@ -54,6 +54,9 @@ export class Context implements LifecycleLike {
   onUpdate(name: string, cb: (name: string) => void): void {
     this.registry.onUpdate(name, cb);
   }
+  removeUpdate(cb: (name: string) => void): void {
+    this.registry.removeUpdate(cb);
+  }
 
   private flushDependents(name: string): void {
     for (const fiber of this.fibers.values()) {

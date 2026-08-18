@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Context } from "@vibepm/core";
 import { dbPath as defaultDbPath } from "@vibepm/core";
+import { sendJson, readBody, routeCtx, type WebServerService } from "@vibepm/plugin-web-ui";
 import { Database, type ProjectRow, type TodoRow } from "./db.js";
 
 export { Database } from "./db.js";
@@ -44,7 +45,77 @@ class StoragePlugin {
     const db = new Database(dbFile);
     const svc = new DatabaseService(db);
     ctx.provide("db", svc);
-    return () => { try { db.close(); } catch { /* noop */ } };
+
+    // --- db 业务 API（迁自旧 web-ui 路由）：projects / todos / field / sync ---
+    // storage 最先加载，webServer 由 web-ui 稍后提供 → 用 onUpdate 等它出现再注册
+    const registerApi = (): Array<() => void> => {
+      if (!ctx.has("webServer")) return [];
+      const ws = ctx.get("webServer") as WebServerService;
+      const offs: Array<() => void> = [];
+      offs.push(ws.register({ kind: "prefix", path: "/api/projects", handler: (req, res) => {
+        const rctx = routeCtx(req, res);
+        if (rctx.req.method !== "GET" && rctx.req.method !== "POST") { sendJson(res, 405, { ok: false }); return; }
+        if (rctx.path === "/api/projects") { sendJson(res, 200, svc.listProjects()); return; }
+        const todoM = rctx.path.match(/^\/api\/projects\/([^/]+)\/todos$/);
+        if (todoM) {
+          const pid = decodeURIComponent(todoM[1]);
+          if (rctx.req.method === "GET") { sendJson(res, 200, svc.listTodos(pid)); return; }
+          void (async () => {
+            const body = await readBody(rctx.req);
+            const id = svc.addTodo(pid, String(body.title ?? ""), String(body.priority ?? "中"));
+            sendJson(res, 200, { id });
+          })();
+          return;
+        }
+        const fieldM = rctx.path.match(/^\/api\/projects\/([^/]+)\/field$/);
+        if (fieldM && rctx.req.method === "POST") {
+          const pid = decodeURIComponent(fieldM[1]);
+          void (async () => {
+            const body = await readBody(rctx.req);
+            const p = svc.getProject(pid);
+            if (p) {
+              const allowed = ["goal", "priority", "status", "tags", "notes"];
+              const np: any = { ...p };
+              for (const k of Object.keys(body)) if (allowed.includes(k)) np[k] = body[k];
+              svc.upsertProject({ ...np, repo_name: np.repo_name });
+            }
+            sendJson(res, 200, { ok: true });
+          })();
+          return;
+        }
+        const projM = rctx.path.match(/^\/api\/projects\/([^/]+)$/);
+        if (projM) { sendJson(res, 200, svc.getProject(decodeURIComponent(projM[1]))); return; }
+        sendJson(res, 404, { ok: false });
+      }}));
+      offs.push(ws.register({ kind: "prefix", path: "/api/todos", handler: (req, res) => {
+        const rctx = routeCtx(req, res);
+        const m = rctx.path.match(/^\/api\/todos\/(\d+)\/done$/);
+        if (m && rctx.req.method === "POST") {
+          void (async () => {
+            const body = await readBody(rctx.req);
+            svc.setTodoDone(Number(m[1]), Boolean(body.done));
+            sendJson(res, 200, { ok: true });
+          })();
+          return;
+        }
+        sendJson(res, 404, { ok: false });
+      }}));
+      offs.push(ws.register({ kind: "exact", path: "/api/sync", handler: (req, res) => {
+        if (req.method !== "POST") { sendJson(res, 405, { ok: false }); return; }
+        // 旧 sync 依赖 repoStore（从未提供）；保留端点，诚实返回未实现
+        sendJson(res, 200, { ok: false });
+      }}));
+      return offs;
+    };
+    let apiOffs: Array<() => void> = registerApi();
+    const onWs = (): void => { if (!apiOffs.length && ctx.has("webServer")) apiOffs = registerApi(); };
+    ctx.onUpdate("webServer", onWs);
+
+    return () => {
+      ctx.removeUpdate(onWs);
+      for (const off of apiOffs.reverse()) try { off(); } catch { /* noop */ }
+      try { db.close(); } catch { /* noop */ }
+    };
   }
 }
 
