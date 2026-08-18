@@ -127,6 +127,93 @@ vibepm plugin remove @my-org/my-plugin
 >
 > 说明：patch 默认文件名是 `vibepm.patch.json`（JSON，少依赖）；若 `insert` 出未安装到插件目录的行，该插件会在启动时被安全跳过（进 skipped，不崩整链）。
 
+### 作为开发者：给 vibepm 写并分发一个插件
+
+> 你是插件作者，想把插件做成别人 `vibepm plugin add` 就能装的包。`examples/plugin-hello` 是最小可跑模板，**复制它 → 改 manifest → 写业务** 三步即成。
+
+**1. 复制模板**
+
+```bash
+cp -r examples/plugin-hello my-plugin
+cd my-plugin
+```
+
+改 `package.json` 的 `name` / `version` / `description`；再把 `vibepm.patch.json` 里的 `id` / `name` 改成你的插件 id（id 是组合层里的稳定键，建议与包名同名）。
+
+**2. 插件是「两半式」**
+
+| 半 | 文件 | 职责 | 加载端 |
+| --- | --- | --- | --- |
+| node 半 | `src/index.ts` | 后端逻辑：暴露 service、注册 HTTP 路由、提供能力 | Node：loader 装配后调用 `apply(ctx)` |
+| client 半 | `src/client.ts` | 前端界面：定义自定义元素、注册 shell 槽位、交互 | 浏览器：壳从 `vibepm.client.entry` 动态 import |
+
+- **node 半**导出 `{ name, provide, inject, apply }` 的对象，`apply(ctx)` 在装入内核时被调用并返回清理函数（卸载时执行）。模板是**完全自包含**的——零 `@vibepm/*` 依赖、用结构签名鸭子类型访问内核，这样第三方不必依赖 monorepo。
+- **client 半**通过壳内核构造到 `window.__VIBEPM_MODULES__` 的模块表注册自己，不要在 client 里 import 壳 URL：
+
+```ts
+const modules = (window as any).__VIBEPM_MODULES__;
+modules.register("my-plugin", () => ({
+  name: "my-plugin", inject: [], provide: [],
+  apply() { /* 定义组件 / 注册渲染 */ return () => { /* 清理 */ }; },
+}));
+```
+
+**3. 声明 manifest（`package.json` 的 `vibepm` 字段）**
+
+- `vibepm.node` —— node 半装配信息（`inject` 要注入的服务 / `provide` 提供的能力）
+- `vibepm.client` —— client 半入口（`entry` 指向打包后的浏览器 bundle）+ `immediately` 是否立即加载
+- `vibepm.bundle.patch` —— 指向 patch 文件（默认 `./vibepm.patch.json`）。**没有这一项，你的包只会被当成普通依赖安装，不构成组合层，`vibepm plugin add` 装了也不生效**；patch 用它把自己 `insert` 进组合层 bootGraph。
+
+```json
+{
+  "vibepm": {
+    "node":  { "inject": [], "provide": [], "immediately": true },
+    "client":{ "entry": "./dist/client.js", "inject": [], "provide": [], "immediately": true },
+    "bundle":{ "patch": "./vibepm.patch.json" }
+  }
+}
+```
+
+`vibepm.patch.json`（把插件自己加进 bootGraph，`id` 必须与 node 半的 `name` 一致）：
+
+```json
+[
+  { "id": "my-plugin", "name": "@you/my-plugin" }
+]
+```
+
+**4. 想有界面？用 shell 槽位注册**
+
+UI 插件经 `slots` 服务往极简壳注册内容（node 半 `inject: ["slots"]`）：
+
+| 槽 | 用途 |
+| --- | --- |
+| `shell.nav` | 首屏导航卡（每条 `payload.hash` 对应一个 hash 路由） |
+| `shell.primary` | 主面板（每条 `payload.route` 对应一个路由，命中即渲染） |
+| `shell.secondary` | 状态 pill |
+| `shell.footer` | 底栏 |
+
+```ts
+slots.register("shell.nav", {
+  id: "my/nav", label: "我的插件", order: 10,
+  payload: { kind: "nav-card", icon: "settings", desc: "点我进插件", hash: "#my" },
+});
+```
+
+禁用插件后，这些槽条目随界面一起消失（对齐 dsh：外壳不动，UI 全由插件驱动）。
+
+**5. 构建 → 本地自测 → 分发**
+
+```bash
+npm run build            # 产出 dist/（node）+ dist/client.js（client）
+vibepm plugin add ../my-plugin   # 本地自测安装，重启 `vibepm web` 验证生效
+```
+
+验证 OK 后二选一分发，别人就能 `vibepm plugin add` 安装了：
+
+- **npm 包**：`npm publish` → `vibepm plugin add @you/my-plugin`
+- **git 仓库**：推上去 → `vibepm plugin add git+https://github.com/you/my-plugin.git`（git 依赖构建脚本会被 pnpm 阻断，把条目加进 `~/.vibepm/plugins/pnpm-workspace.yaml` 的 `allowBuilds` 再装）
+
 ## 开发
 
 ```bash
