@@ -1,7 +1,7 @@
 # plugin-github 设计文档（项目画像）
 
 日期：2026-08-18
-状态：已与用户对齐颗粒度，待用户 review 后转实现计划
+状态：颗粒度已对齐（第 2 轮），待用户 review 后转实现计划
 
 ## 1. 背景与动机
 
@@ -13,21 +13,24 @@
 问题：
 
 1. 连接方式繁琐：必须手动填 username + PAT，与本地已登录的 `gh` CLI 无关。
-2. 功能定位不匹配：`repo-feed` 用的是"关注仓库动态"（received_events），而本插件的真实目的是**管理自己的项目**。
+2. 功能定位不匹配：`repo-feed` 用"关注仓库动态"（received_events），本插件真实目的是**管理自己的项目**。
 3. 两个插件割裂，能力分散。
 
 ## 2. 目标
 
-合并 `plugin-github-auth` + `plugin-repo-feed` 为单一插件 `plugin-github`，并升级能力：
+合并 `plugin-github-auth` + `plugin-repo-feed` 为单一插件 `plugin-github`，升级能力：
 
 - 简化连接：优先自动读取本地 `gh` CLI 已登录 token（零输入）；次选 Device Flow 浏览器授权；手动 PAT 保留作兜底。
-- 只读动态：**只展示自己名下仓库的动态**，按仓库分组。用于管理自己的项目。
+- 只读动态：**只展示自己名下仓库的动态**，用于管理自己的项目。
+- 动态关注点在 **commits**：能看到每次 push 的 commit 列表与标题（feat 等 subject），**不需要**文件级 diff。
+- 仓库列表按提交频率分区：活跃区 + 尘封区（低活跃），帮助聚焦真在维护的项目。
 - 明确不做：不做 clone / pull / push 等本地 git 操作，因此**不需要 SSH**，不引入本地 git 执行链路。
 
 ## 3. 非目标
 
 - 不做仓库拉取/推送（无 SSH，无 child_process git 操作）。
-- 不做关注仓库 / 他人仓库的动态聚合（received_events 单流移除）。
+- 不做关注仓库 / 他人仓库的动态（received_events 移除）。
+- 不做 commit 的文件级 diff / 单文件改动详情（只展示 commit subject）。
 - 不做 GitHub 通知（notifications）、Issue/PR 交互操作。
 - 不做 token 加密存储（延续现状：明文本地 SQLite，本地优先够用原则）。
 
@@ -45,7 +48,7 @@
 packages/plugin-github/
 ├── src/index.ts          # Node 侧：认证三源 + github service 增强 + API + 面板/导航卡注册
 ├── client/index.ts       # Client 侧：注册自定义元素
-├── client/components.ts  # Client 侧：认证面板 + 动态面板 UI
+├── client/components.ts  # Client 侧：认证面板 + 仓库列表面板 + 仓库详情面板
 ├── client/types.d.ts     # 浏览器模块 ambient 声明
 ├── client-dist/client.js # esbuild 产物（构建生成）
 ├── dist/                 # tsc 产物（构建生成）
@@ -53,58 +56,64 @@ packages/plugin-github/
 └── tsconfig.json
 ```
 
+页面结构（3 页，`#feed` 移除）：
+
+| 路由 | 组件 | 说明 |
+| --- | --- | --- |
+| #auth | github-auth-panel | 连接页；登录后授权表单折叠 |
+| #repos | github-repos-panel | 我的仓库（入口默认页）：活跃区 + 尘封区 |
+| #repo?name=owner/repo | github-repo-detail-panel | 仓库详情：meta 条 + 动态 timeline（commits 为主） |
+
 替换链路（影响面，7 处，实现时同步修改）：
 
 1. 新建 `packages/plugin-github`（迁移自两个旧插件代码并增强）。
 2. `packages/core/src/loader.ts`：bundles minimal 列表中的 `plugin-github-auth`、`plugin-repo-feed` → `plugin-github`。
 3. `packages/plugin-plugin-manager/src/index.ts`：插件元数据两条 → 合并一条 `plugin-github`。
-4. `packages/plugin-ide-view/client/components.ts`：面板组件 `case "github-auth-panel"` → 适配新组件（认证面板沿用 `github-auth-panel`，动态面板新注册）。
+4. `packages/plugin-ide-view/client/components.ts`：面板组件 `case "github-auth-panel"` 扩展为认证/列表/详情三组件分发。
 5. 删除 `packages/plugin-github-auth`、`packages/plugin-repo-feed` 两目录。
 6. workspace / tsconfig reference 更新（移除对两个旧包的依赖与引用）。
 7. `plugin-onboarding` 无硬依赖（导航卡自注册），不动。
 
-## 6. 认证三源
+## 6. 认证三源 + 入口守卫
 
-优先级：gh CLI 自动读 > Device Flow > 手动 PAT 兜底。
+### 6.1 三源（优先级）
 
-### 6.1 gh CLI 自动读（主，零输入）
+1. **gh CLI 自动读（主，零输入）**：
+   - 优先执行 `gh auth token`（若 `gh` 在 PATH），取 stdout。
+   - `gh` 未安装 / 失败 → 解析 hosts.yml（Win: `%APPDATA%\GitHub CLI\hosts.yml`；POSIX: `~/.config/gh/hosts.yml`），取 `github.com:` 下 `oauth_token`。
+   - 仅读取，不写入不修改 gh 配置。
+   - 每次 `/status` 实时解析，gh 已登录即自动 connected（静默自动登录，零交互）。
+2. **Device Flow（次，浏览器授权）**：
+   - 需要 OAuth App 公开 `client_id`（仅 client_id 参与，client_secret 不参与）。
+   - `POST /device/start` → 返回 `device_code` / `user_code` / `verification_uri` / `expires_in` / `interval`。
+   - 前端展示授权码 + 链接，按 `interval` 轮询 `POST /device/poll` → 成功存 token；过期/拒绝明确提示可重开。
+   - `client_id` 做成配置项，内置默认值，可被覆盖。
+3. **手动 PAT（兜底）**：保留 username + PAT 表单，置于最不显眼位置（登录后折叠）。
 
-- 优先执行 `gh auth token`（若 `gh` 在 PATH），取 stdout 作为 token。
-- `gh` 未安装 / 失败 → 解析 hosts.yml：
-  - Windows：`%APPDATA%\GitHub CLI\hosts.yml`
-  - POSIX：`~/.config/gh/hosts.yml`
-  - 取 `github.com:` 下 `oauth_token` 字段。
-- 仅读取，不写入、不修改任何 gh 配置。
+### 6.2 token 存储与来源标记
 
-### 6.2 Device Flow（次，浏览器授权）
+- token 存 `github.token`，username 存 `github.username`，来源存 `github.source`（`gh`/`device`/`pat`）。
+- 运行时解析顺序：gh CLI 实时读 → 无 gh 回退 settings 中存的手动/device token。
+- logout 清 token/username/source + 内存缓存。
 
-- GitHub 官方 Device Flow：需要 OAuth App 的公开 `client_id`（仅 client_id 参与，client_secret 不参与）。
-- 流程：
-  1. `POST /api/github/device/start` → GitHub 返回 `device_code` / `user_code` / `verification_uri` / `expires_in` / `interval`。
-  2. 前端展示 `user_code` + 授权链接（verification_uri），引导用户打开浏览器授权。
-  3. 前端按 `interval` 自动轮询 `POST /api/github/device/poll`。
-  4. 轮询成功 → 拿 `access_token` 存 settings；失败（expired/denied/pending）→ 明确提示并允许重开。
-- `client_id` 做成配置项，内置默认值，可被用户覆盖。
+### 6.3 入口守卫（强制跳转）
 
-### 6.3 手动 PAT（兜底）
+- 进入 `#repos` / `#repo` 前，前端先调 `GET /api/github/status`：
+  - connected（含 gh 自动解析）→ 正常渲染。
+  - 未连接 → **强制跳转 `#auth`**（不做页内空态引导，避免用户停在无数据的页）。
 
-- 保留现有 username + PAT 表单，置于设置面板最不显眼位置。
+### 6.4 授权表单折叠
 
-### 6.4 token 存储与来源标记
-
-- token 仍存 settings（`github.token`），username 存 `github.username`。
-- 新增 `github.source` 记录来源（`gh` / `device` / `pat`），`/status` 展示。
-- 优先解析顺序（运行时）：
-  1. gh CLI 实时读取（每次取用，保证与本地 gh 同步）；
-  2. 无 gh 时回退到 settings 中存的手动/device token。
+- 已登录后 `#auth` 仅显示状态条（账号 + 来源 + 退出 + 切换），Device Flow / PAT 表单全部折叠隐藏，不重复展示。
 
 ## 7. github service 增强
 
-保留现有 `fetchJson` / `me`，新增：
+保留 `fetchJson` / `me`，新增：
 
-- `listRepos(): Promise<RepoMeta[]>`：`GET /user/repos?per_page=100&sort=updated` 分页合并全量，返回仓库元数据（name、full_name、description、language、updated_at、html_url、default_branch 等）。
-- `repoEvents(owner, repo): Promise<any[]>`：`GET /repos/:owner/:repo/events?per_page=30`。
-- 内存 TTL 缓存：repos 与单仓 events 各缓存 60s（可配置 `cache_ttl`），降低限流与延迟。缓存 key 含 token 归属，logout 时清空。
+- `listRepos(): Promise<RepoMeta[]>`：`GET /user/repos?per_page=100&sort=updated` 分页合并全量。
+- `repoEvents(owner, repo): Promise<GhEvent[]>`：`GET /repos/:owner/:repo/events?per_page=100`。
+- `commitFrequency(events): { commits7d, commits30d }`：从 events 中累加 PushEvent 的 `distinct_size`（去重提交数），分 7 天 / 30 天两档统计。
+- 内存 TTL 缓存：repos 与单仓 events 各缓存 `cache_ttl`（默认 60s）；缓存 key 含 token 归属，logout 清空。
 
 ## 8. API 设计（统一前缀 /api/github/*）
 
@@ -115,56 +124,83 @@ packages/plugin-github/
 | POST | /api/github/logout | 清 token/username/source + 清缓存 |
 | POST | /api/github/device/start | 发起 Device Flow，返回授权码与链接 |
 | POST | /api/github/device/poll | 轮询授权状态，成功返回 token |
-| GET | /api/github/repos | 我的仓库列表（带缓存） |
-| GET | /api/github/repos/:owner/:repo/events | 单仓动态（带缓存） |
-| GET | /api/github/feed | 聚合：我的仓库 + 每仓 events，按仓库分组；`?refresh=1` 强刷 |
+| GET | /api/github/repos | 仓库列表 + 提交频率 + 活跃标记（后端聚合） |
+| GET | /api/github/repos/:owner/:repo/events | 单仓动态（commits 为主） |
 
-移除旧 `/api/feed`（received_events 单流）。
+移除旧 `/api/feed`（received_events 单流）与聚合 `/api/github/feed`（聚合逻辑并入 /repos）。
 
 ## 9. 动态数据方案
 
-采用**逐仓聚合**：
+### 9.1 仓库列表聚合（GET /repos 后端完成）
 
 1. `GET /user/repos` 取我的全部仓库（分页合并，按 updated 排序）。
-2. 并行拉取每仓 `GET /repos/:owner/:repo/events?per_page=30`，并发上限 5，单仓失败跳过并标记（不影响整体）。
-3. 后端按仓库分组返回：`[{ repo, meta, items: FeedItem[] }]`。
-4. 前端渲染"仓库头 + 该仓动态列表"。
+2. 并行拉取每仓 `GET /repos/:owner/:repo/events?per_page=100`，并发上限 5，单仓失败跳过并标记。
+3. 从每仓 events 计算提交频率（PushEvent distinct_size 累加）：
+   - `commits7d`：近 7 天去重提交数。
+   - `commits30d`：近 30 天去重提交数。
+4. 分区判据（**待用户确认**）：`commits7d >= 5` → 活跃区；否则 → 尘封区。
+5. 返回：`{ ok, repos: [{ ...RepoMeta, commits7d, commits30d, active }], activeCount, dustyCount }`。
 
-FeedItem 字段（沿用并保留）：`id / type / icon / actor / title / repo / repo_url / created_at / raw`。
+> 理解标注：用户给出两个数字"30"与"7天5次"，本设计采用——统计展示窗口 30 天（commits30d），分区判据近 7 天 ≥ 5 次提交（commits7d >= 5）。若两者应统一为同一窗口，请在 review 时指出。
+
+### 9.2 单仓动态（GET /repos/:owner/:repo/events）
+
+- 保留各类型事件：push / PR / issue / release / star / fork / create / watch / other。
+- **push 事件展开**：显示"推送 N 个提交"+ 每个 commit 行（subject 即 feat 标题 + 短 sha + 提交者），**不展示文件级 diff**。
+- FeedItem 字段：`id / type / icon / actor / title / repo / repo_url / created_at / raw`；push 额外带 `commits: [{ sha_short, subject, author }]`。
 
 ## 10. UI
 
-- 面板 `#auth`（`github-auth-panel`，改造）：连接状态条（显示来源）+ Device Flow 授权区块 + 手动 PAT 兜底表单（折叠）。
-- 面板 `#feed`（动态面板，新增/改造）：仓库分组列表，每仓库头部（名称、语言、更新时间、打开链接）+ 该仓动态 timeline（复用现有 push/PR/issue/release/star/fork 图标与相对时间）。
-- 首页 nav 导航卡两张：`#auth`（连接）+ `#feed`（仓库动态），随插件装卸出现/消失。
-- 沿用科研黄黑皮肤 CSS 变量（--skin-* / --yellow 等），不新增全局样式。
+### 10.1 #auth 连接页（改造 github-auth-panel）
+
+- 未登录：状态条（未连接）+ Device Flow 授权块（授权码 + 链接 + 轮询态）+ PAT 兜底表单（折叠）。
+- 已登录：状态条（账号 + 来源 + 退出 + 切换），授权表单折叠隐藏。
+
+### 10.2 #repos 仓库列表页（新 github-repos-panel，入口默认页）
+
+- 顶部：连接状态条（已连接：账号 + 来源 + 退出；未连接守卫已强制跳 #auth）+ 仓库总数 + 刷新。
+- **活跃区**（标题 + 计数，可折叠）：按 `commits7d` 降序的仓库行。
+- **尘封区**（标题 + 计数，**默认折叠**沉底）：低活跃仓库，按 `commits7d` 降序。
+- 仓库行字段：名称 + 描述 + 语言色点 + star/fork + "近 30 天提交 N 次" + 最近更新时间 + 打开链接。点行进 `#repo?name=owner/repo`。
+
+### 10.3 #repo?name=owner/repo 仓库详情页（新 github-repo-detail-panel）
+
+- 顶部 meta 条：名称、描述、语言、star/fork、默认分支、html_url 打开链接。
+- 动态 timeline：该仓事件，push 展开 commit subject 列表；PR/issue/release 等保留现有图标与相对时间渲染。
+- 沿用科研黄黑皮肤 CSS 变量（--skin-* / --yellow），不新增全局样式。
 
 ## 11. 配置（vibepm.configSchema）
 
 - `client_id`：Device Flow 用 OAuth App client_id，默认内置值。
 - `api_base`：默认 `https://api.github.com`（沿用）。
 - `cache_ttl`：内存缓存秒数，默认 60。
+- `active_window_days`：活跃判据窗口天数，默认 7。
+- `active_min_commits`：活跃判据最少提交数，默认 5。
+- `stats_window_days`：提交数展示窗口天数，默认 30。
 
 ## 12. 错误处理
 
-- 无任何 token 且 gh CLI 不存在 → `/status` 返回未连接，前端引导走 Device Flow / PAT。
-- gh CLI 存在但未登录 → 自动落到 Device Flow / PAT。
-- 限流（403 / 429）→ 返回提示 + 优先命中缓存，失败仓库跳过并标记。
+- 无任何 token 且 gh CLI 不存在 → `/status` 未连接，前端守卫强制跳 `#auth`。
+- gh CLI 存在但未登录 → 落到 Device Flow / PAT。
+- 限流（403 / 429）→ 提示 + 优先命中缓存，失败仓库跳过并标记。
 - Device Flow 过期/拒绝/超时 → 明确提示，允许重新发起。
 - 单仓 events 拉取失败 → 该仓标记失败，其余正常返回。
 
 ## 13. 测试（真机验证，验收前必做）
 
-1. 本机已登录 `gh` → 启动 vibepm，`/status` 显示来源 `gh`，`/feed` 正常按仓库分组展示。
-2. 模拟无 gh（临时移走 gh 可执行/未登录）→ Device Flow 授权码流程 → 拿到 token → 动态正常。
-3. 手动 PAT 兜底表单 → 连接 → 动态正常。
-4. 仓库数量较多时：并行拉取不超限流，缓存命中，刷新用 `?refresh=1` 强刷。
-5. logout → token/username/source 清空，缓存清空，回到未连接态。
-6. 三个旧入口全部消失：`plugin-github-auth`、`plugin-repo-feed` 从 bundles/元数据/面板全部移除，无残留引用。
+1. 本机已登录 `gh` → 启动 vibepm，进 `#repos` 自动 connected（守卫放行），列表按分区渲染。
+2. 模拟无 gh → 进 `#repos` 被强制跳 `#auth` → Device Flow 授权码流程 → 拿 token → 返回列表正常。
+3. 手动 PAT 兜底 → 连接 → 列表 + 详情正常。
+4. 分区正确性：高活跃仓库在活跃区、低活跃仓库进尘封区且默认折叠；提交数文案正确。
+5. 仓库详情：push 事件展开 commit subject 列表，无文件 diff；PR/issue/release 正常。
+6. 仓库较多时：并行不超限流、缓存命中、`?refresh=1` 强刷。
+7. logout → 凭据与缓存清空 → 守卫重新强制跳 `#auth`。
+8. 三处旧痕迹全部消失：`plugin-github-auth`、`plugin-repo-feed` 从 bundles/元数据/面板/路由全部移除，无残留引用。
 
 ## 14. 风险与备注
 
-- GitHub Events API 90 天 / 300 条上限：UI 文案需说明"近 90 天动态"，避免"所有动态"误导。
+- GitHub Events API 90 天 / 300 条上限：UI 文案需说明"近 30 天提交"，避免"所有"误导。
 - Device Flow 需真实 OAuth App client_id：实现时需用户在 GitHub 创建 OAuth App（callback 可任意填写，Device Flow 不回调）。
 - 影响面 7 处需一次改全（loader / plugin-manager / ide-view / workspace / tsconfig / 删两包），避免残留引用导致构建或加载失败。
+- 分区判据两窗口（统计 30 天 / 判据 7 天）为待确认项，见 §9.1。
 - 对外可见内容（README / package.json 描述 / 仓库文档）不出现任何历史借鉴痕迹。
