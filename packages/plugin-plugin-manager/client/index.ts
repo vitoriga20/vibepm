@@ -8,9 +8,11 @@ modules.register("plugin-plugin-manager", () => ({
   name: "plugin-plugin-manager",
   inject: [],
   provide: [],
-  apply(_ctx: unknown) {
+  apply(ctx: unknown) {
     if (!customElements.get("plugin-manager-panel")) {
       customElements.define("plugin-manager-panel", PluginManagerPanel);
     }
+    // 面板注册：kind → 标签名（壳查表渲染，不硬编码）
+    try { (ctx as any).services.get("render").register("plugin-manager-panel", "plugin-manager-panel"); } catch { /* noop */ }
   },
 }));

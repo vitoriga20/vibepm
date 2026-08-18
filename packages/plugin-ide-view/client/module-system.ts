@@ -37,6 +37,20 @@ class ServiceRegistry {
   }
 }
 
+/**
+ * 浏览器侧渲染注册表：kind → custom element 标签名。
+ * 面板（shell.primary）与导航卡（shell.nav）的 kind 由各自插件在 apply 里自注册，
+ * 壳（VibeShell）只查表渲染，不再 switch 硬编码 —— 新面板插件不碰壳即可接入。
+ */
+export class RenderRegistry {
+  private _m = new Map<string, string>();
+  register(kind: string, tagName: string): () => void {
+    this._m.set(kind, tagName);
+    return () => { if (this._m.get(kind) === tagName) this._m.delete(kind); };
+  }
+  get(kind: string): string | undefined { return this._m.get(kind); }
+}
+
 type Factory = () => ClientPluginShape | Promise<ClientPluginShape>;
 
 class ClientModuleSystem {
@@ -44,6 +58,11 @@ class ClientModuleSystem {
   private _applied = new Map<string, { entry: any; plugin: ClientPluginShape; dispose?: () => void }>();
   services = new ServiceRegistry();
   events = new EventTarget();
+
+  constructor() {
+    // 渲染注册表：面板/导航卡 kind → 标签名，由各插件在 apply 里自注册
+    this.services.provide("render", new RenderRegistry());
+  }
 
   register(id: string, factory: Factory): void {
     this._factories.set(id, factory);

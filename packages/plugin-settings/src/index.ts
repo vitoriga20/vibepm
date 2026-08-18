@@ -82,6 +82,7 @@ class SettingsPlugin {
       order: 20,
       payload: {
         kind: "settings-panel",
+        icon: "settings",
         title: "设置",
         desc: "所有配置均存在本地数据库（key-value JSON）。插件想存什么都直接走 settings API。",
         route: "settings",

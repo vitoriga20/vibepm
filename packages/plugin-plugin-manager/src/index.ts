@@ -152,6 +152,7 @@ class PluginManagerPlugin {
       order: 40,
       payload: {
         kind: "plugin-manager-panel",
+        icon: "plugins",
         title: "插件",
         desc: "启停插件，冷启动生效（重启内核后该插件的界面与后端一起消失/恢复）。内核三件套不可关。",
         route: "plugins",

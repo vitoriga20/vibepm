@@ -8,9 +8,11 @@ modules.register("plugin-github-auth", () => ({
   name: "plugin-github-auth",
   inject: [],
   provide: [],
-  apply(_ctx: unknown) {
+  apply(ctx: unknown) {
     if (!customElements.get("github-auth-panel")) {
       customElements.define("github-auth-panel", GithubAuthPanel);
     }
+    // 面板注册：kind → 标签名（壳查表渲染，不硬编码）
+    try { (ctx as any).services.get("render").register("github-auth-panel", "github-auth-panel"); } catch { /* noop */ }
   },
 }));

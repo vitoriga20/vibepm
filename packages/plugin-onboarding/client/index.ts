@@ -17,9 +17,11 @@ modules.register("plugin-onboarding", () => ({
   name: "plugin-onboarding",
   inject: [],
   provide: [],
-  apply(_ctx: unknown) {
+  apply(ctx: unknown) {
     if (!customElements.get("onboarding-nav-card")) {
       customElements.define("onboarding-nav-card", OnboardingNavCard);
     }
+    // 导航卡注册：kind "nav-card" → 标签名（壳查表渲染，不硬编码）
+    try { (ctx as any).services.get("render").register("nav-card", "onboarding-nav-card"); } catch { /* noop */ }
   },
 }));

@@ -182,6 +182,7 @@ class GithubAuthPlugin {
       order: 10,
       payload: {
         kind: "github-auth-panel",
+        icon: "github",
         title: "连接 GitHub",
         desc: "Personal Access Token (classic) 请勾选 repo + read:user + read:org；只存本地 SQLite。",
         route: "auth",

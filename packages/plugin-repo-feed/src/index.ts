@@ -129,6 +129,7 @@ class RepoFeedPlugin {
       order: 30,
       payload: {
         kind: "feed-panel",
+        icon: "feed",
         title: "仓库动态",
         desc: "received_events（关注的仓库最近的 push / PR / issue / release / star / fork…）",
         route: "feed",

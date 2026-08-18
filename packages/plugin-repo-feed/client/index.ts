@@ -8,9 +8,11 @@ modules.register("plugin-repo-feed", () => ({
   name: "plugin-repo-feed",
   inject: [],
   provide: [],
-  apply(_ctx: unknown) {
+  apply(ctx: unknown) {
     if (!customElements.get("feed-panel")) {
       customElements.define("feed-panel", FeedPanel);
     }
+    // 面板注册：kind → 标签名（壳查表渲染，不硬编码）
+    try { (ctx as any).services.get("render").register("feed-panel", "feed-panel"); } catch { /* noop */ }
   },
 }));

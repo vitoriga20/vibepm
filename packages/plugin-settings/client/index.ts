@@ -8,9 +8,11 @@ modules.register("plugin-settings", () => ({
   name: "plugin-settings",
   inject: [],
   provide: [],
-  apply(_ctx: unknown) {
+  apply(ctx: unknown) {
     if (!customElements.get("settings-panel")) {
       customElements.define("settings-panel", SettingsPanel);
     }
+    // 面板注册：kind → 标签名（壳查表渲染，不硬编码）
+    try { (ctx as any).services.get("render").register("settings-panel", "settings-panel"); } catch { /* noop */ }
   },
 }));

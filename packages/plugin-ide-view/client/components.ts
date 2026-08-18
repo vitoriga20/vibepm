@@ -22,6 +22,7 @@
  *   - shell.secondary / shell.footer：永远渲染
  */
 import { iconEl, iconSVG } from "./icons.js";
+import { modules, type RenderRegistry } from "./module-system.js";
 
 const CSS = `
 :host{display:block;width:100%;height:100%;}
@@ -200,7 +201,8 @@ function asciiBanner(): string {
   const w = window as any;
   const boot = w.__VIBEPM_BOOT__ ?? { rev: "0", entries: [] };
   const entries: Array<{ id?: string }> = Array.isArray(boot.entries) ? boot.entries : [];
-  const plugins = entries.filter((e) => (e?.id ?? "") !== "plugin-ide-view").length;
+  // 壳是直接加载的入口（不在 bootGraph 动态 import 之列），其余都是 client 插件
+  const plugins = Math.max(0, entries.length - 1);
   const rev = String(boot.rev ?? "");
   const ver = rev.length > 8 ? rev.slice(0, 8) : (rev || "dev");
   const lines = [
@@ -218,6 +220,11 @@ function getSlots(): Slots {
   const out: Slots = {};
   for (const k of Object.keys(raw)) out[k] = Array.isArray(raw[k]) ? raw[k] : [];
   return out;
+}
+
+/** 查渲染注册表：kind → custom element 标签名（面板/导航卡由各插件在 apply 里自注册） */
+function renderTag(kind: string): string | undefined {
+  try { return modules.services.get<RenderRegistry>("render").get(kind); } catch { return undefined; }
 }
 
 function sorted(list: SlotItem[]): SlotItem[] {
@@ -301,22 +308,14 @@ export class VibeShell extends HTMLElement {
     small.textContent = "· minimal";
     brand.appendChild(small);
     const nav = document.createElement("nav");
-    const iconFor = (rt: string): "settings" | "github" | "feed" | "plugins" | null => {
-      switch (rt) {
-        case "settings": return "settings";
-        case "auth": return "github";
-        case "feed": return "feed";
-        case "plugins": return "plugins";
-        default: return null;
-      }
-    };
-    // Home 固定入口；其余导航项由 shell.primary 面板槽驱动（被禁用插件 → 面板消失 → 导航同步消失）
-    const mkLink = (r: string, label: string, icon: "settings" | "github" | "feed" | "plugins" | null) => {
+    // 导航项由 shell.primary 面板槽驱动（被禁用插件 → 面板消失 → 导航同步消失）；
+    // 图标取面板 payload.icon（数据驱动，壳不硬编码 route→icon）
+    const mkLink = (r: string, label: string, iconName: string | null) => {
       const a = document.createElement("a");
       a.href = r ? `#${r}` : "#/";
       const isActive = r === route || (!r && !route);
       if (isActive) a.classList.add("active");
-      if (icon) a.appendChild(iconEl(icon, 14));
+      if (iconName) a.appendChild(iconEl(iconName as any, 14));
       const span = document.createElement("span");
       span.textContent = label;
       a.appendChild(span);
@@ -328,7 +327,7 @@ export class VibeShell extends HTMLElement {
       const pd: any = it.payload ?? {};
       const r = String(pd.route ?? "");
       if (!r) continue;
-      mkLink(r, String(pd.title ?? it.label ?? r), iconFor(r));
+      mkLink(r, String(pd.title ?? it.label ?? r), pd.icon ?? null);
     }
     hd.append(brand, nav);
     return hd;
@@ -429,15 +428,16 @@ export class VibeShell extends HTMLElement {
   private renderNav(box: HTMLElement, slots: Slots): void {
     const items = (slots["shell.nav"] ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     if (!items.length) {
-      box.innerHTML = `<div class="nav-empty">（还没有插件注册 shell.nav · 请先加载 plugin-onboarding）</div>`;
+      box.innerHTML = `<div class="nav-empty">（还没有插件注册 shell.nav）</div>`;
       return;
     }
     const list = document.createElement("div");
     list.className = "nav-grid";
     for (const it of items) {
       const p: any = it.payload ?? {};
-      if (p.kind === "nav-card") {
-        const el = document.createElement("onboarding-nav-card");
+      const tag = renderTag(String(p.kind ?? ""));
+      if (p.kind === "nav-card" && tag) {
+        const el = document.createElement(tag);
         el.setAttribute("icon", String(p.icon ?? "help"));
         el.setAttribute("title", it.label ?? "");
         el.setAttribute("desc", String(p.desc ?? ""));
@@ -462,15 +462,16 @@ export class VibeShell extends HTMLElement {
       wrap.className = "primary-empty";
       wrap.innerHTML = `<pre class="ascii-banner">${asciiBanner()}</pre>
         <div class="title"><img class="welcome-logo" src="/static/img/logo-snake.jpg" alt="">Welcome</div>
-        <div class="sub">从上方导航条（Home / Feed / GitHub / Settings）或下方卡片进入功能。所有功能均按插件方式装卸。</div>`;
+        <div class="sub">从上方导航条或左侧卡片进入功能。所有功能均按插件方式装卸。</div>`;
       box.appendChild(wrap);
       const secondary = document.createElement("div");
       secondary.className = "nav-grid";
       const navItems = (slots["shell.nav"] ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       for (const it of navItems) {
         const pp: any = it.payload ?? {};
-        if (pp.kind === "nav-card") {
-          const el = document.createElement("onboarding-nav-card");
+        const tag = renderTag(String(pp.kind ?? ""));
+        if (pp.kind === "nav-card" && tag) {
+          const el = document.createElement(tag);
           el.setAttribute("icon", String(pp.icon ?? "help"));
           el.setAttribute("title", it.label ?? "");
           el.setAttribute("desc", String(pp.desc ?? ""));
@@ -491,17 +492,15 @@ export class VibeShell extends HTMLElement {
     head.className = "primary-head";
     head.innerHTML = `<div class="title">${title}</div><div class="sub">${desc}</div>`;
     card.appendChild(head);
+    // 面板渲染数据驱动：kind → 标签名由面板插件在 apply 里注册，壳不再 switch 硬编码
+    const tag = renderTag(kind);
     let body: HTMLElement;
-    switch (kind) {
-      case "github-auth-panel": body = document.createElement("github-auth-panel"); break;
-      case "settings-panel": body = document.createElement("settings-panel"); break;
-      case "feed-panel": body = document.createElement("feed-panel"); break;
-      case "plugin-manager-panel": body = document.createElement("plugin-manager-panel"); break;
-      default:
-        body = document.createElement("div");
-        body.className = "empty";
-        body.innerHTML = `<b>未识别面板</b> kind=${kind || "—"}；未提供对应 <code>custom element</code>。`;
-        break;
+    if (tag) {
+      body = document.createElement(tag);
+    } else {
+      body = document.createElement("div");
+      body.className = "empty";
+      body.innerHTML = `<b>未识别面板</b> kind=${kind || "—"}；未提供对应 <code>custom element</code>。`;
     }
     card.appendChild(body);
     box.appendChild(card);
