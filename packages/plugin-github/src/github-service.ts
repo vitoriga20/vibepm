@@ -112,43 +112,53 @@ export class GitHubService {
     return arr;
   }
 
-  // ---- 提交统计：commits API 按窗口计数 + 最近提交时间 ----
-  // 说明：events API 的 PushEvent payload 已不含 commits 详情（仅 ref/head/before，无 distinct_size/commits 数组），
-  //       提交数改用 commits 接口（?since= 窗口起点）统计，顺带返回最近提交时间供列表「最近提交」列。
+  // ---- 提交统计：commits API 按窗口计数 + 最近提交时间 + 最近提交列表 ----
+  // 说明：events API 的 PushEvent payload 已不含 commits 详情（仅 ref/head/before），
+  //       提交数改用 commits 接口（?since= 窗口起点）统计，顺带返回最近提交时间与最近 commit 列表。
+  //       空仓库（409 "Git Repository is empty"）降级返回 empty:true，不抛错。
   async commitStats(
     owner: string,
     repo: string,
     daysArr: number[],
-  ): Promise<{ counts: Record<number, number>; lastCommitAt: string | null }> {
+  ): Promise<{ counts: Record<number, number>; lastCommitAt: string | null; recent: Array<{ sha: string; message: string; date: string }>; empty: boolean }> {
     const maxDays = Math.max(...daysArr);
     const since = new Date(Date.now() - maxDays * DAY_MS).toISOString();
     const key = `cc:${owner}/${repo}:${maxDays}:${this.tokenFingerprint()}`;
-    const cached = this.cacheGet<{ counts: Record<number, number>; lastCommitAt: string | null }>(key);
+    const cached = this.cacheGet<{ counts: Record<number, number>; lastCommitAt: string | null; recent: Array<{ sha: string; message: string; date: string }>; empty: boolean }>(key);
     if (cached) return cached;
-    const dates: number[] = [];
-    let page = 1;
-    for (;;) {
-      const data = await this.fetchJson(
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?per_page=${REPOS_PER_PAGE}&since=${encodeURIComponent(since)}&page=${page}`,
-      );
-      if (!Array.isArray(data) || data.length === 0) break;
-      for (const c of data) {
-        const d = c?.commit?.committer?.date ?? c?.commit?.author?.date;
-        if (d) dates.push(Date.parse(d));
+    const commits: Array<{ at: number; sha: string; message: string; date: string }> = [];
+    let empty = false;
+    try {
+      let page = 1;
+      for (;;) {
+        const data = await this.fetchJson(
+          `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?per_page=${REPOS_PER_PAGE}&since=${encodeURIComponent(since)}&page=${page}`,
+        );
+        if (!Array.isArray(data) || data.length === 0) break;
+        for (const c of data) {
+          const d = c?.commit?.committer?.date ?? c?.commit?.author?.date;
+          if (!d) continue;
+          commits.push({ at: Date.parse(d), sha: String(c?.sha ?? ""), message: String(c?.commit?.message ?? ""), date: String(d) });
+        }
+        if (data.length < REPOS_PER_PAGE) break;
+        page += 1;
       }
-      if (data.length < REPOS_PER_PAGE) break;
-      page += 1;
+    } catch (e) {
+      if ((e as any)?.code === "GH_409") { empty = true; } else { throw e; }
     }
+    // 窗口去重：daysArr 可能含重复天数（activeWindowDays === statsWindowDays），重复会双重计数
+    const uniqueDays = [...new Set(daysArr)];
     const now = Date.now();
     const counts: Record<number, number> = {};
-    for (const d of daysArr) counts[d] = 0;
-    for (const at of dates) {
-      if (!Number.isFinite(at)) continue;
-      for (const d of daysArr) if (at >= now - d * DAY_MS) counts[d] += 1;
+    for (const d of uniqueDays) counts[d] = 0;
+    for (const c of commits) {
+      if (!Number.isFinite(c.at)) continue;
+      for (const d of uniqueDays) if (c.at >= now - d * DAY_MS) counts[d] += 1;
     }
-    dates.sort((a, b) => b - a);
-    const lastCommitAt = dates.length > 0 ? new Date(dates[0]).toISOString() : null;
-    const out = { counts, lastCommitAt };
+    commits.sort((a, b) => b.at - a.at);
+    const lastCommitAt = commits.length > 0 ? commits[0].date : null;
+    const recent = commits.slice(0, 5).map((c) => ({ sha: c.sha, message: c.message.split("\n")[0] || "", date: c.date }));
+    const out = { counts, lastCommitAt, recent, empty };
     this.cacheSet(key, out);
     return out;
   }

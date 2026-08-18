@@ -327,6 +327,8 @@ export class VibeShell extends HTMLElement {
       const pd: any = it.payload ?? {};
       const r = String(pd.route ?? "");
       if (!r) continue;
+      // 内部路由面板（如登录页/详情页，payload.nav === false）渲染但不产生顶栏 tab
+      if (pd.nav === false) continue;
       mkLink(r, String(pd.title ?? it.label ?? r), pd.icon ?? null);
     }
     hd.append(brand, nav);

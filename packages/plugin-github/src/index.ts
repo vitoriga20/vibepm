@@ -13,8 +13,8 @@ import {
   GH_DEVICE_CODE_URL, GH_ACCESS_TOKEN_URL, DEVICE_GRANT_TYPE, GH_SCOPE, JSON_ACCEPT, JSON_CONTENT_TYPE,
   DEVICE_POLL_INTERVAL_S, DEVICE_EXPIRES_IN_S, HTTP,
   HASH_AUTH, HASH_REPOS, HASH_REPO, PANEL_KIND_AUTH, PANEL_KIND_REPOS, PANEL_KIND_DETAIL,
-  SLOT_AUTH, SLOT_AUTH_NAV, SLOT_REPOS, SLOT_REPOS_NAV, SLOT_DETAIL,
-  TEXT_AUTH_TITLE, TEXT_AUTH_DESC, TEXT_AUTH_NAV_DESC, TEXT_REPOS_TITLE, TEXT_REPOS_DESC, TEXT_REPOS_NAV_DESC, TEXT_DETAIL_TITLE, TEXT_DETAIL_DESC,
+  SLOT_AUTH, SLOT_REPOS, SLOT_REPOS_NAV, SLOT_DETAIL,
+  TEXT_AUTH_TITLE, TEXT_AUTH_DESC, TEXT_REPOS_TITLE, TEXT_REPOS_DESC, TEXT_REPOS_NAV_DESC, TEXT_DETAIL_TITLE, TEXT_DETAIL_DESC,
   ERR_MSG_LOGIN_REQUIRED, ERR_MSG_DEVICE_CLIENT_ID, ERR_MSG_NOT_FOUND,
 } from "./constants.js";
 import {
@@ -204,8 +204,14 @@ class GithubPlugin {
                 service.commitStats(owner, repo, [thresholds().statsWindowDays]),
               ]);
               const th = thresholds();
-              // 下发统计窗口 + 真实提交数（events 的 PushEvent 已无 commits 详情，提交数走 commits 接口）
-              sendJson(rctx.res, HTTP.OK, { ok: true, items, commits: stats.counts[th.statsWindowDays] ?? 0, statsWindowDays: th.statsWindowDays });
+              // 下发统计窗口 + 真实提交数 + 最近 commit 列表 + 空仓库标记（events 的 PushEvent 已无 commits 详情）
+              sendJson(rctx.res, HTTP.OK, {
+                ok: true, items,
+                commits: stats.counts[th.statsWindowDays] ?? 0,
+                recent: stats.recent,
+                empty: stats.empty,
+                statsWindowDays: th.statsWindowDays,
+              });
             } catch (e) { sendJson(rctx.res, HTTP.BAD_GATEWAY, { ok: false, reason: (e as Error).message, items: [] }); }
           })();
           return;
@@ -221,7 +227,7 @@ class GithubPlugin {
               if (cached) { sendJson(rctx.res, HTTP.OK, cached); return; }
               const th = thresholds();
               const repos = await service.listRepos();
-              const withStats = repos.map((r) => ({ ...r, commits30d: 0, active: false, statsFailed: false, lastPushAt: null as string | null }));
+              const withStats = repos.map((r) => ({ ...r, commits30d: 0, active: false, statsFailed: false, lastPushAt: null as string | null, empty: false }));
               // 逐仓并行拉 events，并发上限 REPO_PARALLEL；单仓失败跳过并标记 statsFailed
               const pool: Promise<void>[] = [];
               const queue = [...withStats];
@@ -234,8 +240,9 @@ class GithubPlugin {
                     try {
                       const st = await service.commitStats(owner, repo, [th.activeWindowDays, th.statsWindowDays]);
                       item.commits30d = st.counts[th.statsWindowDays] ?? 0;
-                      item.active = (st.counts[th.activeWindowDays] ?? 0) >= th.activeMinCommits; // 活跃判据：≥（近 active_window_days 天，三级取值后实际值）
+                      item.active = st.empty ? false : (st.counts[th.activeWindowDays] ?? 0) >= th.activeMinCommits; // 活跃判据：≥（近 active_window_days 天，三级取值后实际值）
                       item.lastPushAt = st.lastCommitAt ?? null; // 列表「最近提交」列
+                      item.empty = st.empty; // 空仓库标记（前端显示「空仓库」）
                     } catch { item.statsFailed = true; }
                   }
                 })());
@@ -265,38 +272,33 @@ class GithubPlugin {
       },
     }));
 
-    // --- 面板 / 导航卡：三个页面槽（含详情面板）---
+    // --- 面板 / 导航卡：GitHub 统一入口 + 内部路由面板（auth/detail 不进顶栏）---
+    // auth 面板：登录页，nav:false 不进顶栏（点 GitHub 未登录时经 guard 跳 #auth 渲染）
     disposers.push(slots.register("shell.primary", {
       id: SLOT_AUTH,
       label: TEXT_AUTH_TITLE,
       order: 10,
-      payload: { kind: PANEL_KIND_AUTH, icon: "github", title: TEXT_AUTH_TITLE, desc: TEXT_AUTH_DESC, route: HASH_AUTH },
-    }));
-    disposers.push(slots.register("shell.nav", {
-      id: SLOT_AUTH_NAV,
-      label: TEXT_AUTH_TITLE,
-      order: 10,
-      payload: { kind: "nav-card", icon: "github", desc: TEXT_AUTH_NAV_DESC, hash: "#" + HASH_AUTH, orderHint: 10 },
+      payload: { kind: PANEL_KIND_AUTH, icon: "github", title: TEXT_AUTH_TITLE, desc: TEXT_AUTH_DESC, route: HASH_AUTH, nav: false },
     }));
     disposers.push(slots.register("shell.primary", {
       id: SLOT_REPOS,
       label: TEXT_REPOS_TITLE,
       order: 20,
-      payload: { kind: PANEL_KIND_REPOS, icon: "git", title: TEXT_REPOS_TITLE, desc: TEXT_REPOS_DESC, route: HASH_REPOS },
+      payload: { kind: PANEL_KIND_REPOS, icon: "github", title: TEXT_REPOS_TITLE, desc: TEXT_REPOS_DESC, route: HASH_REPOS },
     }));
-    // 仓库 nav 卡 icon 用 settings（onboarding icons map 只有 github/settings/feed/help，无 repo，避免 fallback 成 help）
+    // 仓库导航卡：GitHub 统一入口（首页卡片）
     disposers.push(slots.register("shell.nav", {
       id: SLOT_REPOS_NAV,
       label: TEXT_REPOS_TITLE,
       order: 20,
-      payload: { kind: "nav-card", icon: "settings", desc: TEXT_REPOS_NAV_DESC, hash: "#" + HASH_REPOS, orderHint: 20 },
+      payload: { kind: "nav-card", icon: "github", desc: TEXT_REPOS_NAV_DESC, hash: "#" + HASH_REPOS, orderHint: 20 },
     }));
-    // 详情面板：route=repo；缺失则 #repo?name=… 在 renderPrimary 中无匹配项，永不渲染
+    // 详情面板：route=repo，nav:false 不进顶栏（从列表点仓库经 #repo?name= 渲染）
     disposers.push(slots.register("shell.primary", {
       id: SLOT_DETAIL,
       label: TEXT_DETAIL_TITLE,
       order: 30,
-      payload: { kind: PANEL_KIND_DETAIL, title: TEXT_DETAIL_TITLE, desc: TEXT_DETAIL_DESC, route: HASH_REPO },
+      payload: { kind: PANEL_KIND_DETAIL, title: TEXT_DETAIL_TITLE, desc: TEXT_DETAIL_DESC, route: HASH_REPO, nav: false },
     }));
 
     return () => {

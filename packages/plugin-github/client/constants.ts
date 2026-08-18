@@ -162,6 +162,7 @@ export const TEXT = {
     star: "★",
     fork: "⑂",
     empty: "暂无仓库",
+    emptyRepo: "空仓库",
   },
   detail: {
     title: "仓库动态",
@@ -175,9 +176,11 @@ export const TEXT = {
     sep: " · ",
     push: "推送 ",
     pushCommits: " 个提交",
+    recentTitle: "最近提交",
   },
   event: {
     push: "推送 ",
+    pushBranch: "更新 ",
     pr: "PR ",
     issue: "Issue ",
     release: "发布 ",

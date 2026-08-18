@@ -155,9 +155,9 @@ function oneLine(e: any): string {
     const p: any = e.payload ?? {};
     switch (e.type) {
       case "PushEvent": {
-        const n = p.distinct_size ?? p.commits?.length ?? 0;
-        const head = p.commits?.[0]?.message?.split("\n")[0] ?? "";
-        return `${TEXT.event.push}${n}${TEXT.detail.pushCommits}${head ? TEXT.event.by + head : ""}`;
+        // events API 的 PushEvent 已无 commits 详情，改为显示分支名（真实提交列表见详情「最近提交」区块）
+        const branch = String(p.ref ?? "").replace(/^refs\/heads\//, "");
+        return `${TEXT.event.pushBranch}${branch || TEXT.event.push.trim()}`;
       }
       case "PullRequestEvent": return `${TEXT.event.pr}${p.action}${TEXT.event.by}${p.pull_request?.title ?? ""}`;
       case "IssuesEvent": return `${TEXT.event.issue}${p.action}${TEXT.event.by}${p.issue?.title ?? ""}`;
@@ -432,9 +432,9 @@ export class GithubReposPanel extends HTMLElement {
     const list = s.getElementById("list")!;
     const html: string[] = [];
     html.push(zhead(TEXT.repos.sectionActive, active.length, true));
-    for (const x of active) html.push(this.row(x));
+    for (const x of active) html.push(this.row(x, win));
     html.push(zhead(TEXT.repos.sectionDusty, dusty.length, false));
-    for (const x of dusty) html.push(this.row(x));
+    for (const x of dusty) html.push(this.row(x, win));
     list.innerHTML = html.join("");
     list.querySelectorAll<HTMLElement>(".zhead").forEach((z) => {
       z.addEventListener("click", () => {
@@ -450,17 +450,21 @@ export class GithubReposPanel extends HTMLElement {
       });
     });
   }
-  private row(x: any): string {
+  private row(x: any, win: number): string {
     const lang = x.language
       ? `<span class="lang" style="background:${LANG_COLORS[x.language] ?? LANG_COLOR_FALLBACK}"></span>${esc(x.language)}`
       : "";
     const desc = x.description ? `<div class="ds">${esc(x.description)}</div>` : "";
     const tag = (x.archived ? esc(TEXT.repos.archived) : "") + (x.private ? esc(TEXT.repos.private) : "");
     const lastPush = x.lastPushAt ? esc(TEXT.repos.lastPush) + esc(relTime(x.lastPushAt)) : "";
+    // 空仓库：显示「空仓库」而非裸 0 提交
+    const stats = x.empty
+      ? esc(TEXT.repos.emptyRepo)
+      : `${esc(TEXT.repos.commits)}<b>${x.commits30d ?? 0}</b>${esc(TEXT.repos.perDays)}${win}d<br />${lastPush}`;
     return `<div class="repo" data-name="${esc(x.full_name)}">
       <div><div class="nm">${esc(x.name)}${tag}</div>${desc}</div>
       <div class="meta">${lang}</div>
-      <div class="meta">${esc(TEXT.repos.star)}<span class="acc">${x.stargazers_count ?? 0}</span> ${esc(TEXT.repos.fork)}<span class="acc">${x.forks_count ?? 0}</span><br />${esc(TEXT.repos.commits)}<b>${x.commits30d ?? 0}</b>${esc(TEXT.repos.perDays)}30d<br />${lastPush}</div>
+      <div class="meta">${esc(TEXT.repos.star)}<span class="acc">${x.stargazers_count ?? 0}</span> ${esc(TEXT.repos.fork)}<span class="acc">${x.forks_count ?? 0}</span><br />${stats}</div>
     </div>`;
   }
 }
@@ -487,16 +491,23 @@ export class GithubRepoDetailPanel extends HTMLElement {
       return;
     }
     const [owner, repo] = name.split("/");
-    const data = await api<{ items?: any[]; statsWindowDays?: number; commits?: number }>(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/events`);
+    const data = await api<{ items?: any[]; statsWindowDays?: number; commits?: number; recent?: Array<{ sha: string; message: string; date: string }>; empty?: boolean }>(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/events`);
     const items = data.items ?? [];
     const win = data.statsWindowDays ?? ACTIVE_WINDOW_DAYS;
     const commits = data.commits ?? 0; // 后端 commits API 统计（events 的 PushEvent 已无 commits 详情）
+    const recent = data.recent ?? [];
+    // 最近提交区块：events 的 PushEvent 无 commits 详情，真实 commit 列表由后端 commits API 下发
+    const recentHtml = recent.length
+      ? `<div class="zhead open"><h2>${esc(TEXT.detail.recentTitle)}</h2></div><div class="zb">${recent.map((c) =>
+          `<p class="commit"><b>${esc(String(c.sha ?? "").slice(0, SHORT_SHA_LEN))}</b> ${esc(c.message ?? "")}</p>`).join("")}</div>`
+      : "";
     s.innerHTML = `<style>${CSS}</style>
       <div class="ptitle">
         <div class="dhead"><h1>${esc(name)}</h1><a class="link" href="https://github.com/${esc(name)}" target="_blank" rel="noreferrer noopener">${esc(TEXT.detail.openGithub)}</a></div>
         <${PANEL_KIND_AVATAR}></${PANEL_KIND_AVATAR}>
       </div>
-      <p class="desc">${esc(TEXT.detail.commits.replace("{window}", String(win)))}<b style="color:var(--accent)">${commits}</b>${esc(TEXT.detail.commitsTimes)}${esc(TEXT.detail.sep)}${esc(TEXT.detail.events)}${items.length}${esc(TEXT.detail.eventsCount)}</p>
+      <p class="desc">${esc(TEXT.detail.commits.replace("{window}", String(win)))}<b style="color:var(--accent)">${commits}</b>${esc(TEXT.detail.commitsTimes)}${esc(TEXT.detail.sep)}${esc(TEXT.detail.events)}${items.length}${esc(TEXT.detail.eventsCount)}${data.empty ? esc(TEXT.detail.sep) + esc(TEXT.repos.emptyRepo) : ""}</p>
+      ${recentHtml}
       <ul class="tl" id="tl"></ul>`;
     const ul = s.getElementById("tl")!;
     if (!items.length) {
@@ -506,13 +517,10 @@ export class GithubRepoDetailPanel extends HTMLElement {
     ul.innerHTML = items.map((e) => {
       const t = classify(e.type);
       const icon = ICONS[t] ?? ICONS.other;
-      const commitsHtml = t === "push" && Array.isArray(e.payload?.commits)
-        ? e.payload.commits.map((c: any) =>
-            `<p class="commit"><b>${esc(String(c.sha ?? "").slice(0, SHORT_SHA_LEN))}</b> ${esc((c.message ?? "").split("\n")[0])}</p>`).join("")
-        : "";
+      // 注：events 的 PushEvent 已无 commits 详情，commit 列表统一在「最近提交」区块（recentHtml）展示
       return `<li>
         <div class="dot"><svg viewBox="0 0 24 24" fill="currentColor">${icon}</svg></div>
-        <div><h4><b>${esc(e.actor?.login ?? "?")}</b>${esc(TEXT.event.by)}${esc(oneLine(e))}</h4>${commitsHtml}</div>
+        <div><h4><b>${esc(e.actor?.login ?? "?")}</b>${esc(TEXT.event.by)}${esc(oneLine(e))}</h4></div>
         <time>${esc(relTime(e.created_at ?? ""))}</time>
       </li>`;
     }).join("");
