@@ -12,6 +12,7 @@ export const STATS_WINDOW_DAYS = 30;     // 展示提交数的窗口（天）—
 export const GH_TIMEOUT_MS = 8000;       // gh CLI 执行超时
 export const REQUEST_TIMEOUT_MS = 20000; // GitHub API 请求超时
 export const REPOS_PER_PAGE = 100;       // 分页大小
+export const COMMITS_MAX_PAGES = 10;     // commits 翻页上限（防 GitHub 分页异常无限翻页；100×10=1000 commit 足够个人仓库）
 export const REPO_PARALLEL = 5;          // /repos 逐仓并发上限
 export const DEVICE_POLL_INTERVAL_S = 5; // Device Flow 轮询间隔兜底（秒）
 export const DEVICE_EXPIRES_IN_S = 900;  // Device Flow 过期兜底（秒）

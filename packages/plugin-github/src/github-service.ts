@@ -1,7 +1,7 @@
 // GitHub REST 封装：fetchJson 通用 + 三源认证 + 仓库/事件聚合 + TTL 缓存
 import { resolveToken, type AuthResult } from "./auth.js";
 import {
-  API_BASE, CACHE_TTL_S, DAY_MS, GH_ACCEPT_MEDIA, GH_API_VERSION, GH_USER_AGENT, JSON_CONTENT_TYPE,
+  API_BASE, CACHE_TTL_S, COMMITS_MAX_PAGES, DAY_MS, GH_ACCEPT_MEDIA, GH_API_VERSION, GH_USER_AGENT, JSON_CONTENT_TYPE,
   ERR_NO_TOKEN, ERR_MSG_NO_TOKEN, ERR_MSG_GITHUB, REPOS_PER_PAGE, REQUEST_TIMEOUT_MS,
 } from "./constants.js";
 
@@ -142,6 +142,7 @@ export class GitHubService {
         }
         if (data.length < REPOS_PER_PAGE) break;
         page += 1;
+        if (page > COMMITS_MAX_PAGES) break; // 翻页上限保护
       }
     } catch (e) {
       if ((e as any)?.code === "GH_409") { empty = true; } else { throw e; }

@@ -21,11 +21,13 @@ export const EVT_THRESHOLDS = "vibepm:github:thresholds";
    CSS（全 token，无硬编码色值）
    ============================================================ */
 const CSS = /* css */`
-:host{display:block}
+:host{display:block;position:relative}
 h1{font-size:16px;letter-spacing:1.5px;color:var(--ink);margin:0;font-weight:900;text-transform:uppercase;font-family:var(--display-cjk)}
 .desc{font-size:12px;color:var(--dim);margin:6px 0 16px;line-height:1.6}
-.ptitle{display:flex;align-items:center;gap:12px;margin-bottom:2px}
+.ptitle{display:flex;align-items:center;gap:12px;margin-bottom:2px;position:relative}
 .ptitle h1{flex:0 0 auto}
+/* 头像右顶格：贴面板标题行右上角（absolute，不受 h1 宽度影响） */
+.ptitle github-avatar{position:absolute;top:0;right:0}
 .status{display:inline-block;padding:4px 9px;font:700 9px/1 var(--mono);letter-spacing:1px;border:1px solid var(--line-strong);color:var(--dim);text-transform:uppercase;background:var(--panel)}
 .status.on{color:var(--on-ink);border-color:var(--accent);background:var(--accent)}
 .status.off{color:var(--warn);border-color:var(--warn);background:var(--panel-alt)}
