@@ -64,15 +64,33 @@ packages/plugin-github/
 | #repos | github-repos-panel | 我的仓库（入口默认页）：活跃区 + 尘封区 |
 | #repo?name=owner/repo | github-repo-detail-panel | 仓库详情：meta 条 + 动态 timeline（commits 为主） |
 
-替换链路（影响面，7 处，实现时同步修改）：
+### 5.1 实现基座（对齐解耦后标准，dsh 风格）
+
+**Node 侧**（对照 plugin-settings / plugin-plugin-manager）：
+
+- `inject = ["db", "slots", "webServer"]`；`ctx.get("webServer")` 注册 API。
+- API 用 `ws.register({ kind: "prefix", path: "/api/github", handler })`，内部 `routeCtx(req, res)` + `sendJson` / `readBody`（来自 `@vibepm/plugin-web-ui`）。
+- 面板 / 导航卡用 `slots.register("shell.primary" / "shell.nav", { payload: { kind, route / hash } })`。
+- **不使用**旧 `ctx.on("web-api/route")`——全库无 emit，已死链路（github-auth / repo-feed 遗留，新插件绝不沿用）。
+
+**Client 侧**（对照 plugin-settings client）：
+
+- `const modules = (window as any).__VIBEPM_MODULES__`，`modules.register("plugin-github", () => ({...}))`；**不 import** `/plugins/plugin-ide-view/module-system.js`。
+- `apply(ctx)` 内：`customElements.define(kind, PanelClass)` + `(ctx as any).services.get("render").register(kind, tagName)`（壳查 render 注册表渲染，不硬编码）。
+- 面板 kind：`github-auth-panel` / `github-repos-panel` / `github-repo-detail-panel`；导航卡 kind `nav-card` 由 onboarding 接管渲染。
+
+**gh CLI 读取**：Node 侧 `import("node:child_process")` 执行 `gh auth token`（对照 web-ui `webopen` 的 child_process 用法）；读 hosts.yml 用 `node:fs`。
+
+替换链路（影响面，8 处，实现时同步修改）：
 
 1. 新建 `packages/plugin-github`（迁移自两个旧插件代码并增强）。
 2. `packages/core/src/loader.ts`：bundles minimal 列表中的 `plugin-github-auth`、`plugin-repo-feed` → `plugin-github`。
 3. `packages/plugin-plugin-manager/src/index.ts`：插件元数据两条 → 合并一条 `plugin-github`。
-4. `packages/plugin-ide-view/client/components.ts`：面板组件 `case "github-auth-panel"` 扩展为认证/列表/详情三组件分发。
+4. 壳（plugin-ide-view）**无需改动**：面板渲染已数据驱动（render 注册表查表，P4 起无 switch 硬编码），plugin-github 的 client 在 apply 里 `render.register(kind, tag)` 自注册三个面板组件即可。
 5. 删除 `packages/plugin-github-auth`、`packages/plugin-repo-feed` 两目录。
 6. workspace / tsconfig reference 更新（移除对两个旧包的依赖与引用）。
 7. `plugin-onboarding` 无硬依赖（导航卡自注册），不动。
+8. 清理旧两包遗留：`ctx.on("web-api/route")` 死链路、`/plugins/plugin-ide-view/module-system.js` 壳 URL import、`@vibepm/plugin-github-auth` / `@vibepm/plugin-repo-feed` workspace 依赖全部清除；新插件直接按 §5.1 标准写法。
 
 ## 6. 认证三源 + 入口守卫
 
@@ -192,6 +210,7 @@ packages/plugin-github/
 6. 仓库较多时：并行不超限流、缓存命中、`?refresh=1` 强刷。
 7. logout → 凭据与缓存清空 → 守卫重新强制跳 `#auth`。
 8. 三处旧痕迹全部消失：`plugin-github-auth`、`plugin-repo-feed` 从 bundles/元数据/面板/路由全部移除，无残留引用。
+9. 解耦一致性：全仓无 `ctx.on("web-api/route")` 引用、无 `/plugins/plugin-ide-view/module-system.js` 壳 URL import；plugin-github 按 `webServer.register` + `window.__VIBEPM_MODULES__` + render 注册表标准接入。
 
 ## 14. 风险与备注
 
