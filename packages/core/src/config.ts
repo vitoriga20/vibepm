@@ -14,6 +14,10 @@ export function profilePath(): string {
 export function dbPath(): string {
   return join(configDir(), "vibepm.db");
 }
+/** 用户第三方插件安装目录（`vibepm plugin <pkg>` 的 pnpm 工作区），对齐 dsh profile 包目录思想 */
+export function pluginsDir(): string {
+  return join(configDir(), "plugins");
+}
 
 export function defaultProfile(): Record<string, any> {
   return {

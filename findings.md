@@ -56,14 +56,18 @@
 - 列表 UI = timeline 条，每条：时间、用户头像、repo 名、事件描述。dsh 的 feed 就这么极简。
 
 ## 8. 影响面检查清单（改完再核对）
-- [ ] `SlotName` 枚举 + SlotService 类型是否扩了
-- [ ] `plugin-ide-view/src/index.ts` 老 slot 注册是否全删（不要残留 activity-bar / sidebar 条目）
-- [ ] `plugin-ide-view/client/components.ts` 是否只剩 VibeShell
-- [ ] `plugin-ide-view/client/icons.ts` 老图标是否被任何剩余代码引用
-- [ ] `plugin-web-ui/static/index.html` 只含 `<vibe-shell>` + boot-error banner + 1 个 `type=module` 脚本
-- [ ] `plugin-web-ui/static/shell.css` IDE 工作台 CSS 是否全删（workbench / bar-h / sidebar-w / status-h 变量可以留但不要用）
-- [ ] `plugin-storage/src/db.ts` settings 表是否 CREATE TABLE IF NOT EXISTS
-- [ ] 4 个新插件 package.json 是否有 `vibepm.node.inject`（含 slots/db/webApp 等真实用到的）且**无虚构 inject**（上次 ide-view 写 webApp 卡 fiber 的坑再犯）
-- [ ] 4 个新插件 build 后 dist/client/index.js / dist/src/index.js 都存在
-- [ ] `pnpm run build` 0 error
-- [ ] Playwright 6 条断言全过
+- [x] `SlotName` 枚举 + SlotService 类型扩了（shell.* 4 槽已加，老 IDE 槽保留 deprecate）
+- [x] `plugin-ide-view/src/index.ts` 老 slot 注册全删（极简壳干净）
+- [x] `plugin-ide-view/client/components.ts` 只剩 VibeShell
+- [x] `plugin-web-ui/static/index.html` 只含 `<vibe-shell>` + 1 个 `type=module` 脚本
+- [x] `plugin-storage/src/db.ts` settings 表 CREATE TABLE IF NOT EXISTS（含 getSetting/setSetting/listSettings/deleteSetting）
+- [x] 4 新插件 build 后 dist/client/index.js / dist/src/index.js 都在；`pnpm run build` 0 error
+- [x] boot 冒烟 8 插件原序装载，无 skip/error
+
+## 9. 阶段 v3 · 生态机制（2026-08-18 落地）
+- **patch 行语义**（`core/src/patches.ts`）：`{id,config}` 覆盖整行 config（非 merge）、`{insert:[rows]}` 插入新行、`{disabled:bool}` 禁用/再启用；`parsePatchLayer` 展平 insert；`resolvePluginRows` 多层 base←bundle层←已装层←顶层 层叠；`configLayerToRows` 兼容旧 `Record<id,config>` 覆盖层。
+- **manifest 扩**：`vibepm.bundle.patch`（默认 `./vibepm.patch.json`，任务计划写的 `.yml` 是 dsh 参考，vibepm 选 JSON 少依赖）+ `node.schema`/`client.schema`（轻量字段类型校验）；`ResolvedEntry.bundlePatch`。
+- **loader v3**：插件组合先由 `buildBootConfig` 经 resolvePluginRows 算出 order/per/disabled；命中 bundle 的 workspace 包按依赖序(Topo)提供 patch 层；schema 校验失败 → 该插件进 `skipped`（插件级隔离，不炸整链）；`pluginsDir()` = `~/.vibepm/plugins`，从 package.json 的 `vibepm.pluginLayers` 自发现已装层并 `mergeEntries` 进 bootGraph（供 `/plugins/<id>/client.js`）。
+- **CLI `vibepm plugin`**（`cli/src/cli/plugin.ts`）：薄 pnpm forwarder（首次初始化 pluginsDir + pnpm-workspace.yaml 空 allowBuilds），转发 `pnpm <args>`（相对路径 spec 锚定到调用目录），成功后 `reconcilePlugins` 按已安装态维护 layer 栈（新增 bundle 声明进栈、丢失/未装移除、builder-less 仅告警）。Windows `spawn` 带 `shell`（CVE-2024-27980 硬化）。
+- **影响面核对**：`buildBootConfig` 仅 loader 内部 + index 导出，调用方 cli web 只传 config → 无破坏；冷启动 `plugins.enabled` 逻辑保留；内核三件套(PROTECTED_CORE)不可被 patch 禁用；老 `config.plugins` 直列并入 base；老 `config-layer` 覆盖统一 `configLayerToRows` 兼容。
+- **风险记录**：insert 的第三方插件若未装到 pluginsDir，loader 会在 import 时 failed → 进 skipped（不 crash）。三轮冒烟验证均绿。

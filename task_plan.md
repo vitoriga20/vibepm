@@ -56,3 +56,69 @@
 - [ ] 全链路 `pnpm run build` exit 0；
 - [ ] 新 4 插件 `package.json` 都有 `vibepm.node` / `vibepm.client`（或二选一，按需）；
 - [ ] 无 console error，无 boot-error 横幅。
+
+---
+
+# 阶段 v3 · 生态机制对齐 dsh（A 层 · 只对齐生态机制）
+
+> 决策：跟 dsh 生态完全对齐，但只对齐「生态机制」，不堆 harness 重机制（HMR / preset / per-session cordis.yml / headless+web 双 profile 不做）。
+> 目标：第三方插件 = npm 包 + `vibepm.bundle.patch` 声明 → 可用 `vibepm plugin <pkg>` 安装 → 按依赖顺序层叠进组合。业务插件全部自研。
+
+## 现状盘点（v3 对齐前已有什么 / 缺什么）
+
+已具备（可复用，不动）：
+- `buildBootConfig(config, patchLayers, bundles, directPlugins)`：已有 patchLayers 维度，但语义 = **按 entryId 覆盖 config**，不是按行插入/删行
+- `scanWorkspace` + `ResolvedEntry`：扫 `vibepm.node` / `vibepm.client`
+- `DEFAULT_BUNDLES[minimal]`：硬编码 plugin 名单
+- CLI `applyPatch / ensureProfile / saveProfile / profilePath / loadProfile / defaultProfile`（core 已导出）
+- 冷启动 `plugins.enabled`（plugin-plugin-manager 可关插件，等价 dsh profile user-layer patch 思想）
+
+缺（本次要建）：
+1. 插件 package.json 的 **`vibepm.bundle.patch` 字段**未解析（manifest.ts 只读 node/client）
+2. **patch 文件行语义**：dsh 是 `- id:` / `- insert:` / `- disabled:` 的行列表，按 id 覆盖且可插入新行；现 patchLayers 只是 config 覆盖，不能 insert
+3. **`vibepm plugin <pkg>` 命令**（pnpm forwarder + 装后 reconcile）不存在
+4. **schema 校验**不存在（先手写 validate，不引 schemastery）
+
+## 步骤
+
+### 3.1 manifest 解析 `vibepm.bundle`
+- 扩展 `packages/core/src/manifest.ts`：`VibePmManifest` 加 `bundle?: { patch?: string }`
+- `scanWorkspace` 时解析 `pkg.vibepm.bundle.patch`（相对包根的 patch 文件路径，默认 `./vibepm.patch.yml`），存进 `ResolvedEntry`（新增 `bundlePatch: string | null`）
+- 对齐 dsh：`"vibepm": { "bundle": { "patch": "./vibepm.patch.yml" } }` 的包 = 可安装组合层插件
+
+### 3.2 patch 文件格式 + 层叠语义（核心）
+- 定义 patch 行格式（对齐 dsh cordis.patch.yml 思想，用 JSON/YAML 均可，先 JSON 少依赖）：
+  - 覆盖已有行：`{ id: "plugin-settings", config: {...} }`
+  - 插入新行：`{ insert: { id: "my-plugin", name: "@my/pkg", config: {...} } }`
+  - 禁用：`{ id: "plugin-repo-feed", disabled: true }`
+- 新增 `packages/core/src/patches.ts`：
+  - `parsePatchLayer(raw): PatchRow[]`
+  - `resolvePluginRows(layers): { order, per }` —— 按「base 行 ← 各 bundle 按 dependency 顺序 ← profile 覆盖 ← CLI --patch」层叠：
+    - 逐层应用，`id` 相同 → 覆盖该行（config 整体替换，对齐 dsh「patch 替换整行 config」）
+    - `insert` → 追加新行
+    - `disabled: true` → 标记跳过
+- `loader.ts` 的 `buildBootConfig` 改走 `resolvePluginRows`；`DEFAULT_BUNDLES[minimal]` → 改为 base patch 层文件（谁提供？见 3.4）
+
+### 3.3 CLI `vibepm plugin` 子命令
+- 新增 `packages/cli/src/cli/plugin.ts`（照搬 dsh `apps/cli/src/plugin.ts` 逻辑）：
+  - `vibepm plugin <profile?> <pnpm args...>` → 确保 profile 目录 + 初始化 base → `spawnSync('pnpm', args, { cwd: profileDir, stdio:'inherit', shell: win32 })` → 成功后 `reconcilePlugins`
+  - `reconcilePlugins`：扫已装依赖，发现声明 `vibepm.bundle.patch` 的加入 layer 栈；丢失该声明的移除；无 bundle 声明的普通依赖给 warning
+  - 注册进 `bin.ts` / commander（对齐现有 web/setup/sync/status 样式）
+- Windows：命令分隔用 `;`；`spawn` pnpm 需 `shell`（CVE-2024-27980 硬化）
+
+### 3.4 现有 7 插件迁成 patch 形式
+- 为 system 内置插件建 base patch（放 `packages/core` 或用 config 默认）：`minimal` 名单 → 一行一行的 patch row，含当前 `DEFAULT_BUNDLES[minimal]` 全部 8 个插件
+- 每个插件 package.json 若需被第三方覆盖 → 确认 `id` 稳定（`entryIdFromPkgName` 结果），无 `vibepm.bundle` 声明的内置插件仍属 base，不出现在可安装层
+
+### 3.5 schema 校验
+- `packages/core/src/schema.ts`：手写轻量 `validatePluginConfig(id, config, schema)`，每个插件 `package.json` `vibepm.node` 旁可选 `schema` 字段（字段名/类型/必填）
+- loader 装入时校验，失败 → 插件进 `skipped` 并带清晰报错（不 crash 整链，对齐 dsh fail-loud 但插件级隔离）
+
+## 影响面检查清单
+- [ ] patch 行语义改动后：`buildBootConfig` 老 `patchLayers`（config 覆盖）调用方是否兼容或统一迁到新层叠
+- [ ] `DEFAULT_BUNDLES` 迁 patch 后：`plugin-plugin-manager` 冷启动 enabled 读取序是否仍可用（db 最先加载不变）
+- [ ] 每个 patch 行 `id` 与 `entryIdFromPkgName` 输出严格一致，否则面板丢渲染
+- [ ] `vibepm plugin` 子命令不破坏现有 web/setup/sync/status
+- [ ] schema 校验失败只跳过该插件，不炸整链
+- [ ] `pnpm run build` + Playwright 全过；对外（README/npm 描述/注释）不提 dsh
+- [ ] 完成一次 git commit（每验收一提交，便于回滚）

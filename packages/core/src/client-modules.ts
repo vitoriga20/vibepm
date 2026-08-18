@@ -57,6 +57,14 @@ export class ClientModuleHost {
     return this._entries.get(id);
   }
 
+  /** 并入额外解析出的 entry（如已安装到 pluginsDir 的三方插件），并重算 bootGraph */
+  mergeEntries(extra: Map<string, ResolvedEntry>): void {
+    if (!extra.size) return;
+    for (const [k, v] of extra) this._entries.set(k, v);
+    this._graph = buildBootGraph(this._entries);
+    this._rev = this._graph.rev;
+  }
+
   graph(): BootGraph {
     return this._graph;
   }

@@ -4,10 +4,18 @@ import { readdirSync, existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+/** 轻量 schema 字段：字段名 → 类型/必填（用于 validatePluginConfig） */
+export type SchemaField = {
+  type: "string" | "number" | "boolean" | "array" | "object" | "any";
+  required?: boolean;
+};
+export type PluginSchema = Record<string, SchemaField>;
+
 export interface VibePmNodeManifest {
   inject: string[];
   provide: string[];
   immediately?: boolean;
+  schema?: PluginSchema;
 }
 
 export interface VibePmClientManifest {
@@ -18,11 +26,18 @@ export interface VibePmClientManifest {
   entry?: string;
   /** 样式资源相对路径（可选） */
   styles?: string;
+  schema?: PluginSchema;
+}
+
+export interface VibePmBundleManifest {
+  /** 相对包根的 patch 文件路径，默认 "./vibepm.patch.json" */
+  patch?: string;
 }
 
 export interface VibePmManifest {
   node?: VibePmNodeManifest;
   client?: VibePmClientManifest;
+  bundle?: VibePmBundleManifest;
 }
 
 export interface ResolvedEntry {
@@ -38,6 +53,8 @@ export interface ResolvedEntry {
   clientEntry: string | null;
   /** 样式 bundle 路径（可选） */
   clientStyles: string | null;
+  /** bundle patch 文件绝对路径（该包声明 vibepm.bundle 时才有，否则 null） */
+  bundlePatch: string | null;
   manifest: VibePmManifest;
 }
 
@@ -107,7 +124,12 @@ export function scanWorkspace(rootHint?: string): Map<string, ResolvedEntry> {
     const clientEntry = clientRel ? resolve(pkgDir, clientRel) : null;
     const stylesRel = manifest.client?.styles ?? null;
     const clientStyles = stylesRel ? resolve(pkgDir, stylesRel) : null;
-    entries.set(id, { id, pkgName, pkgDir, nodeEntry, clientEntry, clientStyles, manifest });
+    // bundle 层：声明 vibepm.bundle 的包 = 可安装组合层；未给定路径默认 ./vibepm.patch.json
+    const bundlePatch =
+      manifest.bundle || pkg.vibepm?.bundle
+        ? resolve(pkgDir, pkg.vibepm?.bundle?.patch ?? "./vibepm.patch.json")
+        : null;
+    entries.set(id, { id, pkgName, pkgDir, nodeEntry, clientEntry, clientStyles, bundlePatch, manifest });
   }
   return entries;
 }

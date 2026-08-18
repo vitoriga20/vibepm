@@ -1,13 +1,24 @@
-// 加载器 v2（manifest 扫描版；对齐 dsh loader 思想）
-// 取代旧 loader.ts：不再硬编码 ENTRY_DIR，扫描 packages/* 下所有带 vibepm manifest 的包
-// 1) 早期注入 slots + bootGraph 服务
-// 2) 根据 bundles 组合插件启动顺序
-// 3) 双面插件（node + client）只在 Node 侧挂载 apply，client 侧由前端壳加载
+// 加载器 v3（manifest 扫描 + patch 层叠；对齐 dsh loader + bundle patch 思想）
+// 取代旧 loader.ts：
+//   1) 早期注入 slots + bootGraph 服务
+//   2) 插件组合 = base 层(builtin bundles) ← workspace bundle patch 层(依赖序) ← 已安装插件层 ← profile/CLI patch
+//   3) 校验 schema，失败插件进 skipped（插件级隔离）
+//   4) 双面插件 (node + client) 只在 Node 侧挂载 apply，client 侧由前端壳加载
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Context } from "./context.js";
 import { resolvePluginObject } from "./registry.js";
-import { scanWorkspace, type ResolvedEntry } from "./manifest.js";
+import {
+  scanWorkspace,
+  entryIdFromPkgName,
+  type ResolvedEntry,
+  type PluginSchema,
+} from "./manifest.js";
 import { slotsPlugin } from "./slots.js";
-import { clientModulesPlugin } from "./client-modules.js";
+import { clientModulesPlugin, ClientModuleHost } from "./client-modules.js";
+import { resolvePluginRows, configLayerToRows, type PatchRow } from "./patches.js";
+import { validatePluginConfig } from "./schema.js";
+import { pluginsDir } from "./config.js";
 
 export const DEFAULT_BUNDLES: Record<string, string[]> = {
   minimal: [
@@ -23,10 +34,7 @@ export const DEFAULT_BUNDLES: Record<string, string[]> = {
   ],
 };
 
-/**
- * 内核三件套：shell 自身依赖，永远不可在设置里关闭。
- * plugin-plugin-manager 不在此列 → 可关，但关了就没法再从 UI 关别的，保留推荐已锁定三类。
- */
+/** 内核三件套：shell 自身依赖，永远不可在设置里关闭 */
 export const PROTECTED_CORE = new Set<string>([
   "plugin-storage",
   "plugin-web-ui",
@@ -54,6 +62,14 @@ const LEGACY_ENTRY_DIR: Record<string, string> = {
   "field-todo": "fields/todo",
 };
 
+function readJson(abs: string): any {
+  try {
+    return JSON.parse(readFileSync(abs, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
 export function availableEntries(workspaceRoot?: string): string[] {
   const fromWs = [...scanWorkspace(workspaceRoot).keys()];
   const fromLegacy = Object.keys(LEGACY_ENTRY_DIR);
@@ -61,47 +77,171 @@ export function availableEntries(workspaceRoot?: string): string[] {
   return [...s];
 }
 
-export function buildBootConfig(
-  config: Record<string, any>,
-  patchLayers?: Array<Record<string, Record<string, any>>>,
-  bundles?: Record<string, string[]>,
-  directPlugins?: Record<string, unknown>,
-): { order: string[]; per: Record<string, Record<string, any>> } {
-  bundles = bundles ?? DEFAULT_BUNDLES;
-  const order: string[] = [];
+/**
+ * 把 builtin bundle 名单（DEFAULT_BUNDLES）转成 base patch 层（insert 行）。
+ * base 层永远最先，构成插件组合的底座；后续 bundle 层按 id 覆盖它。
+ */
+function baseBundleRows(
+  bundles: Record<string, string[]>,
+  blist: string | string[],
+  ws: Map<string, ResolvedEntry> | null,
+): PatchRow[] {
+  const list = Array.isArray(blist) ? blist : [blist];
+  const rows: PatchRow[] = [];
   const seen = new Set<string>();
-  let blist = config.bundles ?? ["minimal"];
-  if (typeof blist === "string") blist = [blist];
-  for (const b of blist) {
-    for (const p of bundles[b] ?? []) {
-      if (!seen.has(p)) { seen.add(p); order.push(p); }
+  for (const b of list) {
+    for (const id of bundles[b] ?? []) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      rows.push({ id, name: ws?.get(id)?.pkgName });
     }
   }
-  for (const p of Object.keys(directPlugins ?? {})) {
-    if (!seen.has(p)) { seen.add(p); order.push(p); }
-  }
+  return rows;
+}
+
+/** 解析 config.plugins 老直列（.enabled / .plugins / 数组）为补充行 */
+function legacyPluginRows(config: Record<string, any>): PatchRow[] {
   let legacy = config.plugins ?? [];
   if (typeof legacy === "object" && !Array.isArray(legacy)) legacy = legacy.enabled ?? legacy.plugins ?? [];
   if (typeof legacy === "string") legacy = [legacy];
+  const rows: PatchRow[] = [];
   for (let p of legacy ?? []) {
     if (typeof p === "object" && p !== null) p = p.name ?? p.id;
-    if (p && !seen.has(p)) { seen.add(p); order.push(p); }
+    if (p && typeof p === "string") rows.push({ id: p });
   }
-  const per: Record<string, Record<string, any>> = {};
-  for (const name of order) {
-    let merged = { ...((config[name] ?? {}) as Record<string, any>) };
-    for (const layer of patchLayers ?? []) {
-      if (name in layer) merged = { ...layer[name] };
+  return rows;
+}
+
+/** 依赖序排序 bundle 层：被依赖的 bundle 排在前（其 patch 先生效依从 base） */
+function orderBundles(entries: ResolvedEntry[]): ResolvedEntry[] {
+  const byId = new Map(entries.map((e) => [e.id, e]));
+  const done = new Set<string>();
+  const out: ResolvedEntry[] = [];
+  const visit = (id: string): void => {
+    if (done.has(id)) return;
+    done.add(id);
+    const e = byId.get(id);
+    if (!e) return;
+    const pkg = readJson(join(e.pkgDir, "package.json"));
+    for (const dep of Object.keys(pkg?.dependencies ?? {})) {
+      const depId = entryIdFromPkgName(dep);
+      if (byId.has(depId)) visit(depId);
     }
-    per[name] = merged;
+    out.push(e);
+  };
+  for (const e of entries) visit(e.id);
+  return out;
+}
+
+/** 读一个 bundle entry 的 patch 文件为行数组（文件不存在 → 空层） */
+function readBundleLayer(e: ResolvedEntry): PatchRow[] {
+  if (!e.bundlePatch || !existsSync(e.bundlePatch)) return [];
+  const parsed = readJson(e.bundlePatch);
+  if (parsed === null) return [];
+  try {
+    return Array.isArray(parsed) ? (parsed as PatchRow[]) : [parsed as PatchRow];
+  } catch {
+    return [];
   }
-  return { order, per };
+}
+
+/**
+ * 收集已安装到 pluginsDir 的三方插件（config.vibepm.pluginLayers 列的包名）：
+ * 返回其 ResolvedEntry（合并进 client/bootGraph）与其 patch 层。
+ */
+function loadInstalledBundles(pluginNames: string[]): { entries: ResolvedEntry[]; layers: PatchRow[] } {
+  const entries: ResolvedEntry[] = [];
+  const existing = new Set<string>();
+  const layers: PatchRow[] = [];
+  for (const name of pluginNames) {
+    const pkgJson = join(pluginsDir(), "node_modules", name, "package.json");
+    if (!existsSync(pkgJson)) {
+      process.stderr.write(`vibepm: 已声明的插件 ${name} 未安装（缺失 ${pkgJson}），忽略\n`);
+      continue;
+    }
+    const pkg = readJson(pkgJson);
+    const manifest = pkg?.vibepm ?? {};
+    const id = entryIdFromPkgName(name);
+    if (existing.has(id)) continue;
+    existing.add(id);
+    const pkgDir = join(pluginsDir(), "node_modules", name);
+    const resolveRel = (rel?: string | null, def?: string | null): string | null =>
+      rel ? join(pkgDir, rel) : def != null ? join(pkgDir, def) : null;
+    entries.push({
+      id,
+      pkgName: name,
+      pkgDir,
+      nodeEntry: resolveRel(manifest.node ? (pkg.main ?? "./dist/index.js") : null, null),
+      clientEntry: resolveRel(manifest.client?.entry, manifest.client ? "./dist/client/index.js" : null),
+      clientStyles: resolveRel(manifest.client?.styles ?? null, null),
+      bundlePatch:
+        manifest.bundle || pkg.vibepm?.bundle
+          ? join(pkgDir, manifest.bundle?.patch ?? "./vibepm.patch.json")
+          : null,
+      manifest,
+    });
+    const patches = readBundleLayer(entries[entries.length - 1]);
+    if (patches.length) layers.push(...patches);
+  }
+  return { entries, layers };
+}
+
+/** 已安装插件层包名：config 显式覆盖，否则读 pluginsDir/package.json 的 vibepm.pluginLayers */
+function pluginLayerNames(config: Record<string, any>): string[] {
+  if (Array.isArray(config?.vibepm?.pluginLayers)) return config.vibepm.pluginLayers;
+  const pkg = readJson(join(pluginsDir(), "package.json"));
+  return Array.isArray(pkg?.vibepm?.pluginLayers) ? pkg.vibepm.pluginLayers : [];
+}
+
+/**
+ * 组装插件组合：base ← workspace bundle 层 ← 已安装插件层 ← 顶层 patch 层。
+ * @param config 用户配置（bundles / plugins / vibepm.pluginLayers / 每插件 config）
+ * @param patchLayers 顶层 patch 层（PatchRow[] 或旧 config-覆盖 Record<id,config>）
+ * @param bundles builtin bundle 表
+ * @param directPlugins 直接注入的插件表（测试用）
+ */
+export function buildBootConfig(
+  config: Record<string, any>,
+  patchLayers?: Array<Record<string, Record<string, any>> | PatchRow[]>,
+  bundles?: Record<string, string[]>,
+  directPlugins?: Record<string, unknown>,
+): { order: string[]; per: Record<string, Record<string, any>>; disabled: string[] } {
+  bundles = bundles ?? DEFAULT_BUNDLES;
+  const ws = scanWorkspace();
+  // base 层：builtin bundles + 老 config.plugins
+  let blist = config.bundles ?? ["minimal"];
+  if (typeof blist === "string") blist = [blist];
+  const baseRows = baseBundleRows(bundles, blist as string | string[], ws);
+  // 老 config.plugins 直列也作为 base 补充行
+  baseRows.push(...legacyPluginRows(config));
+  // 各层行：base ← workspace bundle 层（依赖序） ← 已安装插件层 ← 用户 patch
+  const wsBundles = orderBundles([...ws.values()].filter((e) => e.bundlePatch));
+  const wsLayers: PatchRow[] = [];
+  for (const e of wsBundles) wsLayers.push(...readBundleLayer(e));
+  const installed = loadInstalledBundles(pluginLayerNames(config));
+  const userLayers: Array<Record<string, Record<string, any>> | PatchRow[]> =
+    patchLayers ?? [];
+  const normalizedLayers: (PatchRow[] | string | object)[] = userLayers.map((layer) =>
+    Array.isArray(layer) ? (layer as PatchRow[]) : configLayerToRows(layer as Record<string, Record<string, any>>),
+  );
+  const layers: (PatchRow[] | string | object)[] = [
+    baseRows,
+    wsLayers,
+    installed.layers,
+    ...normalizedLayers,
+  ];
+  const { order, per, disabled } = resolvePluginRows(layers);
+  // direct plugins 尾部并入
+  for (const id of Object.keys(directPlugins ?? {})) {
+    if (!order.includes(id)) order.push(id);
+  }
+  return { order, per, disabled };
 }
 
 async function importFromWorkspace(entry: string, ws: Map<string, ResolvedEntry>, direct?: unknown): Promise<{ mod: unknown; source: "ws" | "legacy" | "direct" }> {
   if (direct !== undefined) return { mod: direct, source: "direct" };
   const fromWs = ws.get(entry);
-  if (fromWs && fromWs.nodeEntry) {
+  if (fromWs && fromWs.nodeEntry && existsSync(fromWs.nodeEntry)) {
     const specifier = "file://" + fromWs.nodeEntry.replace(/\\/g, "/");
     const mod = await import(specifier);
     return { mod, source: "ws" };
@@ -128,22 +268,28 @@ export interface BootResult {
 
 export async function boot(
   config: Record<string, any>,
-  patchLayers?: Array<Record<string, Record<string, any>>>,
+  patchLayers?: Array<Record<string, Record<string, any>> | PatchRow[]>,
   bundles?: Record<string, string[]>,
   direct?: Record<string, unknown>,
   scope?: string,
   workspaceRoot?: string,
 ): Promise<BootResult> {
-  const { order, per } = buildBootConfig(config, patchLayers, bundles, direct);
+  const { order, per, disabled: patchDisabled } = buildBootConfig(config, patchLayers, bundles, direct);
   const wsEntries = scanWorkspace(workspaceRoot);
+  // 并入已安装插件 entry（供 /plugins/<id>/client.js 服务）
+  const installed = loadInstalledBundles(pluginLayerNames(config));
   const ctx = new Context({ config, scope, loader: null });
   const skipped: string[] = [];
-  const disabled: string[] = [];
-  // Step 0: 先提供 slots + bootGraph（两个基础服务不属于 bundle 组合，永远存在）
+  const disabled: string[] = [...patchDisabled];
+  // 内核三件套不可被 patch 禁用
+  for (const p of [...disabled]) if (PROTECTED_CORE.has(p)) disabled.splice(disabled.indexOf(p), 1);
+  // Step 0: 先提供 slots + bootGraph（基础服务不属于 bundle 组合）
   ctx.plugin(slotsPlugin(), {}, "slots");
-  ctx.plugin(clientModulesPlugin(workspaceRoot), {}, ClientModuleHost_NAME());
-  // 冷启动开关：storage(提供 db) 是最先的插件，load 它之后再读 settings 的 plugins.enabled
-  // 决定后续插件是否跳过加载（dsh 等价物：profile user-layer patch）
+  ctx.plugin(clientModulesPlugin(workspaceRoot), {}, ClientModuleHost.NAME);
+  // 让 bootGraph 认识已安装插件
+  const host = ctx.get(ClientModuleHost.NAME) as ClientModuleHost | undefined;
+  if (host && installed.entries.length) host.mergeEntries(new Map(installed.entries.map((e) => [e.id, e])));
+  // 冷启动开关：storage(提供 db) 是最先的插件，load 它之后再读 plugins.enabled
   let dbReady = false;
   for (const entry of order) {
     if (ctx.has("db") && !dbReady) {
@@ -158,6 +304,14 @@ export async function boot(
       }
     }
     if (disabled.includes(entry)) continue;
+    const wsEntry = wsEntries.get(entry) ?? installedEntriesMap(installed).get(entry);
+    const schema: PluginSchema | undefined = wsEntry?.manifest?.node?.schema;
+    const configErr = validatePluginConfig(entry, per[entry] ?? {}, schema);
+    if (configErr) {
+      skipped.push(`${entry}: ${configErr}`);
+      ctx.bootErrors.push(new Error(configErr));
+      continue;
+    }
     try {
       const directPlugin = direct?.[entry];
       const { mod } = await importFromWorkspace(entry, wsEntries, directPlugin);
@@ -172,4 +326,6 @@ export async function boot(
   return { ctx, order, skipped, disabled, errors: ctx.bootErrors, workspaceEntries: wsEntries };
 }
 
-function ClientModuleHost_NAME(): string { return "bootGraph"; }
+function installedEntriesMap(installed: { entries: ResolvedEntry[] }): Map<string, ResolvedEntry> {
+  return new Map(installed.entries.map((e) => [e.id, e]));
+}
