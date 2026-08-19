@@ -11,10 +11,10 @@
  * 「全部可见插件」来源 = enumerateAllEntries（workspace + 三方安装 + runtime 兜底，与 bootGraph 同一数据源）。
  * 壳插件列表（runtime.protected）在此处 locked，前端禁改。
  */
-import type { Context } from "@vibepm/core";
-import { PLUGINS_ENABLED_KEY, enumerateAllEntries, type EntryMeta } from "@vibepm/core";
-import { readBody, sendJson, routeCtx, type WebServerService } from "@vibepm/plugin-web-ui";
-import type { SlotService } from "@vibepm/plugin-ide-view";
+import type { Context } from "@vitoriga20/core";
+import { PLUGINS_ENABLED_KEY, enumerateAllEntries, type EntryMeta } from "@vitoriga20/core";
+import { readBody, sendJson, routeCtx, type WebServerService } from "@vitoriga20/plugin-web-ui";
+import type { SlotService } from "@vitoriga20/plugin-ide-view";
 
 type DbLike = {
   getSetting<T = unknown>(k: string): T | null;

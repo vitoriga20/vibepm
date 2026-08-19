@@ -8,7 +8,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { pluginsDir } from "@vibepm/core";
+import { pluginsDir } from "@vitoriga20/core";
 
 const PLUGINS_PKG = "vibepm-plugins";
 

@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import net from "node:net";
 import {
   boot,
+  scanInstalled,
   type BootResult,
   ensureProfile,
   applyPatch,
@@ -11,8 +12,8 @@ import {
   loadProfile,
   defaultProfile,
   type Context,
-} from "@vibepm/core";
-import { DEFAULT_BUNDLES, PROTECTED_CORE } from "../runtime.js";
+} from "@vitoriga20/core";
+import { DEFAULT_BUNDLES, PROTECTED_CORE, DEFAULT_PLUGIN_PACKAGES } from "../runtime.js";
 
 export function setup(): void {
   const p = profilePath();
@@ -90,10 +91,10 @@ export async function web(opts: WebOptions = {}): Promise<void> {
 
   const patchObject = readPatchOrDie(opts.patch);
   const config = mergePatch(cfg, patchObject);
-  // 注入运行时组合：内核不持有插件 id，默认插件集/壳列表由运行时提供
+  // 注入运行时组合：内核不持有插件 id，默认插件集/壳列表/内置插件包名由运行时提供
   config.vibepm = {
     ...(config.vibepm ?? {}),
-    runtime: { bundles: DEFAULT_BUNDLES, protected: PROTECTED_CORE },
+    runtime: { bundles: DEFAULT_BUNDLES, protected: PROTECTED_CORE, installedPlugins: DEFAULT_PLUGIN_PACKAGES },
   };
   if (freePort) {
     config.web_ui = { ...(config.web_ui ?? {}), port: freePort };
@@ -101,7 +102,9 @@ export async function web(opts: WebOptions = {}): Promise<void> {
     config["plugin-web-ui"] = { ...(config["plugin-web-ui"] ?? {}), port: freePort };
   }
 
-  const result: BootResult = await boot(config);
+  // 发布态：从 cli 所在 node_modules 按包名解析内置插件（对齐 dsh loader，不依赖 workspace 目录）
+  const installedEntries = scanInstalled(DEFAULT_PLUGIN_PACKAGES, import.meta.url);
+  const result: BootResult = await boot(config, undefined, undefined, undefined, undefined, undefined, undefined, installedEntries);
   const ctx = result.ctx;
   // 让事件循环推进：等待 web-ui 的 listening/error 绑定事件落定(端口占用在此浮现)
   await new Promise((r) => setTimeout(r, 400));

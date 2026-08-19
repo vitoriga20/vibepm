@@ -1,6 +1,7 @@
 // 插件 manifest 契约：扫描 workspace 下所有带 `vibepm` 字段的 package.json
 // 对齐 dsh 的插件 manifest 思路（dsh.client → vibepm.node / vibepm.client）
 import { readdirSync, existsSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -135,13 +136,74 @@ export function scanWorkspace(rootHint?: string): Map<string, ResolvedEntry> {
 }
 
 export function entryIdFromPkgName(pkgName: string): string {
-  // @vibepm/plugin-storage → plugin-storage；其余直接用
+  // @vitoriga20/plugin-storage → plugin-storage；其余直接用
   let name = pkgName;
   if (name.startsWith("@")) {
     const slash = name.indexOf("/");
     if (slash > 0) name = name.slice(slash + 1);
   }
   return name;
+}
+
+/**
+ * 从 node_modules 按包名解析已安装插件（发布态的主源，对齐 dsh loader：
+ * 插件包是 cli 的真实 dependencies，安装后即位于 node_modules，无需扫 workspace 目录）。
+ * 解析基准默认是 core 自身（createRequire 从 core 所在 node_modules 向上找）；
+ * 亦可显式传入 cli 模块位置（cli 依赖全部内置插件，解析最稳）。
+ * 解析不到的包跳过（不 throw，与 dsh loader 按名 resolve 的容错一致）。
+ */
+export function scanInstalled(pkgNames: string[], base?: string): Map<string, ResolvedEntry> {
+  const entries = new Map<string, ResolvedEntry>();
+  if (!pkgNames.length) return entries;
+  let req: ReturnType<typeof createRequire>;
+  try {
+    // base 可为 file:// URL（如 import.meta.url）或目录路径；URL 直接交给 createRequire，路径加占位文件锚定
+    req = base === undefined
+      ? createRequire(import.meta.url)
+      : /^file:\/\//.test(base)
+        ? createRequire(base)
+        : createRequire(join(base, "__vibepm_scan__.js"));
+  } catch {
+    return entries;
+  }
+  for (const name of pkgNames) {
+    let pkgJsonPath: string;
+    try {
+      pkgJsonPath = req.resolve(`${name}/package.json`);
+    } catch {
+      continue; // 未安装（或发布态缺失该依赖）→ 跳过，靠其它源兜底
+    }
+    const pkgDir = dirname(pkgJsonPath);
+    let pkg: any;
+    try {
+      pkg = JSON.parse(readFileSync(pkgJsonPath, "utf-8"));
+    } catch {
+      continue;
+    }
+    const manifest: VibePmManifest = pkg.vibepm ?? {};
+    if (!manifest.node && !manifest.client) continue; // 不是插件包
+    const pkgName: string = typeof pkg.name === "string" ? pkg.name : name;
+    const id = entryIdFromPkgName(pkgName);
+    const nodeRel = manifest.node ? (pkg.main ?? "./dist/index.js") : null;
+    const nodeEntry = nodeRel ? resolve(pkgDir, nodeRel) : null;
+    const clientRel = manifest.client?.entry ?? (manifest.client ? "./dist/client/index.js" : null);
+    const clientEntry = clientRel ? resolve(pkgDir, clientRel) : null;
+    const stylesRel = manifest.client?.styles ?? null;
+    const clientStyles = stylesRel ? resolve(pkgDir, stylesRel) : null;
+    const bundlePatch =
+      manifest.bundle || pkg.vibepm?.bundle
+        ? resolve(pkgDir, pkg.vibepm?.bundle?.patch ?? "./vibepm.patch.json")
+        : null;
+    entries.set(id, { id, pkgName, pkgDir, nodeEntry, clientEntry, clientStyles, bundlePatch, manifest });
+  }
+  return entries;
+}
+
+/** 合并多个 entry 表（后者覆盖前者同 id），供 workspace + installed 双源合并 */
+export function mergeEntryMaps(...maps: Array<Map<string, ResolvedEntry>>): Map<string, ResolvedEntry> {
+  const merged = new Map<string, ResolvedEntry>();
+  for (const m of maps) for (const [k, v] of m) merged.set(k, v);
+  return merged;
 }
 
 /** 生成本地 client boot graph（给 <script> 注入 window.__VIBEPM_BOOT__） */

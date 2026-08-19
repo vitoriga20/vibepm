@@ -23,9 +23,33 @@ importers:
 
   packages/cli:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
+      '@vitoriga20/plugin-ambient':
+        specifier: workspace:*
+        version: link:../plugin-ambient
+      '@vitoriga20/plugin-github':
+        specifier: workspace:*
+        version: link:../plugin-github
+      '@vitoriga20/plugin-ide-view':
+        specifier: workspace:*
+        version: link:../plugin-ide-view
+      '@vitoriga20/plugin-onboarding':
+        specifier: workspace:*
+        version: link:../plugin-onboarding
+      '@vitoriga20/plugin-plugin-manager':
+        specifier: workspace:*
+        version: link:../plugin-plugin-manager
+      '@vitoriga20/plugin-settings':
+        specifier: workspace:*
+        version: link:../plugin-settings
+      '@vitoriga20/plugin-storage':
+        specifier: workspace:*
+        version: link:../plugin-storage
+      '@vitoriga20/plugin-web-ui':
+        specifier: workspace:*
+        version: link:../plugin-web-ui
       commander:
         specifier: ^12.0.0
         version: 12.1.0
@@ -38,10 +62,10 @@ importers:
 
   packages/plugin-ambient:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
-      '@vibepm/plugin-ide-view':
+      '@vitoriga20/plugin-ide-view':
         specifier: workspace:*
         version: link:../plugin-ide-view
     devDependencies:
@@ -60,13 +84,13 @@ importers:
 
   packages/plugin-github:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
-      '@vibepm/plugin-ide-view':
+      '@vitoriga20/plugin-ide-view':
         specifier: workspace:*
         version: link:../plugin-ide-view
-      '@vibepm/plugin-web-ui':
+      '@vitoriga20/plugin-web-ui':
         specifier: workspace:*
         version: link:../plugin-web-ui
     devDependencies:
@@ -85,16 +109,16 @@ importers:
 
   packages/plugin-ide-view:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
 
   packages/plugin-onboarding:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
-      '@vibepm/plugin-ide-view':
+      '@vitoriga20/plugin-ide-view':
         specifier: workspace:*
         version: link:../plugin-ide-view
     devDependencies:
@@ -113,13 +137,13 @@ importers:
 
   packages/plugin-plugin-manager:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
-      '@vibepm/plugin-ide-view':
+      '@vitoriga20/plugin-ide-view':
         specifier: workspace:*
         version: link:../plugin-ide-view
-      '@vibepm/plugin-web-ui':
+      '@vitoriga20/plugin-web-ui':
         specifier: workspace:*
         version: link:../plugin-web-ui
     devDependencies:
@@ -138,13 +162,13 @@ importers:
 
   packages/plugin-settings:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
-      '@vibepm/plugin-ide-view':
+      '@vitoriga20/plugin-ide-view':
         specifier: workspace:*
         version: link:../plugin-ide-view
-      '@vibepm/plugin-web-ui':
+      '@vitoriga20/plugin-web-ui':
         specifier: workspace:*
         version: link:../plugin-web-ui
     devDependencies:
@@ -163,10 +187,10 @@ importers:
 
   packages/plugin-skin-rhine:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
-      '@vibepm/plugin-ide-view':
+      '@vitoriga20/plugin-ide-view':
         specifier: workspace:*
         version: link:../plugin-ide-view
     devDependencies:
@@ -185,16 +209,16 @@ importers:
 
   packages/plugin-storage:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
-      '@vibepm/plugin-web-ui':
+      '@vitoriga20/plugin-web-ui':
         specifier: workspace:*
         version: link:../plugin-web-ui
 
   packages/plugin-web-ui:
     dependencies:
-      '@vibepm/core':
+      '@vitoriga20/core':
         specifier: workspace:*
         version: link:../core
 

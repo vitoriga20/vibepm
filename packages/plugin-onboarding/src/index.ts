@@ -4,8 +4,8 @@
  *    由各自插件自注册（github-auth / settings / repo-feed），随插件装卸而出现/消失，对齐 dsh。
  *  - 不提供任何 service、无 HTTP 路由。
  */
-import type { Context } from "@vibepm/core";
-import type { SlotName, SlotService } from "@vibepm/plugin-ide-view";
+import type { Context } from "@vitoriga20/core";
+import type { SlotName, SlotService } from "@vitoriga20/plugin-ide-view";
 
 type NavCardState = "idle" | "active" | "completed";
 interface NavCardPayload {

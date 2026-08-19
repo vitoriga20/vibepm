@@ -1,11 +1,20 @@
 {
-  "name": "@vibepm/core",
+  "name": "@vitoriga20/core",
   "version": "0.1.0",
   "type": "module",
+  "description": "vibepm core: Cordis-like kernel, plugin registry, loader (workspace + node_modules discovery)",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "exports": {
     ".": "./dist/index.js",
+    "./package.json": "./package.json",
     "./slots": "./dist/slots.js",
     "./manifest": "./dist/manifest.js",
     "./client-modules": "./dist/client-modules.js",

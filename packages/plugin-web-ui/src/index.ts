@@ -7,8 +7,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
-import type { Context, SlotService, ClientModuleHost } from "@vibepm/core";
-import { BootError } from "@vibepm/core";
+import type { Context, SlotService, ClientModuleHost } from "@vitoriga20/core";
+import { BootError } from "@vitoriga20/core";
 
 export const PLUGIN_NAME = "plugin-web-ui";
 

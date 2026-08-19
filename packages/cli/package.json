@@ -1,20 +1,35 @@
 {
-  "name": "@vibepm/cli",
-  "version": "0.1.0",
+  "name": "@vitoriga20/vibepm",
+  "version": "0.1.1",
   "type": "module",
+  "description": "vibepm CLI: plugin-based GitHub project manager, one-command install (npx @vitoriga20/vibepm web)",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "vibepm": "dist/bin.js"
   },
   "main": "dist/cli/index.js",
   "types": "dist/cli/index.d.ts",
   "files": ["dist"],
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "node -e \"import('fs').then(f=>f.rmSync('dist',{recursive:true,force:true}))\"",
     "test": "exit 0"
   },
   "dependencies": {
-    "@vibepm/core": "workspace:*",
+    "@vitoriga20/core": "workspace:*",
+    "@vitoriga20/plugin-storage": "workspace:*",
+    "@vitoriga20/plugin-web-ui": "workspace:*",
+    "@vitoriga20/plugin-ide-view": "workspace:*",
+    "@vitoriga20/plugin-onboarding": "workspace:*",
+    "@vitoriga20/plugin-github": "workspace:*",
+    "@vitoriga20/plugin-settings": "workspace:*",
+    "@vitoriga20/plugin-plugin-manager": "workspace:*",
+    "@vitoriga20/plugin-ambient": "workspace:*",
     "commander": "^12.0.0"
   }
 }

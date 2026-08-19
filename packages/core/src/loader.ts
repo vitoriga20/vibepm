@@ -10,6 +10,8 @@ import { Context } from "./context.js";
 import { resolvePluginObject } from "./registry.js";
 import {
   scanWorkspace,
+  scanInstalled,
+  mergeEntryMaps,
   entryIdFromPkgName,
   type ResolvedEntry,
   type PluginSchema,
@@ -30,8 +32,14 @@ function readJson(abs: string): any {
   }
 }
 
-export function availableEntries(workspaceRoot?: string): string[] {
-  return [...scanWorkspace(workspaceRoot).keys()];
+export function availableEntries(workspaceRoot?: string, installedEntries?: Map<string, ResolvedEntry>): string[] {
+  return [...mergeEntryMaps(scanWorkspace(workspaceRoot), installedEntries ?? new Map()).keys()];
+}
+
+/** 发布态内置插件包名：config.vibepm.runtime.installedPlugins（由 cli 注入） */
+function installedPluginNames(config: Record<string, any>): string[] {
+  const list = config?.vibepm?.runtime?.installedPlugins;
+  return Array.isArray(list) ? list.filter((x: any) => typeof x === "string") : [];
 }
 
 /** 插件可见元信息（给 UI 插件管理 / 外部工具枚举） */
@@ -54,11 +62,11 @@ export type EntryMeta = {
  * 源 2) 用户全局 pluginsDir（~/.vibepm/plugins）中 config.vibepm.pluginLayers 已声明的三方包
  * 源 3) 运行时兜底 fallbackIds（默认插件集由运行时提供，保持与组合层一致）
  */
-export function enumerateAllEntries(workspaceRoot?: string, fallbackIds?: string[]): EntryMeta[] {
+export function enumerateAllEntries(workspaceRoot?: string, fallbackIds?: string[], installedEntries?: Map<string, ResolvedEntry>): EntryMeta[] {
   const out = new Map<string, EntryMeta>();
 
-  // 源 1：workspace（packages/* + legacy）
-  const ws = scanWorkspace(workspaceRoot);
+  // 源 1：workspace（packages/* + legacy）+ 发布态 installed（node_modules 按包名解析）
+  const ws = mergeEntryMaps(scanWorkspace(workspaceRoot), installedEntries ?? new Map());
   for (const [id, info] of ws) {
     const pkgDir: string | null = info.pkgDir ?? null;
     const pkgJson = pkgDir ? readJson(join(pkgDir, "package.json")) : null;
@@ -224,9 +232,11 @@ export function buildBootConfig(
   patchLayers?: Array<Record<string, Record<string, any>> | PatchRow[]>,
   bundles?: Record<string, string[]>,
   directPlugins?: Record<string, unknown>,
+  installedEntries?: Map<string, ResolvedEntry>,
 ): { order: string[]; per: Record<string, Record<string, any>>; disabled: string[] } {
   const bundlesTable: Record<string, string[]> = bundles ?? config?.vibepm?.runtime?.bundles ?? {};
-  const ws = scanWorkspace();
+  // 双源：workspace（dev）+ installed（发布态 node_modules），installed 优先
+  const ws = mergeEntryMaps(scanWorkspace(), installedEntries ?? new Map());
   // base 层：builtin bundles + 老 config.plugins
   let blist = config.bundles ?? ["minimal"];
   if (typeof blist === "string") blist = [blist];
@@ -285,9 +295,11 @@ export async function boot(
   scope?: string,
   workspaceRoot?: string,
   protectedCore?: Iterable<string>,
+  installedEntries?: Map<string, ResolvedEntry>,
 ): Promise<BootResult> {
-  const { order, per, disabled: patchDisabled } = buildBootConfig(config, patchLayers, bundles, direct);
-  const wsEntries = scanWorkspace(workspaceRoot);
+  const { order, per, disabled: patchDisabled } = buildBootConfig(config, patchLayers, bundles, direct, installedEntries);
+  // 双源 entry 表：workspace（dev）+ 发布态 installed（node_modules），installed 优先
+  const wsEntries = mergeEntryMaps(scanWorkspace(workspaceRoot), installedEntries ?? new Map());
   // 并入已安装插件 entry（供 /plugins/<id>/client.js 服务）
   const installed = loadInstalledBundles(pluginLayerNames(config));
   const ctx = new Context({ config, scope, loader: null });
@@ -302,8 +314,9 @@ export async function boot(
   // Step 0: 先提供 slots + bootGraph（基础服务不属于 bundle 组合）
   ctx.plugin(slotsPlugin(), {}, "slots");
   ctx.plugin(clientModulesPlugin(workspaceRoot), {}, ClientModuleHost.NAME);
-  // 让 bootGraph 认识已安装插件
+  // 让 bootGraph 认识已安装插件（发布态内置 + pluginsDir 三方）
   const host = ctx.get(ClientModuleHost.NAME) as ClientModuleHost | undefined;
+  if (host && installedEntries?.size) host.mergeEntries(installedEntries);
   if (host && installed.entries.length) host.mergeEntries(new Map(installed.entries.map((e) => [e.id, e])));
   // 冷启动开关：storage(提供 db) 是最先的插件，load 它之后再读 plugins.enabled
   // disabled 来源 = 全部 enabledMap[id]===false 且非内核（不只限 order：游离的 client-only 皮肤等也要剔除）

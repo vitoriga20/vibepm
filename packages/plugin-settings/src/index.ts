@@ -4,9 +4,9 @@
  *  - inject slots → shell.primary 注册 settings 面板（#settings 路由）
  *  - shell.nav 注册一张「设置」快捷卡（onboarding 已经占了，这里可以不重复；仅加 primary 面板）
  */
-import type { Context } from "@vibepm/core";
-import { readBody, sendJson, routeCtx, type WebServerService } from "@vibepm/plugin-web-ui";
-import type { SlotName, SlotService } from "@vibepm/plugin-ide-view";
+import type { Context } from "@vitoriga20/core";
+import { readBody, sendJson, routeCtx, type WebServerService } from "@vitoriga20/plugin-web-ui";
+import type { SlotName, SlotService } from "@vitoriga20/plugin-ide-view";
 
 type DbLike = {
   listSettings(): Record<string, unknown>;

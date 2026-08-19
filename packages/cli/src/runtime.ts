@@ -16,3 +16,18 @@ export const DEFAULT_BUNDLES: Record<string, string[]> = {
 
 /** 系统壳插件：storage(提供 db) / web-ui(提供服务) / ide-view(提供壳)，不可在设置里关闭 */
 export const PROTECTED_CORE: string[] = ["plugin-storage", "plugin-web-ui", "plugin-ide-view"];
+
+/**
+ * 内置插件 npm 包名（发布态：cli 的真实 dependencies，安装后位于 node_modules）。
+ * 与 DEFAULT_BUNDLES 的 id 一一对应；core 据此从 node_modules 按包名解析（scanInstalled）。
+ */
+export const DEFAULT_PLUGIN_PACKAGES: string[] = [
+  "@vitoriga20/plugin-storage",
+  "@vitoriga20/plugin-web-ui",
+  "@vitoriga20/plugin-ide-view",
+  "@vitoriga20/plugin-onboarding",
+  "@vitoriga20/plugin-github",
+  "@vitoriga20/plugin-settings",
+  "@vitoriga20/plugin-plugin-manager",
+  "@vitoriga20/plugin-ambient",
+];

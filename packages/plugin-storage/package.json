@@ -1,10 +1,17 @@
 {
-  "name": "@vibepm/plugin-storage",
+  "name": "@vitoriga20/plugin-storage",
   "version": "0.1.0",
   "description": "本地 SQLite 数据库服务（db）：设置/项目/同步元数据存取。",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "vibepm": {
     "node": {
       "inject": [],
@@ -12,7 +19,8 @@
     }
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -20,7 +28,7 @@
     "test": "node --import tsx --test test/**/*.test.ts || exit 0"
   },
   "dependencies": {
-    "@vibepm/core": "workspace:*",
-    "@vibepm/plugin-web-ui": "workspace:*"
+    "@vitoriga20/core": "workspace:*",
+    "@vitoriga20/plugin-web-ui": "workspace:*"
   }
 }

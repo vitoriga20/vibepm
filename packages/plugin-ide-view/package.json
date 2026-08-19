@@ -1,10 +1,17 @@
 {
-  "name": "@vibepm/plugin-ide-view",
+  "name": "@vitoriga20/plugin-ide-view",
   "version": "0.1.0",
   "description": "极简壳内核：VibeShell 容器 + 浏览器模块表，面板/卡片按渲染注册表数据驱动。",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "vibepm": {
     "node": {
       "inject": ["slots"],
@@ -23,7 +30,8 @@
     ".": {
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -31,6 +39,6 @@
     "test": "exit 0"
   },
   "dependencies": {
-    "@vibepm/core": "workspace:*"
+    "@vitoriga20/core": "workspace:*"
   }
 }

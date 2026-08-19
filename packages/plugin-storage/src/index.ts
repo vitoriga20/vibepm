@@ -1,9 +1,9 @@
 // storage 插件：提供 db 服务 + effect 关库（照 Python storage plugin.py）
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import type { Context } from "@vibepm/core";
-import { dbPath as defaultDbPath } from "@vibepm/core";
-import { sendJson, readBody, routeCtx, type WebServerService } from "@vibepm/plugin-web-ui";
+import type { Context } from "@vitoriga20/core";
+import { dbPath as defaultDbPath } from "@vitoriga20/core";
+import { sendJson, readBody, routeCtx, type WebServerService } from "@vitoriga20/plugin-web-ui";
 import { Database, type ProjectRow, type TodoRow } from "./db.js";
 
 export { Database } from "./db.js";

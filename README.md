@@ -51,15 +51,16 @@ pnpm workspaces 管理 `packages/*` 多包：
 
 | 包 | 职责 |
 | --- | --- |
-| `@vibepm/cli` | CLI 入口（commander 子命令），对外暴露 `vibepm` 命令 |
-| `@vibepm/core` | Cordis 类内核：context / fiber / services / eventbus / loader / slots / manifest / client-modules |
-| `@vibepm/plugin-storage` | SQLite 存储（项目 / 设置 key-value），提供 `db` 服务 |
-| `@vibepm/plugin-web-ui` | HTTP 服务 + 静态壳，动态端口，`/api/*` 与 `/plugins/*` 路由 |
-| `@vibepm/plugin-ide-view` | 极简壳 `vibe-shell`（Web Components + Shadow DOM），按 shell 槽渲染 |
-| `@vibepm/plugin-onboarding` | 首屏引导导航卡 |
-| `@vibepm/plugin-github` | GitHub 连接（gh / Device Flow / PAT 三源）+ 仓库分区列表 + 仓库详情，提供 `github` 服务 |
-| `@vibepm/plugin-settings` | 通用设置面板 |
-| `@vibepm/plugin-plugin-manager` | 插件开关面板 |
+| `@vitoriga20/vibepm` | CLI 入口（commander 子命令），对外暴露 `vibepm` 命令 |
+| `@vitoriga20/core` | Cordis 类内核：context / fiber / services / eventbus / loader / slots / manifest / client-modules |
+| `@vitoriga20/plugin-storage` | SQLite 存储（项目 / 设置 key-value），提供 `db` 服务 |
+| `@vitoriga20/plugin-web-ui` | HTTP 服务 + 静态壳，动态端口，`/api/*` 与 `/plugins/*` 路由 |
+| `@vitoriga20/plugin-ide-view` | 极简壳 `vibe-shell`（Web Components + Shadow DOM），按 shell 槽渲染 |
+| `@vitoriga20/plugin-onboarding` | 首屏引导导航卡 |
+| `@vitoriga20/plugin-github` | GitHub 连接（gh / Device Flow / PAT 三源）+ 仓库分区列表 + 仓库详情，提供 `github` 服务 |
+| `@vitoriga20/plugin-settings` | 通用设置面板 |
+| `@vitoriga20/plugin-plugin-manager` | 插件开关面板 |
+| `@vitoriga20/plugin-skin-rhine` | 终末地风格皮肤（暗墨蓝 + 柠檬黄），可独立装卸 |
 
 ### Shell 槽位
 
@@ -147,7 +148,7 @@ cd my-plugin
 | node 半 | `src/index.ts` | 后端逻辑：暴露 service、注册 HTTP 路由、提供能力 | Node：loader 装配后调用 `apply(ctx)` |
 | client 半 | `src/client.ts` | 前端界面：定义自定义元素、注册 shell 槽位、交互 | 浏览器：壳从 `vibepm.client.entry` 动态 import |
 
-- **node 半**导出 `{ name, provide, inject, apply }` 的对象，`apply(ctx)` 在装入内核时被调用并返回清理函数（卸载时执行）。模板是**完全自包含**的——零 `@vibepm/*` 依赖、用结构签名鸭子类型访问内核，这样第三方不必依赖 monorepo。
+- **node 半**导出 `{ name, provide, inject, apply }` 的对象，`apply(ctx)` 在装入内核时被调用并返回清理函数（卸载时执行）。模板是**完全自包含**的——零 `@vitoriga20/*` 依赖、用结构签名鸭子类型访问内核，这样第三方不必依赖 monorepo。
 - **client 半**通过壳内核构造到 `window.__VIBEPM_MODULES__` 的模块表注册自己，不要在 client 里 import 壳 URL：
 
 ```ts

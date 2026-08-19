@@ -1,9 +1,9 @@
 // ide-view 插件 Node 半：dsh 风格极简壳，不写任何业务槽。
 // 功能（settings / github-auth / feed / onboarding）都由各自独立插件往 slots 注册。
 // 本插件仅负责一件兜底：shell.footer 写一个 vibepm 版本/版权条，保证首屏不空。
-import type { Context, SlotService } from "@vibepm/core";
+import type { Context, SlotService } from "@vitoriga20/core";
 // re-export core 的 SlotName / SlotService（供 settings/onboarding/… Node 侧 import type）
-export type { SlotName, SlotService, SlotItem } from "@vibepm/core";
+export type { SlotName, SlotService, SlotItem } from "@vitoriga20/core";
 
 class IdeViewPlugin {
   name = "plugin-ide-view";

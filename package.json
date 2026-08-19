@@ -15,7 +15,10 @@
     "lint": "tsc -p tsconfig.base.json --noEmit",
     "lint:hardcolor": "node scripts/verify-no-hardcolor.mjs",
     "lint:all": "pnpm run lint && pnpm run lint:hardcolor",
-    "prepare": "pnpm run build"
+    "prepare": "pnpm run build",
+    "release:pack": "node scripts/release.mjs pack",
+    "release:verify": "node scripts/release.mjs verify",
+    "release:publish": "node scripts/release.mjs publish"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

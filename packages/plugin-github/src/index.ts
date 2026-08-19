@@ -3,9 +3,9 @@
  *  - 解耦后标准：webServer.register 前缀路由；不用旧 ctx.on("web-api/route")。
  *  - 阈值三级取值：settings 运行时键 > vibepm.json 配置 > 常量默认（见 thresholds()）。
  */
-import type { Context } from "@vibepm/core";
-import { readBody, sendJson, routeCtx, type WebServerService } from "@vibepm/plugin-web-ui";
-import type { SlotService } from "@vibepm/plugin-ide-view";
+import type { Context } from "@vitoriga20/core";
+import { readBody, sendJson, routeCtx, type WebServerService } from "@vitoriga20/plugin-web-ui";
+import type { SlotService } from "@vitoriga20/plugin-ide-view";
 import { GitHubService } from "./github-service.js";
 import {
   API_PREFIX, R_SUB_STATUS, R_SUB_LOGIN, R_SUB_LOGOUT, R_SUB_REPOS, R_SUB_DEVICE_START, R_SUB_DEVICE_POLL,

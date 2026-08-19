@@ -4,6 +4,7 @@ client-dist/
 *.tsbuildinfo
 .pnpm-store/
 *.tgz
+dist-tarballs/
 .DS_Store
 *.log
 logs.txt
