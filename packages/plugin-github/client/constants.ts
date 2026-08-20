@@ -9,6 +9,9 @@
 /** API 前缀（与 node 侧 /api/github 注册一致；node/client 口径同步） */
 export const API_PREFIX = "/api/github";
 
+/** 只读子路由（与 node 侧 R_SUB_THRESHOLDS 一致；设置弹层用 api() 自动拼 API_PREFIX） */
+export const R_SUB_THRESHOLDS = "/thresholds";
+
 /** hash 路由（与 node 侧 shell.primary payload.route 一致） */
 export const HASH_AUTH = "auth";
 export const HASH_REPOS = "repos";
@@ -23,10 +26,12 @@ export const PANEL_KIND_AVATAR = "github-avatar";
 /** 分区阈值 settings 键（client 保存用，POST /api/settings {batch}；键名与 node 侧 settings-keys.ts 一致） */
 export const K_ACTIVE_WINDOW_DAYS = "github.active_window_days";
 export const K_ACTIVE_MIN_COMMITS = "github.active_min_commits";
+export const K_ACTIVE_RECENT_DAYS = "github.active_recent_days";
 
-/** 分区阈值兜底（主路径以后端 /repos 下发的 activeWindowDays/activeMinCommits/statsWindowDays 为准） */
+/** 分区阈值兜底（主路径以后端 /repos 下发的 activeWindowDays/activeMinCommits/activeRecentDays/statsWindowDays 为准） */
 export const ACTIVE_WINDOW_DAYS = 30;
 export const ACTIVE_MIN_COMMITS = 60;
+export const ACTIVE_RECENT_DAYS = 3;
 export const STATS_WINDOW_DAYS = 30;
 
 /** Device Flow 轮询间隔兜底（秒；服务端下发的 interval 优先） */
@@ -134,9 +139,10 @@ export const TEXT = {
   },
   settings: {
     title: "分区设置",
-    desc: "活跃 = 近 N 天提交 ≥ M 次，其余进尘封区。三级可配：settings(运行时) > vibepm.json(重启) > 默认。",
+    desc: "活跃 = 近 N 天提交 ≥ M 次，或近 K 天内有新提交，其余进尘封区。三级可配：settings(运行时) > vibepm.json(重启) > 默认。",
     winLabel: "活跃窗口（天）",
     minLabel: "活跃提交数（≥）",
+    recentLabel: "近期有新提交即活跃（天）",
     save: "保存",
     close: "关闭",
     saved: "已保存，正在刷新…",
@@ -144,7 +150,7 @@ export const TEXT = {
   },
   repos: {
     title: "我的仓库",
-    descActiveNote: "近 {window} 天提交 ≥ {min} 为活跃",
+    descActiveNote: "近 {window} 天提交 ≥ {min}，或近 {recent} 天有新提交为活跃",
     loading: "加载中…",
     loadFail: "加载失败",
     reload: "刷新",

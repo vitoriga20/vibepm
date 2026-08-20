@@ -8,8 +8,8 @@ import { readBody, sendJson, routeCtx, type WebServerService } from "@vitoriga20
 import type { SlotService } from "@vitoriga20/plugin-ide-view";
 import { GitHubService } from "./github-service.js";
 import {
-  API_PREFIX, R_SUB_STATUS, R_SUB_LOGIN, R_SUB_LOGOUT, R_SUB_REPOS, R_SUB_DEVICE_START, R_SUB_DEVICE_POLL,
-  API_BASE, CACHE_TTL_S, ACTIVE_WINDOW_DAYS, ACTIVE_MIN_COMMITS, STATS_WINDOW_DAYS, REPO_PARALLEL,
+  API_PREFIX, R_SUB_STATUS, R_SUB_LOGIN, R_SUB_LOGOUT, R_SUB_REPOS, R_SUB_THRESHOLDS, R_SUB_DEVICE_START, R_SUB_DEVICE_POLL,
+  API_BASE, CACHE_TTL_S, ACTIVE_WINDOW_DAYS, ACTIVE_MIN_COMMITS, ACTIVE_RECENT_DAYS, STATS_WINDOW_DAYS, REPO_PARALLEL,
   GH_DEVICE_CODE_URL, GH_ACCESS_TOKEN_URL, DEVICE_GRANT_TYPE, GH_SCOPE, JSON_ACCEPT, JSON_CONTENT_TYPE,
   DEVICE_POLL_INTERVAL_S, DEVICE_EXPIRES_IN_S, HTTP,
   HASH_AUTH, HASH_REPOS, HASH_REPO, PANEL_KIND_AUTH, PANEL_KIND_REPOS, PANEL_KIND_DETAIL,
@@ -19,7 +19,7 @@ import {
 } from "./constants.js";
 import {
   K_TOKEN, K_USERNAME, K_SOURCE, K_DEVICE_CODE, K_DEVICE_EXPIRES,
-  K_ACTIVE_WINDOW_DAYS, K_ACTIVE_MIN_COMMITS, K_STATS_WINDOW_DAYS,
+  K_ACTIVE_WINDOW_DAYS, K_ACTIVE_MIN_COMMITS, K_ACTIVE_RECENT_DAYS, K_STATS_WINDOW_DAYS,
 } from "./settings-keys.js";
 
 type DbLike = {
@@ -35,6 +35,7 @@ type GithubConfig = {
   cache_ttl: number;
   active_window_days: number;
   active_min_commits: number;
+  active_recent_days: number;
   stats_window_days: number;
 };
 
@@ -55,6 +56,7 @@ class GithubPlugin {
       cache_ttl: CACHE_TTL_S,
       active_window_days: ACTIVE_WINDOW_DAYS,
       active_min_commits: ACTIVE_MIN_COMMITS,
+      active_recent_days: ACTIVE_RECENT_DAYS,
       stats_window_days: STATS_WINDOW_DAYS,
       ...ctx.mergedConfig("github"),
       ...ctx.mergedConfig("plugin-github"),
@@ -63,10 +65,12 @@ class GithubPlugin {
     ctx.provide("github", service);
 
     // 阈值三级取值——settings 运行时键（UI「分区设置」改，立即生效）> vibepm.json 配置（mergedConfig，重启生效）> 常量默认。
-    // 每次请求内现算（db.getSetting 实时读），阈值改动即时反映，无需重启；活跃判据保持 n >= activeMinCommits（≥）。
-    const thresholds = (): { activeWindowDays: number; activeMinCommits: number; statsWindowDays: number } => ({
+    // 每次请求内现算（db.getSetting 实时读），阈值改动即时反映，无需重启。
+    // 活跃判据 OR：近 active_window_days 天提交 >= active_min_commits，或近 active_recent_days 天内有新提交（>=1）。
+    const thresholds = (): { activeWindowDays: number; activeMinCommits: number; activeRecentDays: number; statsWindowDays: number } => ({
       activeWindowDays: db.getSetting<number>(K_ACTIVE_WINDOW_DAYS) ?? cfg.active_window_days ?? ACTIVE_WINDOW_DAYS,
       activeMinCommits: db.getSetting<number>(K_ACTIVE_MIN_COMMITS) ?? cfg.active_min_commits ?? ACTIVE_MIN_COMMITS,
+      activeRecentDays: db.getSetting<number>(K_ACTIVE_RECENT_DAYS) ?? cfg.active_recent_days ?? ACTIVE_RECENT_DAYS,
       statsWindowDays: db.getSetting<number>(K_STATS_WINDOW_DAYS) ?? cfg.stats_window_days ?? STATS_WINDOW_DAYS,
     });
 
@@ -88,6 +92,16 @@ class GithubPlugin {
               sendJson(rctx.res, HTTP.OK, { ok: true, connected: true, source, username: me.login, me });
             } catch (e) { sendJson(rctx.res, HTTP.OK, { ok: false, connected: false, reason: (e as Error).message }); }
           })();
+          return;
+        }
+
+        // GET /thresholds —— 当前生效分区阈值（settings>vibepm.json>默认 三级，供设置弹层预填；与 /repos 判定同源）
+        if ((sub === R_SUB_THRESHOLDS || sub === R_SUB_THRESHOLDS + "/") && rctx.req.method === "GET") {
+          const t = thresholds();
+          sendJson(rctx.res, HTTP.OK, { ok: true,
+            activeWindowDays: t.activeWindowDays, activeMinCommits: t.activeMinCommits,
+            activeRecentDays: t.activeRecentDays, statsWindowDays: t.statsWindowDays,
+          });
           return;
         }
 
@@ -238,9 +252,11 @@ class GithubPlugin {
                     if (!item) return;
                     const [owner, repo] = item.full_name.split("/");
                     try {
-                      const st = await service.commitStats(owner, repo, [th.activeWindowDays, th.statsWindowDays]);
+                      // daysArr 含 activeRecentDays：保证 since 窗口覆盖「近期窗口」，counts[activeRecentDays] 判定才准确
+                      const st = await service.commitStats(owner, repo, [th.activeWindowDays, th.activeRecentDays, th.statsWindowDays]);
                       item.commits30d = st.counts[th.statsWindowDays] ?? 0;
-                      item.active = st.empty ? false : (st.counts[th.activeWindowDays] ?? 0) >= th.activeMinCommits; // 活跃判据：≥（近 active_window_days 天，三级取值后实际值）
+                      // 活跃判据 OR：近 active_window_days 天提交 >= active_min_commits，或近 active_recent_days 天内有新提交（>=1，三级取值后实际值）
+                      item.active = st.empty ? false : ((st.counts[th.activeWindowDays] ?? 0) >= th.activeMinCommits || (st.counts[th.activeRecentDays] ?? 0) >= 1);
                       item.lastPushAt = st.lastCommitAt ?? null; // 列表「最近提交」列
                       item.empty = st.empty; // 空仓库标记（前端显示「空仓库」）
                     } catch { item.statsFailed = true; }
@@ -259,6 +275,7 @@ class GithubPlugin {
                 // 下发三级取值后的实际生效值，前端据此动态拼「近 N 天提交 ≥ M 为活跃」文案
                 activeWindowDays: th.activeWindowDays,
                 activeMinCommits: th.activeMinCommits,
+                activeRecentDays: th.activeRecentDays,
                 statsWindowDays: th.statsWindowDays,
               };
               service.cacheSet(aggKey, payload); // 聚合结果 TTL 缓存

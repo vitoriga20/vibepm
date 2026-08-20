@@ -8,8 +8,9 @@
 import {
   API_PREFIX, HASH_AUTH, HASH_REPOS, HASH_REPO,
   PANEL_KIND_AUTH, PANEL_KIND_REPOS, PANEL_KIND_DETAIL, PANEL_KIND_AVATAR,
-  K_ACTIVE_WINDOW_DAYS, K_ACTIVE_MIN_COMMITS,
-  ACTIVE_WINDOW_DAYS, ACTIVE_MIN_COMMITS, DEVICE_POLL_INTERVAL_S,
+  R_SUB_THRESHOLDS,
+  K_ACTIVE_WINDOW_DAYS, K_ACTIVE_MIN_COMMITS, K_ACTIVE_RECENT_DAYS,
+  ACTIVE_WINDOW_DAYS, ACTIVE_MIN_COMMITS, ACTIVE_RECENT_DAYS, DEVICE_POLL_INTERVAL_S,
   SEC, MIN, HOUR, DAY, MONTH, SHORT_SHA_LEN,
   EVENT_CLASSIFY, ICONS, LANG_COLORS, LANG_COLOR_FALLBACK, REL_UNITS, TEXT,
 } from "./constants.js";
@@ -237,8 +238,14 @@ export class GithubAvatar extends HTMLElement {
     location.hash = "#" + HASH_AUTH;
     location.reload();
   }
-  private openSettings(): void {
+  private async openSettings(): Promise<void> {
     const s = this.shadowRoot!;
+    // 打开即拉当前生效阈值预填（settings>vibepm.json>默认 三级，与判定同源）；失败回落前端默认
+    let cur: { activeWindowDays?: number; activeMinCommits?: number; activeRecentDays?: number } = {};
+    try { cur = await api(R_SUB_THRESHOLDS); } catch { /* 回落默认 */ }
+    const win = cur.activeWindowDays ?? ACTIVE_WINDOW_DAYS;
+    const min = cur.activeMinCommits ?? ACTIVE_MIN_COMMITS;
+    const recent = cur.activeRecentDays ?? ACTIVE_RECENT_DAYS;
     const mask = document.createElement("div");
     mask.className = "modal-mask";
     mask.innerHTML = `<div class="modal">
@@ -248,10 +255,15 @@ export class GithubAvatar extends HTMLElement {
           <div class="field"><label>${esc(TEXT.settings.winLabel)}</label><input type="number" data-k="win" /></div>
           <div class="field"><label>${esc(TEXT.settings.minLabel)}</label><input type="number" data-k="min" /></div>
         </div>
+        <div class="field"><label>${esc(TEXT.settings.recentLabel)}</label><input type="number" data-k="recent" /></div>
         <div class="btnrow"><button class="primary" data-act="save">${esc(TEXT.settings.save)}</button><span class="msg"></span></div>
         <div class="btnrow" style="justify-content:flex-end"><button class="ghost" data-act="close">${esc(TEXT.settings.close)}</button></div>
       </div>`;
     s.appendChild(mask);
+    // 预填当前生效值
+    (mask.querySelector('[data-k="win"]') as HTMLInputElement).value = String(win);
+    (mask.querySelector('[data-k="min"]') as HTMLInputElement).value = String(min);
+    (mask.querySelector('[data-k="recent"]') as HTMLInputElement).value = String(recent);
     requestAnimationFrame(() => mask.classList.add("open"));
     const msg = mask.querySelector(".msg")!;
     mask.querySelector('[data-act="close"]')!.addEventListener("click", () => {
@@ -267,7 +279,8 @@ export class GithubAvatar extends HTMLElement {
     const s = this.shadowRoot!;
     const win = Number((mask.querySelector('[data-k="win"]') as HTMLInputElement).value);
     const min = Number((mask.querySelector('[data-k="min"]') as HTMLInputElement).value);
-    if (!Number.isFinite(win) || !Number.isFinite(min) || win <= 0 || min <= 0) {
+    const recent = Number((mask.querySelector('[data-k="recent"]') as HTMLInputElement).value);
+    if (!Number.isFinite(win) || !Number.isFinite(min) || !Number.isFinite(recent) || win <= 0 || min <= 0 || recent <= 0) {
       msg.className = "msg err"; msg.textContent = TEXT.settings.invalid; return;
     }
     msg.className = "msg ok"; msg.textContent = TEXT.settings.saved;
@@ -275,7 +288,7 @@ export class GithubAvatar extends HTMLElement {
       await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batch: { [K_ACTIVE_WINDOW_DAYS]: win, [K_ACTIVE_MIN_COMMITS]: min } }),
+        body: JSON.stringify({ batch: { [K_ACTIVE_WINDOW_DAYS]: win, [K_ACTIVE_MIN_COMMITS]: min, [K_ACTIVE_RECENT_DAYS]: recent } }),
       });
       // 通知仓库列表强刷（绕过聚合缓存）
       window.dispatchEvent(new CustomEvent(EVT_THRESHOLDS));
@@ -413,16 +426,17 @@ export class GithubReposPanel extends HTMLElement {
     if (!(await guard()).valueOf()) return;
     const r = await api<{
       repos?: any[]; activeCount?: number; dustyCount?: number;
-      activeWindowDays?: number; activeMinCommits?: number; statsWindowDays?: number;
+      activeWindowDays?: number; activeMinCommits?: number; activeRecentDays?: number; statsWindowDays?: number;
     }>("/repos" + (force ? "?refresh=1" : ""));
     const repos = r.repos ?? [];
     const active = repos.filter((x) => x.active);
     const dusty = repos.filter((x) => !x.active);
     const win = r.activeWindowDays ?? ACTIVE_WINDOW_DAYS;
     const min = r.activeMinCommits ?? ACTIVE_MIN_COMMITS;
+    const recent = r.activeRecentDays ?? ACTIVE_RECENT_DAYS;
     s.innerHTML = `<style>${CSS}</style>
       <div class="ptitle"><h1>${esc(TEXT.repos.title)}</h1><${PANEL_KIND_AVATAR}></${PANEL_KIND_AVATAR}></div>
-      <p class="desc">${esc(TEXT.repos.descActiveNote.replace("{window}", String(win)).replace("{min}", String(min)))}</p>
+      <p class="desc">${esc(TEXT.repos.descActiveNote.replace("{window}", String(win)).replace("{min}", String(min)).replace("{recent}", String(recent)))}</p>
       <div class="statline">
         <span>${esc(TEXT.repos.total)}<b>${repos.length}</b></span>
         <span>${esc(TEXT.repos.sep)}${esc(TEXT.repos.activeCount)}<b>${active.length}</b></span>

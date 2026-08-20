@@ -3,11 +3,13 @@
 // ---- 可配置默认值（唯一源）----
 // 阈值（active_* / stats_*）为「默认值」：三级取值 settings 运行时键（github.active_window_days 等，
 // UI「分区设置」可改，立即生效）> vibepm.json 配置（ctx.mergedConfig("github")，重启生效）> 本常量兜底。
-// 取数见 src/index.ts 的 thresholds()；活跃判据为 近 active_window_days 天提交 >= active_min_commits（注意 >=）。
+// 取数见 src/index.ts 的 thresholds()；活跃判据为 近 active_window_days 天提交 >= active_min_commits
+// 或 近 active_recent_days 天内有新提交（counts[active_recent_days] >= 1，OR 关系，注意 >=）。
 export const API_BASE = "https://api.github.com";
 export const CACHE_TTL_S = 60;           // 内存缓存 TTL（秒）
 export const ACTIVE_WINDOW_DAYS = 30;    // 活跃判据窗口（天）——默认值；可被 settings / vibepm.json 配置覆盖
 export const ACTIVE_MIN_COMMITS = 60;    // 活跃判据最少提交数：近 ACTIVE_WINDOW_DAYS 天内提交 ≥ 该值 为活跃（注意 ≥）——默认值；可被 settings / vibepm.json 配置覆盖
+export const ACTIVE_RECENT_DAYS = 3;     // 活跃判据「近期窗口」（天）：近 N 天内有新提交（≥1 次）即活跃（OR 补充分支）——默认值；可被 settings / vibepm.json 配置覆盖
 export const STATS_WINDOW_DAYS = 30;     // 展示提交数的窗口（天）——默认值；可被 settings / vibepm.json 配置覆盖
 export const GH_TIMEOUT_MS = 8000;       // gh CLI 执行超时
 export const REQUEST_TIMEOUT_MS = 20000; // GitHub API 请求超时
@@ -36,6 +38,7 @@ export const R_SUB_STATUS = "/status";
 export const R_SUB_LOGIN = "/login";
 export const R_SUB_LOGOUT = "/logout";
 export const R_SUB_REPOS = "/repos";
+export const R_SUB_THRESHOLDS = "/thresholds";
 export const R_SUB_DEVICE_START = "/device/start";
 export const R_SUB_DEVICE_POLL = "/device/poll";
 
@@ -57,7 +60,7 @@ export const TEXT_AUTH_TITLE = "连接 GitHub";
 export const TEXT_AUTH_DESC = "gh CLI 直连 / Device Flow / PAT 兜底；只读自己仓库动态，不做拉取推送。";
 export const TEXT_AUTH_NAV_DESC = "连接 GitHub（gh / Device Flow / PAT）";
 export const TEXT_REPOS_TITLE = "GitHub";       // 顶栏统一入口；页面内 h1 由 client 组件渲染「我的仓库」
-export const TEXT_REPOS_DESC = "自有仓库，按近 N 天提交分区（活跃 / 尘封，N/M 可在面板「分区设置」调整）";
+export const TEXT_REPOS_DESC = "自有仓库，按近 N 天提交分区（活跃 / 尘封，近 M 天有提交也算活跃，N/M/K 可在面板「分区设置」调整）";
 export const TEXT_REPOS_NAV_DESC = "自有仓库列表：活跃区 + 尘封区";
 export const TEXT_DETAIL_TITLE = "仓库动态";
 export const TEXT_DETAIL_DESC = "单仓动态 timeline（commits 为主）";
