@@ -1,0 +1,97 @@
+/* root
+ * 皮肤 token 映射层：颜色不写死，引用 vibepm 壳皮肤变量（theme.js 同步父窗口 token 到本页 :root）。
+ * fallback 值供独立打开 preview（无父窗口）时使用。 */
+:root {
+  /* 背景 / 文字色阶 */
+  --bg-color: var(--bg, hsl(236, 18%, 100%));
+  --text-color: var(--ink, #000);
+  --text-color-0: var(--ink, #000);
+  --text-color-1: var(--text, #333);
+  --text-color-2: var(--muted, #666);
+  --text-color-3: var(--dim, #999);
+  --text-color-4: var(--line-strong, #ccc);
+  --text-color-5: var(--panel-alt, #eee);
+  --text-color-6: var(--on-ink, #fff);
+
+  --border-color: var(--line, #e5e5e5);
+
+  --setting-bg-color: var(--panel-alt, hsl(36, 14%, 98%));
+
+  --mask-color-light: var(--skin-nav-scrim, hsla(227deg 24% 0% / 0.04));
+
+  --taskBox-bg-color: var(--panel, hsla(227deg 24% 100% / 1));
+  --taskBox-border-color: var(--line, hsla(227deg 5% 94% / 1));
+
+  /* 番茄强调：红/橙 → 皮肤 danger / accent */
+  --kv-red-color: var(--danger, hsl(4, 100%, 50%));
+  --kv-orange-color: var(--accent, hsl(24, 90%, 68%));
+
+  /* 强调色底上的对比文字（theme.js 按 accent 亮度算；fallback 橙亮底 → 深字） */
+  --on-accent: #14161e;
+
+  /* 长目标彩色标签卡文字：色板恒浅马卡龙，固定深墨保证可读 */
+  --tag-ink: #22252a;
+
+  --kv-shadow-color: color-mix(in srgb, var(--accent, hsl(24, 90%, 68%)) 30%, transparent);
+
+  --day-cell-color: var(--panel-alt, hsl(216, 14%, 95%));
+
+  --activeTask-bg-linear: linear-gradient(95deg, color-mix(in srgb, var(--panel, #fff) 70%, transparent) 10%, color-mix(in srgb, var(--accent, #ffbe73) 9%, transparent) 40%, color-mix(in srgb, var(--accent, #ffbe73) 6%, transparent) 60%, color-mix(in srgb, var(--panel, #fff) 66%, transparent) 80%, transparent 85%);
+  --activeTask-bg-linear-hover: linear-gradient(90.39deg, color-mix(in srgb, var(--accent, #ffd8cf) 12%, transparent) 0%, transparent 91.3%);
+
+  --mix-blend-mode: multiply;
+
+  --slider-fill-opacity: 0.2;
+
+  --switch-shadow: none;
+
+  --break-btn-bg-color: color-mix(in srgb, var(--panel-alt, #e2efea) 55%, transparent);
+  --break-btn-bg-color-hover: color-mix(in srgb, var(--panel-alt, #e2efea) 85%, transparent);
+
+  --scale-opacity: 0.2;
+
+}
+
+/* 暗色模式的颜色变量：同样映射皮肤 token（皮肤自身已含明暗，跟随即可） */
+[data-theme="dark"] {
+  --bg-color: var(--bg, #1a1a1a);
+  --text-color: var(--ink, #fff);
+  --text-color-0: var(--ink, #fff);
+  --text-color-1: var(--text, #eee);
+  --text-color-2: var(--muted, #ccc);
+  --text-color-3: var(--dim, #999);
+  --text-color-4: var(--line-strong, #666);
+  --text-color-5: var(--panel-alt, #333);
+  --text-color-6: var(--on-ink, #000);
+
+  --border-color: var(--line, hsl(0, 0%, 25%));
+
+  --setting-bg-color: var(--panel-alt, hsl(36, 14%, 98%));
+
+  --mask-color-light: var(--skin-nav-scrim, hsla(227deg 24% 100% / 0.08));
+
+  --taskBox-bg-color: var(--panel, hsla(227deg 24% 100% / 1));
+  --taskBox-border-color: var(--line, hsla(227deg 5% 15% / 1));
+
+  --kv-red-color: var(--danger, hsl(4, 100%, 50%));
+  --kv-orange-color: var(--accent, hsl(24, 90%, 68%));
+
+  --kv-shadow-color: color-mix(in srgb, var(--accent, hsl(24, 90%, 68%)) 30%, transparent);
+
+  --day-cell-color: var(--panel-alt, hsl(216, 14%, 25%));
+
+  --activeTask-bg-linear: linear-gradient(95deg, color-mix(in srgb, var(--panel, #fff) 4%, transparent) 24%, color-mix(in srgb, var(--accent, #ffd8cf) 6%, transparent) 40%, color-mix(in srgb, var(--accent, #ffead2) 5%, transparent) 60%, color-mix(in srgb, var(--panel, #fff) 3%, transparent) 80%, transparent 85%);
+  --activeTask-bg-linear-hover: linear-gradient(90.39deg, color-mix(in srgb, var(--accent, #ffd8cf) 5%, transparent) 0%, transparent 91.3%);
+
+  --mix-blend-mode: screen;
+
+  --slider-fill-opacity: 0.65;
+
+  --switch-shadow: color-mix(in srgb, var(--on-ink, #fff) 60%, transparent) 0px 0px 4px 0px;
+
+  --break-btn-bg-color: color-mix(in srgb, var(--panel-alt, #e2efea) 12%, transparent);
+  --break-btn-bg-color-hover: color-mix(in srgb, var(--panel-alt, #e2efea) 30%, transparent);
+
+  --scale-opacity: 0.6;
+
+}
