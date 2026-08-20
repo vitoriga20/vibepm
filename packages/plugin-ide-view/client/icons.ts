@@ -24,7 +24,8 @@ type IName =
   | "settings"      // 齿轮
   | "github"        // GitHub 猫（简线）
   | "feed"          // 动态信号流
-  | "plugins";      // 拼图/插件（plugin-manager 用）
+  | "plugins"       // 拼图/插件（plugin-manager 用）
+  | "help";         // 帮助（onboarding 快速说明用）
 
 /** 直接返回 SVG 字符串（innerHTML 可用），或者在 shadow DOM 里当 innerHTML。
  *  所有 icon 尺寸：宽度 100%；由父级定具体大小。
@@ -135,6 +136,12 @@ export function iconSVG(name: IName): string {
         <path d="M10 12 V18.8 a1.2 1.2 0 0 0 1.8 1 L14 17"/>
         <path d="M14 12 V18.8 a1.2 1.2 0 0 1 1.8 1 L20 16.5"/>
         <path d="M14 12 l6 3 a1.2 1.2 0 0 1 0 2.1 L16 19.5"/>
+      `);
+    case "help":
+      return c(`
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M9.5 9a2.5 2.5 0 0 1 4.8-.9c0 1.5-2.2 2-2.2 3.4"/>
+        <circle cx="12" cy="16.5" r="1" fill="currentColor"/>
       `);
     default:
       return "";

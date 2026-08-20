@@ -52,16 +52,19 @@ const CSS = `
 .hd nav a:hover{color:var(--ink);border-color:var(--skin-navbar-hover-bd,#cfccc2);background:var(--skin-navbar-hover-bg,#eceae3)}
 .hd nav a.active{color:var(--accent);background:var(--accent-dim,#e3efee);border-color:var(--accent-line,#0f6a66);font-weight:700}
 
-/* ======= 主区：左侧满高折叠把手 + 左导航(纸面) + 可缩放分隔条 + 右内容 ======= */
+/* ======= 主区：左侧满高折叠把手 + 窄图标栏(绝对浮层,Endfield) + 右内容 ======= */
 .main{flex:1;min-height:0;display:grid;
-  grid-template-columns: [toggle] 12px [nav] var(--nav-w, 300px) [resizer] 8px [primary] 1fr;
-  grid-template-rows: 1fr auto;background:var(--bg);position:relative}
-.main.collapsed{grid-template-columns: [toggle] 12px [nav] 0 [resizer] 0 [primary] 1fr}
-.main.collapsed .nav,.main.collapsed .resizer{display:none;visibility:hidden;overflow:hidden}
+  grid-template-columns: [toggle] 12px [primary] 1fr;
+  grid-template-rows: 1fr auto;background:var(--bg);position:relative;
+  --rail-w:68px; --rail-open-w:280px;
+  /* 展开伸出量（仿 Endfield 浮层：容器固定 --rail-w，浮层右伸 --rail-ext 形成展开背景） */
+  --rail-ext:calc(var(--rail-open-w) - var(--rail-w))}
+.main.collapsed .nav{display:none}
 .main.collapsed .secondary{display:none}
+.main.collapsed .primary{padding-left:34px}
 
 /* ---- 左侧满高折叠把手（朴素窄条） ---- */
-.toggle-bar{grid-column: toggle / span 1;grid-row: 1 / 3;position:relative;
+.toggle-bar{grid-column: toggle / span 1;grid-row: 1 / 3;position:relative;z-index:60;
   background:var(--skin-toggle-bg1,#e4e3dc);border-right:1px solid var(--skin-toggle-border,#c9c7bd);
   cursor:pointer;user-select:none;overflow:hidden}
 .toggle-bar::before{content:"";position:absolute;left:0;right:0;top:0;bottom:0;pointer-events:none;z-index:0;
@@ -84,22 +87,62 @@ const CSS = `
 .tb-grip .tb-arrow{position:relative;z-index:2;color:var(--accent,#147d78);font:700 13px/1 var(--display-wide);
   writing-mode:vertical-rl;text-orientation:upright;letter-spacing:0}
 
-/* ---- 导航区：暖白纸面 ---- */
-.nav{overflow:auto;padding:22px 18px 24px;grid-row:1 / 2;grid-column:nav / span 1;position:relative;
+/* ---- 导航区：终末地官网窄图标栏（Endfield：容器固定 68px，.rail-open 让背景浮层与子元素伸出 280px） ---- */
+.nav{position:absolute;left:12px;top:0;bottom:0;width:var(--rail-w);z-index:50;overflow:visible;
   background:var(--skin-nav-base,#efeee9);color:var(--skin-nav-ink,var(--ink));
   border-right:1px solid var(--skin-nav-border,rgba(120,125,120,.4));
-  box-shadow:inset 1px 0 0 var(--skin-nav-hi, rgba(255,255,255,.7)), 1px 0 0 var(--skin-nav-shadow,#e3e1d9)}
-
-.resizer{grid-row:1 / 3;grid-column:resizer / span 1;position:relative;cursor:col-resize;touch-action:none;
-  background:var(--bg);border-left:1px solid var(--line)}
-.resizer::after{content:"";position:absolute;inset:0 auto;width:2px;top:0;bottom:0;left:50%;transform:translateX(-50%);
-  background:transparent;transition:background .1s}
-.resizer:hover::after,.resizer.active::after{background:var(--accent,#147d78)}
-.resizer .grip{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:4px;height:30px;
-  display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;pointer-events:none}
-.resizer .grip::before,.resizer .grip::after{content:"";width:2px;height:3px;background:var(--line-strong)}
-.resizer{--grip-color:#9aa0a5}
-.primary{background:var(--bg);overflow:auto;padding:30px 34px 48px;grid-row:1 / 3;grid-column:primary / span 1;position:relative}
+  transition:border-color .3s ease}
+/* 背景浮层（仿 Endfield :before 伸出层）：贴容器右缘，展开时向右平移形成 280px 背景板，阴影跟随 */
+.nav::before{content:"";position:absolute;top:0;right:0;width:calc(100% + var(--rail-ext));height:100%;z-index:0;
+  background:var(--skin-nav-base,#efeee9);
+  transition:transform .3s ease}
+.main.rail-open .nav::before{transform:translate3d(var(--rail-ext),0,0);
+  box-shadow:16px 0 32px -12px var(--skin-nav-shadow-x,rgba(31,34,40,.18))}
+.main.rail-open .nav{border-right-color:transparent}
+.nav-inner{position:relative;z-index:1;height:100%;padding:24px 0 16px;display:flex;flex-direction:column}
+/* 品牌：logo（折叠居中） + 名称（展开浮现） */
+.nav-brand{display:flex;align-items:center;justify-content:center;gap:10px;padding:0 0 18px;margin-bottom:8px;flex-shrink:0;transition:justify-content .3s}
+.main.rail-open .nav-brand{justify-content:flex-start;padding-left:19px}
+.nav-brand .nav-logo{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;color:var(--skin-nav-ink,var(--ink))}
+.nav-brand .nav-logo i{width:28px;height:28px;display:block}
+.nav-brand .nav-btext{opacity:0;max-width:0;overflow:hidden;white-space:nowrap;transition:opacity .2s ease,max-width .25s ease}
+.main.rail-open .nav .nav-btext{opacity:1;max-width:200px}
+.nav-brand .nav-btext b{font:800 15px/1.1 var(--display-cjk);letter-spacing:1px;display:block}
+.nav-brand .nav-btext small{display:block;margin-top:3px;font:600 8px/1 var(--display-wide);color:var(--dim);letter-spacing:1.5px;text-transform:uppercase}
+/* 选中指示条：灰底 + 左条，随激活行滑动（.Header_overlay；展开时宽度跟随伸出区） */
+.nav-indi{position:absolute;left:0;top:0;width:calc(100% - 16px);height:72px;pointer-events:none;z-index:0;
+  background:var(--skin-nav-ov-bg,#e6e4dc);border-left:12px solid var(--skin-nav-ov-bar,#147d78);
+  opacity:0;transition:top .3s ease,width .3s ease,opacity .2s ease}
+.main.rail-open .nav-indi{width:calc(var(--rail-open-w) - 16px)}
+.nav-list{position:relative;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
+/* 导航行：容器固定 68px；展开时行伸出 280px（仿 Endfield navItem 22.5rem）→ 鼠标在伸出区也算在 rail 内 */
+.nav-item{position:relative;width:var(--rail-w);height:72px;flex:0 0 72px;display:flex;align-items:center;cursor:pointer;z-index:1;border-radius:4px;
+  transition:width .3s ease}
+.main.rail-open .nav-item{width:var(--rail-open-w)}
+.nav-item::before{content:"";position:absolute;inset:0;border-radius:4px;
+  background:var(--skin-nav-hover-bg,rgba(34,37,42,.06));opacity:0;transition:opacity .2s ease;pointer-events:none}
+.main.rail-open .nav-item:not(.active):hover::before{opacity:1}
+.nav-item .nav-ic{position:absolute;left:34px;top:50%;transform:translate(-50%,-50%);width:24px;height:24px;
+  color:var(--skin-nav-icon,#8b8f87);transition:color .18s ease;z-index:1}
+.nav-item .nav-ic i{width:24px;height:24px;display:block}
+.nav-item:hover .nav-ic{color:var(--skin-nav-ic-hover,#22252a)}
+.nav-item.active .nav-ic{color:var(--skin-nav-ink,var(--ink))!important}
+.nav-item .nav-label{position:absolute;left:60px;top:50%;transform:translate3d(-16px,-50%,0);white-space:nowrap;
+  font:600 15px/1.25 var(--display-cjk);color:var(--skin-nav-ink,var(--ink));opacity:0;
+  transition:opacity .2s ease,transform .3s ease;pointer-events:none}
+.main.rail-open .nav-item .nav-label{opacity:1;transform:translate3d(0,-50%,0)}
+/* 底部 switcher（仿 Endfield .Header_switcher）：手动展开/收起；展开时右移到伸出区 */
+.nav-switch{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:26px;height:26px;
+  display:grid;place-items:center;cursor:pointer;border:1px solid var(--skin-nav-border,rgba(120,125,120,.4));
+  border-radius:4px;background:transparent;color:var(--skin-nav-icon,#8b8f87);padding:0;z-index:2;
+  transition:left .3s ease,color .18s ease}
+.nav-switch:hover{color:var(--skin-nav-ic-hover,#22252a);border-color:var(--skin-nav-ov-bar,#147d78)}
+.nav-switch .nav-switch-ic{width:14px;height:14px;display:block;transition:transform .3s ease}
+.main.rail-open .nav-switch{left:calc(var(--rail-open-w) - 34px)}
+.main.rail-open .nav-switch .nav-switch-ic{transform:rotate(180deg)}
+.nav-empty{color:var(--muted);font-size:12px;letter-spacing:.6px;border:1px dashed var(--line-strong);
+  background:rgba(241,240,234,.5);padding:18px;border-radius:var(--radius)}
+.primary{background:var(--bg);overflow:auto;padding:30px 34px 48px calc(12px + var(--rail-w) + 30px);grid-row:1 / 2;grid-column:1 / -1;position:relative}
 .primary::before{content:"";position:absolute;left:0;right:0;top:0;height:70%;pointer-events:none;z-index:0;
   background:
     linear-gradient(var(--skin-primary-grid,rgba(120,125,130,.03)) 1px, transparent 1px),
@@ -109,12 +152,11 @@ const CSS = `
   mask-image:radial-gradient(ellipse at center top, #000 30%, transparent 78%)}
 .primary > canvas.ambient-bg{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;pointer-events:none!important;z-index:0!important}
 .primary > :not(canvas.ambient-bg){position:relative;z-index:1}
-.secondary{background:var(--bg);grid-row:2 / 3;grid-column:nav / span 1;padding:12px 18px;
+.secondary{background:var(--bg);grid-row:2 / 3;grid-column:1 / -1;padding:12px 18px;
   border-top:1px solid var(--line);color:var(--dim);font-size:11px;letter-spacing:.2px}
 .secondary code{color:var(--muted)}
 
-/* ======= 导航大卡：纸白 + 细边框 ======= */
-.nav-item{display:block;width:100%;margin-bottom:12px;text-align:left;clip-path:none}
+/* ======= 导航大卡：纸白 + 细边框（首页 fallback grid 用） ======= */
 .card-nav{display:flex;flex-direction:column;gap:12px;padding:18px 18px 16px;position:relative;overflow:hidden;
   background:linear-gradient(135deg, var(--skin-card-bg1,#fff) 0 78%, var(--skin-card-bg2,#efeee9) 78%);
   color:var(--skin-card-ink,var(--ink));
@@ -243,7 +285,32 @@ export class VibeShell extends HTMLElement {
   private _unhash = (): void => {};
   private _root: ShadowRoot | null = null;
   private _currentRoute = "";
+  private _navSig = "";
   private collapsed = false;
+  private railOpen = false;      // detailActive（仿 Endfield：hover / switcher 切换，导航不重置）
+  private indiPositioned = false;
+
+  /** hashchange：槽位变了 → 全量重建；仅路由变了 → 定点更新（不重建壳 → hover 状态保持） */
+  private onHash = (): void => {
+    const root = this._root;
+    if (!root) return;
+    const slots = getSlots();
+    const sig = (slots["shell.nav"] ?? [])
+      .map((i) => `${i.id}:${i.label ?? ""}:${(i.payload as any)?.hash ?? ""}`)
+      .join("|");
+    if (sig !== this._navSig) {
+      this.render(); // 槽位变化（首次/插件装载）→ 重建
+      return;
+    }
+    this.updateRoute(parseHash(location.hash).route);
+  };
+
+  /** 仿 Endfield switcher/hover：切 detailActive 状态 → .main.rail-open */
+  private setRailOpen(v: boolean): void {
+    if (this.railOpen === v) return;
+    this.railOpen = v;
+    this._root?.querySelector<HTMLElement>(".main")?.classList.toggle("rail-open", v);
+  }
 
   connectedCallback(): void {
     this.attachShadow({ mode: "open" });
@@ -255,9 +322,8 @@ export class VibeShell extends HTMLElement {
     host.className = "host";
     this._root.append(st, host);
     this.render();
-    const onHash = (): void => this.render();
-    window.addEventListener("hashchange", onHash);
-    this._unhash = () => window.removeEventListener("hashchange", onHash);
+    window.addEventListener("hashchange", this.onHash);
+    this._unhash = () => window.removeEventListener("hashchange", this.onHash);
   }
 
   disconnectedCallback(): void {
@@ -273,9 +339,10 @@ export class VibeShell extends HTMLElement {
 
     const grip = tbar.querySelector<HTMLDivElement>(".tb-grip");
     this.collapsed = nextState;
+    this.railOpen = false;
     localStorage.setItem("vibepm.nav.collapsed", this.collapsed ? "1" : "0");
     main.classList.toggle("collapsed", this.collapsed);
-    main.style.setProperty("--nav-w", this.collapsed ? "0px" : null);
+    main.classList.remove("rail-open");
     const arrow = grip?.querySelector<HTMLElement>(".tb-arrow");
     if (arrow) arrow.textContent = this.collapsed ? "»" : "«";
   }
@@ -286,9 +353,36 @@ export class VibeShell extends HTMLElement {
     const hash = parseHash(location.hash);
     const route = hash.route || "";
     this._currentRoute = route;
+    this._navSig = (slots["shell.nav"] ?? [])
+      .map((i) => `${i.id}:${i.label ?? ""}:${(i.payload as any)?.hash ?? ""}`)
+      .join("|");
+    this.indiPositioned = false;
 
     host.innerHTML = "";
     host.append(this.mkHeader(slots, route), this.mkMain(slots, route), this.mkFooter(slots));
+    requestAnimationFrame(() => this.positionNavIndi());
+  }
+
+  /** 定点更新（导航）：只改激活态 + 主面板 + 指示条，不重建壳 */
+  private updateRoute(route: string): void {
+    const root = this._root;
+    if (!root) return;
+    this._currentRoute = route;
+    const slots = getSlots();
+    // 顶栏 tab
+    root.querySelectorAll<HTMLElement>(".hd nav a").forEach((a) => {
+      const r = a.dataset.route ?? "";
+      a.classList.toggle("active", r === route || (!r && !route));
+    });
+    // 侧栏行激活态
+    root.querySelectorAll<HTMLElement>(".nav-item").forEach((row) => {
+      const target = (row.dataset.href ?? "").replace(/^#\/?/, "").split("?")[0];
+      row.classList.toggle("active", target === route || (!target && !route));
+    });
+    // 主面板（路由面板或欢迎页）
+    const prim = root.querySelector<HTMLElement>(".primary");
+    if (prim) this.renderPrimary(prim, slots, route);
+    requestAnimationFrame(() => this.positionNavIndi());
   }
 
   private mkHeader(slots: Slots, route: string): HTMLElement {
@@ -313,6 +407,7 @@ export class VibeShell extends HTMLElement {
     const mkLink = (r: string, label: string, iconName: string | null) => {
       const a = document.createElement("a");
       a.href = r ? `#${r}` : "#/";
+      a.dataset.route = r;
       const isActive = r === route || (!r && !route);
       if (isActive) a.classList.add("active");
       if (iconName) a.appendChild(iconEl(iconName as any, 14));
@@ -337,8 +432,7 @@ export class VibeShell extends HTMLElement {
 
   private mkMain(slots: Slots, route: string): HTMLElement {
     const main = document.createElement("div");
-    main.className = this.collapsed ? "main collapsed" : "main";
-    if (this.collapsed) main.style.setProperty("--nav-w", "0px");
+    main.className = this.collapsed ? "main collapsed" : this.railOpen ? "main rail-open" : "main";
 
     // --- 左侧满高折叠把手 toggle-bar ---
     const tbar = document.createElement("div");
@@ -373,90 +467,117 @@ export class VibeShell extends HTMLElement {
     const navSec = document.createElement("section");
     navSec.className = "nav";
     this.renderNav(navSec, slots);
+    // 仿 Endfield：容器 onMouseEnter/onMouseLeave → detailActive（触屏设备跳过）
+    navSec.addEventListener("mouseenter", () => {
+      if (!("ontouchstart" in window)) this.setRailOpen(true);
+    });
+    navSec.addEventListener("mouseleave", () => {
+      if (!("ontouchstart" in window)) this.setRailOpen(false);
+    });
     const primary = document.createElement("section");
     primary.className = "primary";
     this.renderPrimary(primary, slots, route);
-    const resizer = document.createElement("div");
-    resizer.className = "resizer";
-    const gripR = document.createElement("div");
-    gripR.className = "grip";
-    resizer.appendChild(gripR);
-    this.bindResizer(resizer, main);
     const secondary = document.createElement("section");
     secondary.className = "secondary";
     this.renderSecondary(secondary, slots);
-    main.append(tbar, navSec, resizer, primary, secondary);
+    main.append(tbar, navSec, primary, secondary);
     return main;
-  }
-
-  private bindResizer(handle: HTMLElement, main: HTMLElement): void {
-    const KEY = "vibepm.navw";
-    const MIN = 210, MAX = 560;
-    let dragging = false;
-    let finalW = 330;
-    const init = (): void => {
-      const saved = Number.parseInt(localStorage.getItem(KEY) ?? "330", 10);
-      finalW = Math.min(MAX, Math.max(MIN, Number.isFinite(saved) ? saved : 330));
-      main.style.setProperty("--nav-w", `${finalW}px`);
-    };
-    init();
-    const onMove = (e: MouseEvent): void => {
-      if (!dragging) return;
-      const r = main.getBoundingClientRect();
-      finalW = Math.min(MAX, Math.max(MIN, e.clientX - r.left));
-      main.style.setProperty("--nav-w", `${finalW}px`);
-    };
-    const onUp = (): void => {
-      if (!dragging) return;
-      dragging = false;
-      handle.classList.remove("active");
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      localStorage.setItem(KEY, String(Math.round(finalW)));
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-    handle.addEventListener("mousedown", (e) => {
-      dragging = true;
-      handle.classList.add("active");
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
-      e.preventDefault();
-    });
   }
 
   private renderNav(box: HTMLElement, slots: Slots): void {
     const items = (slots["shell.nav"] ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    // 窄图标栏内层：品牌 + 行列表
+    const inner = document.createElement("div");
+    inner.className = "nav-inner";
+    // 品牌：蛇 logo + vibepm（折叠只显 logo，展开浮现文字）
+    const brand = document.createElement("div");
+    brand.className = "nav-brand";
+    const logo = document.createElement("span");
+    logo.className = "nav-logo";
+    logo.appendChild(iconEl("vibepm-logo", 28));
+    const btext = document.createElement("div");
+    btext.className = "nav-btext";
+    const bn = document.createElement("b");
+    bn.textContent = "vibepm";
+    const bs = document.createElement("small");
+    bs.textContent = "· minimal";
+    btext.append(bn, bs);
+    brand.append(logo, btext);
+    inner.appendChild(brand);
     if (!items.length) {
-      box.innerHTML = `<div class="nav-empty">（还没有插件注册 shell.nav）</div>`;
+      const empty = document.createElement("div");
+      empty.className = "nav-empty";
+      empty.textContent = "（还没有插件注册 shell.nav）";
+      inner.appendChild(empty);
+      box.appendChild(inner);
       return;
     }
+    // 选中指示条（随激活行滑动；定点更新不重建 → top 过渡天然从当前位置滑）
     const list = document.createElement("div");
-    list.className = "nav-grid";
+    list.className = "nav-list";
+    const indi = document.createElement("div");
+    indi.className = "nav-indi";
+    list.appendChild(indi);
+    const routeNow = parseHash(location.hash).route;
     for (const it of items) {
       const p: any = it.payload ?? {};
-      const tag = renderTag(String(p.kind ?? ""));
-      if (p.kind === "nav-card" && tag) {
-        const el = document.createElement(tag);
-        el.setAttribute("icon", String(p.icon ?? "help"));
-        el.setAttribute("title", it.label ?? "");
-        el.setAttribute("desc", String(p.desc ?? ""));
-        el.setAttribute("state", String(p.state ?? "idle"));
-        el.setAttribute("href", String(p.hash ?? "#"));
-        list.appendChild(el);
-      } else {
-        const d = document.createElement("div");
-        d.className = "sec-item";
-        d.textContent = it.label ?? it.id;
-        list.appendChild(d);
-      }
+      const href = String(p.hash ?? "");
+      const target = href.replace(/^#\/?/, "").split("?")[0];
+      const row = document.createElement("div");
+      row.className = "nav-item";
+      row.dataset.href = href;
+      if (target === routeNow || (!target && !routeNow)) row.classList.add("active");
+      const ic = document.createElement("span");
+      ic.className = "nav-ic";
+      ic.appendChild(iconEl(String(p.icon ?? "help") as any, 24));
+      const lb = document.createElement("span");
+      lb.className = "nav-label";
+      lb.textContent = it.label ?? String(p.title ?? it.id ?? "");
+      row.append(ic, lb);
+      row.addEventListener("click", () => {
+        if (href) location.hash = href.startsWith("#") ? href.slice(1) : href;
+      });
+      list.appendChild(row);
     }
-    box.appendChild(list);
+    inner.appendChild(list);
+    // 底部 switcher（仿 Endfield）：手动切换 detailActive
+    const sw = document.createElement("button");
+    sw.className = "nav-switch";
+    sw.title = "展开 / 收起";
+    const swIc = document.createElement("span");
+    swIc.className = "nav-switch-ic";
+    swIc.innerHTML = iconSVG("chevron-down");
+    sw.appendChild(swIc);
+    sw.addEventListener("click", () => this.setRailOpen(!this.railOpen));
+    inner.appendChild(sw);
+    box.appendChild(inner);
+  }
+
+  /** 选中指示条定位：等布局完成再算（rAF）。首次不滑（直接落位），后续从当前位置滑到新位置 */
+  private positionNavIndi(): void {
+    const root = this._root;
+    if (!root) return;
+    const indi = root.querySelector<HTMLElement>(".nav-indi");
+    if (!indi) return;
+    const act = root.querySelector<HTMLElement>(".nav-item.active");
+    if (!act) { this.indiPositioned = false; indi.style.opacity = "0"; return; }
+    const top = act.offsetTop + "px";
+    if (!this.indiPositioned) {
+      // 首次定位：禁过渡 → 落位 → 强制 reflow → 恢复过渡（避免从 top:0 滑过来）
+      indi.style.transition = "none";
+      indi.style.top = top;
+      indi.style.opacity = "1";
+      void indi.offsetWidth;
+      indi.style.transition = "";
+      this.indiPositioned = true;
+    } else {
+      indi.style.top = top;
+      indi.style.opacity = "1";
+    }
   }
 
   private renderPrimary(box: HTMLElement, slots: Slots, route: string): void {
+    box.innerHTML = ""; // 定点更新时复用同一 .primary 容器
     const items = (slots["shell.primary"] ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const p = items.find((x) => String((x.payload as any)?.route ?? "") === route);
     if (!p) {

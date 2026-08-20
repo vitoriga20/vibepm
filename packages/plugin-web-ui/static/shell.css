@@ -94,6 +94,13 @@
   --skin-nav-shadow:      #e3e1d9;
   --skin-nav-ink:         #22252a;
   --skin-nav-texture:     rgba(12,14,16,.015);
+  /* 侧边栏窄图标栏（终末地官网 Endfield PC 侧栏结构）：图标/悬停/选中 overlay */
+  --skin-nav-icon:        #8b8f87;   /* 未激活图标 */
+  --skin-nav-ic-hover:    #22252a;   /* 悬停图标 */
+  --skin-nav-hover-bg:    rgba(34,37,42,.06); /* 行悬停灰底 */
+  --skin-nav-ov-bg:       #e6e4dc;   /* 选中指示灰底 */
+  --skin-nav-ov-bar:      #147d78;   /* 选中指示左条（accent 深青） */
+  --skin-nav-shadow-x:    rgba(31,34,40,.18); /* 展开浮层阴影 */
   /* 折叠把手 toggle-bar：朴素窄条，纸灰 */
   --skin-toggle-bg1:      #e4e3dc;
   --skin-toggle-bg2:      #dddcd4;

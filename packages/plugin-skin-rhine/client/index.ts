@@ -62,6 +62,13 @@ const RHINE_TOKEN: Record<string, string> = {
   "--skin-nav-shadow":       "#030407",
   "--skin-nav-ink":          "#ecebe4",
   "--skin-nav-texture":      "rgba(241,236,220,.03)",
+  // 侧边栏窄图标栏：图标/悬停/选中 overlay（暗墨蓝 + 柠檬黄左条）
+  "--skin-nav-icon":         "#8a8c96",
+  "--skin-nav-ic-hover":     "#f2f0e8",
+  "--skin-nav-hover-bg":     "rgba(255,255,255,.06)",
+  "--skin-nav-ov-bg":        "#1a1d21",
+  "--skin-nav-ov-bar":       "#ffd84d",
+  "--skin-nav-shadow-x":     "rgba(0,0,0,.5)",
   // 折叠把手
   "--skin-toggle-bg1":       "#1a1c26",
   "--skin-toggle-bg2":       "#12141c",
@@ -163,10 +170,10 @@ const INDUSTRIAL_CSS = `
   repeating-linear-gradient(180deg, transparent 0 11px, color-mix(in srgb, var(--accent) 10%, transparent) 11px 12px)}
 .toggle-bar{background:repeating-linear-gradient(180deg, var(--skin-toggle-bg1) 0 2px, var(--skin-toggle-bg2) 2px 4px)!important}
 
-/* ---- 导航区：暗墨蓝 + 左导轨 + 斜纹 + 微粒 ---- */
+/* ---- 导航区：暗墨蓝窄图标栏 + 斜纹 + 微粒（Endfield 结构；左条/阴影走 skin token） ---- */
 .nav{background:var(--skin-nav-base)!important;
-  box-shadow:inset 1px 0 0 var(--skin-nav-hi), 5px 0 0 var(--skin-nav-shadow)!important;
-  border-right:1px solid var(--skin-nav-border)!important}
+  border-right:1px solid var(--skin-nav-border)!important;
+  box-shadow:inset 1px 0 0 var(--skin-nav-hi)}
 .nav::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
   background:
     repeating-linear-gradient(135deg, var(--skin-nav-texture) 0 1px, transparent 1px 9px),
