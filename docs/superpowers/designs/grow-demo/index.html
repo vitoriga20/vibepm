@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>番茄钟 · 种植—生长—收获 关键帧动画演示</title>
+<!--
+  关键帧序列生长动画演示(吉卜力治愈系 3D)。
+  进度驱动:0→100% 在 10 张关键帧(anchor+f01..f09)间做透明度/缩放交叉渐变,无缝过渡。
+  呼吸感:整体容器持续轻微 3D 摇曳(scaleY 呼吸 + 微风 sway),帧间无卡顿。
+  收成三态:<25% 枯萎不记账;25~99% 青果记黄;100% 红番茄记红。
+  素材:assets/*.jpg(AI 生成)。进度暂停→定格;重置→回0%。
+  注意:演示为快进播放;插件真机改造时改由 progress = 1 - timeLeft/totalTime 驱动。
+-->
+<style>
+:root {
+  --paper: #f6f3ec; --ink: #25322f; --ink-soft: #5b6b66; --line: #d5d1c7;
+  --green: #147d78; --tomato: #c94f3d; --shadow: rgba(20,30,28,.12);
+  --font: "JetBrains Mono", Consolas, "Microsoft YaHei", monospace;
+  --p: 0; /* 进度 0~1,JS 驱动 */
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font); background: var(--paper); color: var(--ink);
+  display: flex; flex-direction: column; min-height: 100%;
+}
+.cap { padding: 16px 26px 6px; }
+.cap h1 { font-size: 19px; letter-spacing: .4px; margin: 0; }
+.cap p { margin: 5px 0 0; color: var(--ink-soft); font-size: 12.5px; }
+.hr { height: 1px; background: var(--line); margin: 10px 26px 0; }
+
+.workbench { flex: 1; display: grid; grid-template-columns: 1fr 320px; gap: 20px; padding: 16px 26px 26px; min-height: 0; }
+
+/* 主舞台:图片序列叠加 */
+.stage-wrap {
+  position: relative; border: 1px solid var(--line); border-radius: 12px;
+  overflow: hidden; background: radial-gradient(circle at 50% 30%, #fbf8f1, #efeae0);
+  display: flex; align-items: center; justify-content: center; min-height: 420px;
+}
+/* 呼吸摇曳容器 */
+.breathe { position: relative; width: 420px; height: 540px; transform-origin: 50% 90%; animation: breathe 5.2s ease-in-out infinite; }
+@keyframes breathe {
+  0%,100% { transform: scale(1,1) rotate(0deg); }
+  25%     { transform: scale(1.012,0.99) rotate(-0.4deg); }
+  50%     { transform: scale(0.992,1.015) rotate(0.3deg); }
+  75%     { transform: scale(1.014,0.988) rotate(-0.3deg); }
+}
+.layer {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+  background: var(--paper); border-radius: 8px;
+  opacity: 0; transform: scale(1.04); transition: opacity .45s ease, transform .45s ease;
+  box-shadow: 0 10px 34px var(--shadow);
+}
+.layer.show { opacity: 1; transform: scale(1); }
+
+/* 控制台 */
+.console { border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 15px; }
+.console h2 { font-size: 14px; letter-spacing: .4px; margin: 0 0 4px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.lab { font-size: 12px; color: var(--ink-soft); margin-bottom: 6px; }
+.lab b { color: var(--ink); font-weight: 600; }
+.slider {
+  width: 100%; height: 7px; appearance: none; cursor: pointer; outline: none; border-radius: 4px;
+  background: linear-gradient(to right, var(--green) calc(var(--p,0)*100%), var(--line) 0);
+}
+.slider::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--green); border: 2.5px solid var(--paper); box-shadow: 0 0 0 1px var(--green); }
+.pval { font-size: 22px; margin-top: 4px; }
+.pval small { font-size: 12px; color: var(--ink-soft); }
+
+.verdict { border: 1px dashed var(--line); border-radius: 8px; padding: 12px; font-size: 12.5px; line-height: 1.9; }
+.v-wither { color: var(--ink-soft); } .v-green { color: var(--green); } .v-red { color: var(--tomato); }
+
+.btns { display: flex; gap: 8px; }
+.btn { flex: 1; min-width: 70px; padding: 10px 0; font-family: var(--font); font-size: 13px; background: var(--paper); color: var(--ink); border: 1px solid var(--green); border-radius: 7px; cursor: pointer; transition: background .15s,color .15s; }
+.btn.primary { background: var(--green); color: var(--paper); }
+.btn:hover { filter: brightness(1.06); } .btn:active { transform: translateY(1px); }
+
+.tip { font-size: 11px; color: var(--ink-soft); line-height: 1.7; }
+
+/* 右下角常驻浮层(同动画复用) */
+.pill {
+  position: fixed; right: 24px; bottom: 24px; z-index: 50; width: 200px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 12px 34px var(--shadow); padding: 12px; transition: opacity .3s, transform .3s;
+}
+.pill.hidden { opacity: 0; transform: translateY(16px); pointer-events: none; }
+.pill .mini-stage { position: relative; height: 130px; overflow: hidden; border-radius: 8px; background: radial-gradient(circle at 50% 30%, #fbf8f1, #efeae0); }
+.pill .mini { position: absolute; left: 50%; bottom: -58px; width: 340px; height: 340px; transform: translateX(-50%); }
+.pill .mini.breathe { animation-duration: 5.2s; }
+.pill .mini .layer { border-radius: 6px; }
+.pill-head { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11.5px; }
+.pill .st { color: var(--green); }
+.pill .bar { height: 5px; background: var(--line); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.pill .bar i { display: block; height: 100%; width: calc(var(--p,0)*100%); background: var(--green); transition: width .45s; }
+.pill .tag { margin-top: 6px; font-size: 11px; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<div class="cap">
+  <h1>番茄钟 · 种植—生长—收获（关键帧序列）</h1>
+  <p>拖动进度条模拟计时同步；右下角为常驻浮层形态。素材 assets/*.jpg（AI 生成）。</p>
+</div>
+<div class="hr"></div>
+
+<!-- 常驻浮层 -->
+<div class="pill hidden" id="pill">
+  <div class="mini-stage"><div class="mini breathe" id="mini-stack"></div></div>
+  <div class="pill-head"><span class="st" id="pill-state">专注中</span><span id="pill-verdict">…</span></div>
+  <div class="bar"><i></i></div>
+  <div class="tag" id="pill-note">常驻浮层 · 暂停即停</div>
+</div>
+
+<div class="workbench">
+  <div class="stage-wrap">
+    <div class="breathe" id="main-stack"></div>
+  </div>
+
+  <div class="console">
+    <h2>控制台</h2>
+    <div>
+      <div class="lab">进度 <b>progress = 1 − timeLeft / totalTime</b>（模拟计时同步）</div>
+      <input class="slider" id="slider" type="range" min="0" max="100" value="0" />
+      <div class="pval"><span id="pval">0</span><small>%</small></div>
+    </div>
+    <div>
+      <div class="lab">收成判定（停止时）</div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="play">播放专注</button>
+      <button class="btn" id="pause">暂停</button>
+      <button class="btn" id="reset">重置</button>
+    </div>
+    <div class="tip">呼吸摇曳 5.2s 循环；帧间 opacity/scale 交叉渐变 0.45s。暂停即定格，重置归 0%。</div>
+  </div>
+</div>
+
+<script>
+/* ——— 关键帧定义:对应主栈与浮层栈复用同一图层 ——— */
+const FRAMES = [
+  { p: 0.00, src: "assets/anchor_empty_pot.jpg" },
+  { p: 0.05, src: "assets/f01_seed.jpg" },
+  { p: 0.15, src: "assets/f02_sprout_break.jpg" },
+  { p: 0.28, src: "assets/f03_cotyledon.jpg" },
+  { p: 0.52, src: "assets/f04_grow_branch.jpg" },
+  { p: 0.68, src: "assets/f05_bud.jpg" },
+  { p: 0.80, src: "assets/f06_flower.jpg" },
+  { p: 0.90, src: "assets/f07_green_fruit.jpg" },
+  { p: 0.96, src: "assets/f08_green_to_blush.jpg" },
+  { p: 1.00, src: "assets/f09_ripe.jpg" },
+];
+
+/* 造图层栈 */
+function buildStack(el) {
+  el.innerHTML = "";
+  const layers = FRAMES.map((f) => {
+    const img = document.createElement("img");
+    img.className = "layer";
+    img.src = f.src;
+    img.alt = f.p.toFixed(2);
+    el.appendChild(img);
+    return img;
+  });
+  return layers;
+}
+const mainLayers = buildStack(document.getElementById("main-stack"));
+const miniLayers = buildStack(document.getElementById("mini-stack"));
+
+/* 进度→图层:显示"最后一个 p<=当前"的帧为最新阶段层,其余隐藏(顶层=最新,下覆盖上) */
+function applyStacks(p) {
+  // 找出满足进度条件的最后一帧索引
+  let lastIdx = 0;
+  for (let i = 0; i < FRAMES.length; i++) {
+    if (p >= FRAMES[i].p - 1e-6) lastIdx = i;
+  }
+  [mainLayers, miniLayers].forEach((layers) => {
+    layers.forEach((img, i) => {
+      img.classList.toggle("show", i === lastIdx);
+    });
+  });
+}
+
+/* 控制台 */
+const slider = document.getElementById("slider");
+const pval = document.getElementById("pval");
+const verdict = document.getElementById("verdict");
+const pill = document.getElementById("pill");
+let p = 0, playing = false, rafId = null;
+
+const DEMO_FOCUS_SECONDS = 30; /* 演示快进一次专注耗时;真机由 totalTime 驱动 */
+
+function renderVerdict() {
+  const pc = Math.round(p * 100);
+  let html;
+  if (p < 0.25) html = `停止(<b class="v-wither">${pc}% &lt; 25%</b>) → <span class="v-wither">种子枯萎，不记账</span>`;
+  else if (p < 1) html = `停止(<b class="v-green">${pc}%</b>) → <span class="v-green">青未熟番茄，记黄番茄</span>`;
+  else html = `完成(<b class="v-red">100%</b>) → <span class="v-red">红番茄成熟，记红番茄</span>`;
+  verdict.innerHTML = html;
+  document.getElementById("pill-verdict").textContent = p >= 1 ? "收获红番茄" : (p < 0.25 ? "未开始/枯萎" : "青果");
+  document.getElementById("pill-note").textContent =
+    p > 0 && p < 1 ? "专注中 · 暂停即停" : (p >= 1 ? "专注完成 · 番茄+1" : "未开始");
+}
+
+function setP(v) {
+  p = Math.max(0, Math.min(1, v));
+  slider.value = Math.round(p * 100);
+  pval.textContent = Math.round(p * 100);
+  document.documentElement.style.setProperty("--p", p);
+  slider.style.setProperty("--p", p);
+  applyStacks(p);
+  renderVerdict();
+}
+
+function startPlay() {
+  if (playing) return;
+  playing = true;
+  pill.classList.remove("hidden");
+  const t0 = performance.now(), p0 = p;
+  const step = (now) => {
+    if (!playing) return;
+    const wall = (now - t0) / 1000;
+    const np = Math.min(1, p0 + wall / DEMO_FOCUS_SECONDS);
+    setP(np);
+    if (np >= 1) { playing = false; return; }
+    rafId = requestAnimationFrame(step);
+  };
+  rafId = requestAnimationFrame(step);
+}
+function pausePlay() { playing = false; cancelAnimationFrame(rafId); }
+function resetPlay() { playing = false; cancelAnimationFrame(rafId); setP(0); pill.classList.add("hidden"); }
+
+document.getElementById("play").onclick = startPlay;
+document.getElementById("pause").onclick = pausePlay;
+document.getElementById("reset").onclick = resetPlay;
+slider.addEventListener("input", (e) => { pausePlay(); setP(e.target.value / 100); });
+
+setP(0);
+</script>
+</body>
+</html>

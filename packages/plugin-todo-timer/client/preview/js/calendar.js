@@ -95,7 +95,7 @@ class GitHubCalendar {
             const count = this.data[date]?.count || 0;
             const totalDuration = this.data[date]?.totalDuration || 0;
             cell.style.backgroundColor = this.getColor(count);
-            cell.dataset.tips = count == 0 ?date:`${date}\n🍅 × ${count}\n🕒 ${Math.floor(totalDuration/36000000 || 0)}小时`;
+            cell.dataset.tips = count == 0 ?date:`${date}\n🍅 × ${count}\n🕒 ${Math.floor(totalDuration / MS_PER_MINUTE || 0)}分钟`;
         }
     }
 

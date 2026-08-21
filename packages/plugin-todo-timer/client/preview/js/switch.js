@@ -27,6 +27,8 @@ class Switch {
     }
 
     render() {
+        // 渲染前从配置同步状态，保证「确定」重载后可还原真实开关
+        this.state = this.settingsConfigInstance.config[this.configKey] ?? this.state;
         console.log('rendering switch', this.state);
         if (this.state) {
             this.switchContainer.classList.add('on');

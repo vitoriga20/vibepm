@@ -555,4 +555,30 @@ line::after {
   border-radius: 16px;
 }
 
+/* 设置页「确定」按钮：右对齐，单一强调色，小圆角无渐变 */
+.confirm_box {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 20px;
+}
+
+.confirm_btn {
+  padding: 10px 32px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background-color: var(--kv-orange-color);
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.confirm_btn:hover {
+  filter: brightness(0.94);
+}
+
+.confirm_btn:active {
+  filter: brightness(0.88);
+}
+
 

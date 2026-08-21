@@ -246,6 +246,8 @@ class todoListManger {
     const realDuration = duration * progress;
 
     this.TaskList.statistics.push({ endTimestamp: Date.now(), duration, realDuration, type, progress, tarId, longTarId });
+    // 统计记录必须持久化，否则刷新后首页「H」与「统计」的活动时间会丢失
+    this.saveTaskList(this.TaskList);
     // console.log(this.TaskList.statistics);
   }
 
@@ -282,11 +284,10 @@ class todoListManger {
       }
     }
 
-    // 将总专注时间转换为小时，保留1位小数
-    // const focusHours = parseFloat((totalFocusTime / 3600000).toFixed(1));
-    const focusHours = parseFloat((totalFocusTime / 6000).toFixed(1));
+    // 将总专注时间转换为分钟，保留1位小数（以共享常量统一换算）
+    const focusMinutes = parseFloat((totalFocusTime / MS_PER_MINUTE).toFixed(1));
     // 返回一个对象，包含完成、未完成的数量和总专注时间
-    return { red, yellow, focusHours };
+    return { red, yellow, focusMinutes };
   }
 
   /**
@@ -349,16 +350,16 @@ class todoListManger {
     // 计算总天数（用 endTimestamp 统计，去重）
     const uniqueDays = new Set(workItems.map((item) => new Date(item.endTimestamp).toDateString()));
 
-    // 计算总时间（用 realDuration 加和，单位为小时，保留一位小数）
-    const totalTime = workItems.reduce((sum, item) => sum + item.realDuration, 0) / 3600000;
-    const totalTimeHours = totalTime.toFixed(1);
+    // 计算总时间（用 realDuration 加和，单位为分钟，保留一位小数）
+    const totalTime = workItems.reduce((sum, item) => sum + item.realDuration, 0) / MS_PER_MINUTE;
+    const totalTimeMinutes = totalTime.toFixed(1);
 
     // 计算总项数
     const totalItems = workItems.length;
 
     return {
       totalDay: uniqueDays.size,
-      totalHour: parseFloat(totalTimeHours),
+      totalMinute: parseFloat(totalTimeMinutes),
       totalTomato: totalItems,
       totalShortTar: this.TaskList.archived.length + this.TaskList.current.length + this.TaskList.done.length,
     };
@@ -370,9 +371,9 @@ class todoListManger {
   getWorkStatisticsByLongTarId(longTarId) {
     const filteredItems = this.TaskList.statistics.filter((item) => item.type == "work" && item.longTarId == longTarId);
 
-    // 计算总时间（用 realDuration 加和，单位为小时，保留一位小数）
-    const totalTime = filteredItems.reduce((sum, item) => sum + item.realDuration, 0) / 3600000;
-    const totalTimeHours = totalTime.toFixed(1);
+    // 计算总时间（用 realDuration 加和，单位为分钟，保留一位小数）
+    const totalTime = filteredItems.reduce((sum, item) => sum + item.realDuration, 0) / MS_PER_MINUTE;
+    const totalTimeMinutes = totalTime.toFixed(1);
 
     // 计算总项数
     const totalItems = filteredItems.length;
@@ -388,7 +389,7 @@ class todoListManger {
     });
 
     return {
-      totalHour: parseFloat(totalTimeHours),
+      totalMinute: parseFloat(totalTimeMinutes),
       totalTomato: totalItems,
       totalShortTar: shortTarNum,
     };

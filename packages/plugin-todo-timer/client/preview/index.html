@@ -16,20 +16,31 @@
   <link rel="stylesheet" href="style/select.css" />
   <script src="js/theme.js"></script>
   <style>
-    /* 页面内浮层：迷你胶囊（桌面常驻能力预留，后续可上浮层抽象） */
-    .todoPill {
+    /* 右下角生长浮层：胶囊在上 + 番茄动画在下（可拖拽） */
+    #growWin {
       position: fixed; right: 18px; bottom: 18px; z-index: 999;
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 14px; border-radius: 999px;
+      width: 232px; border-radius: 12px; overflow: hidden;
       background: var(--bg-color); color: var(--text-color);
       border: 1px solid var(--border-color);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, .08);
-      font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px;
-      cursor: pointer; opacity: .85; transition: opacity .2s; user-select: none;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+      font-family: "JetBrains Mono", Consolas, monospace;
+      opacity: .96; transition: opacity .2s; user-select: none;
     }
-    .todoPill:hover { opacity: 1; }
-    .todoPill .pill-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kv-orange-color); }
-    .todoPill.active .pill-dot { animation: pillPulse 1.2s infinite; }
+    #growWin:hover { opacity: 1; }
+    #growWin .growHead {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; border-bottom: 1px solid var(--border-color);
+      cursor: grab; font-size: 12px;
+    }
+    #growWin.dragging { cursor: grabbing; }
+    #growWin.dragging .growHead { cursor: grabbing; }
+    #growWin .pill-state { flex: 1; }
+    #growWin .pill-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kv-orange-color); }
+    #growWin.active .pill-dot { animation: pillPulse 1.2s infinite; }
+    #growWin iframe {
+      display: block; width: 100%; height: 188px; border: 0;
+      background: transparent; pointer-events: none;
+    }
     @keyframes pillPulse {
       0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--kv-orange-color) 40%, transparent); }
       50% { box-shadow: 0 0 0 6px transparent; }
@@ -216,7 +227,7 @@
             </div>
             <div class="calendarKey_item" id="calendarKey_item1">
               <div class="num" id="calendarKey_totalHour">22238.5</div>
-              <div class="label">小时</div>
+              <div class="label">分钟</div>
             </div>
             <div class="calendarKey_item" id="calendarKey_item2">
               <div class="num" id="calendarKey_totalTomato">64</div>
@@ -243,7 +254,7 @@
               <div class="rightBox">
                 <div>
                   <span>13.5</span>
-                  <span>小时</span>
+                  <span>分钟</span>
                 </div>
                 <div>
                   <span>50</span>
@@ -260,7 +271,7 @@
               <div class="rightBox">
                 <div>
                   <span>13.5</span>
-                  <span>小时</span>
+                  <span>分钟</span>
                 </div>
                 <div>
                   <span>50</span>
@@ -277,7 +288,7 @@
               <div class="rightBox">
                 <div>
                   <span>13.5</span>
-                  <span>小时</span>
+                  <span>分钟</span>
                 </div>
                 <div>
                   <span>50</span>
@@ -294,7 +305,7 @@
               <div class="rightBox">
                 <div>
                   <span>13.5</span>
-                  <span>小时</span>
+                  <span>分钟</span>
                 </div>
                 <div>
                   <span>50</span>
@@ -315,7 +326,7 @@
               <div class="rightBox">
                 <div>
                   <span>13.5</span>
-                  <span>小时</span>
+                  <span>分钟</span>
                 </div>
                 <div>
                   <span>50</span>
@@ -332,7 +343,7 @@
               <div class="rightBox">
                 <div>
                   <span>13.5</span>
-                  <span>小时</span>
+                  <span>分钟</span>
                 </div>
                 <div>
                   <span>50</span>
@@ -349,7 +360,7 @@
               <div class="rightBox">
                 <div>
                   <span>13.5</span>
-                  <span>小时</span>
+                  <span>分钟</span>
                 </div>
                 <div>
                   <span>50</span>
@@ -366,7 +377,7 @@
               <div class="rightBox">
                 <div>
                   <span>13.5</span>
-                  <span>小时</span>
+                  <span>分钟</span>
                 </div>
                 <div>
                   <span>50</span>
@@ -479,6 +490,9 @@
               <label for="_3">本月</label>
             </form>
           </div>
+          <div class="confirm_box">
+            <div class="confirm_btn" onclick="onConfirmSettings()">确定</div>
+          </div>
         </div>
       </div>
     </div>
@@ -557,12 +571,16 @@
   <script src="js/todoList.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/index.js"></script>
-  <!-- 页面内浮层：迷你胶囊 -->
-  <div class="todoPill" id="todoPill" title="回到主时钟" onclick="pages.switchPage(0)">
-    <span class="pill-state">休息中</span>
-    <span class="pill-dot"></span>
-    <span class="pill-time">30 min</span>
+  <!-- 右下角生长浮层：胶囊在上 + 番茄动画在下（可拖拽） -->
+  <div id="growWin">
+    <div class="growHead" id="growHead" title="拖拽移动 · 点击回主时钟">
+      <span class="pill-state" id="growState">休息中</span>
+      <span class="pill-dot"></span>
+      <span class="pill-time" id="growTime">30 min</span>
+    </div>
+    <iframe id="tomatoLife" src="tomato-life.html" allow="autoplay" title="番茄生长动画"></iframe>
   </div>
+  <script src="js/growBridge.js"></script>
 </body>
 
 </html>

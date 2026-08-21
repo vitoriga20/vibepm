@@ -58,7 +58,7 @@ function updatePageTodayTomatosNum() {
   const statisticsTodayNum = todoManger_.statisticsTodayNum();
   Ele_todayTomatosRedNum.innerText = statisticsTodayNum.red;
   Ele_todayTomatosYellowNum.innerText = statisticsTodayNum.yellow;
-  document.getElementById("focusHours").innerText = `${statisticsTodayNum.focusHours} H`;
+  document.getElementById("focusHours").innerText = `${statisticsTodayNum.focusMinutes} min`;
 }
 
 async function onBreakEnd(duration, type, progress) {
@@ -828,7 +828,7 @@ class Pages {
 
         // 刷新日历
         Ele_calendarKey_totalDay.innerText = workStatistics.totalDay;
-        Ele_calendarKey_totalHour.innerText = workStatistics.totalHour;
+        Ele_calendarKey_totalHour.innerText = workStatistics.totalMinute;
         Ele_calendarKey_totalTomato.innerText = workStatistics.totalTomato;
         Ele_calendarKey_totalShortTar.innerText = workStatistics.totalShortTar;
 
@@ -881,7 +881,21 @@ class Pages {
 
 const pages = new Pages();
 
-// 为所有page类元素添加点击事件
+// 设置页「确定」：重读配置并整体重渲染（无需手动刷新）
+function onConfirmSettings() {
+  settings.reload();
+  // 复位番茄堆范围单选
+  const form = document.getElementById("tomatoBoxRange");
+  const radios = form ? form.elements["tomatoBoxRange"] : null;
+  if (radios) {
+    for (let radio of radios) {
+      radio.checked = String(radio.value) == String(settings.config.tomatoBoxRange);
+    }
+  }
+  // 重渲染全部设置控件的真实状态
+  settingsPageComponent.forEach((c) => c.component.render());
+  showToast("配置已应用");
+}
 // 为所有page类元素添加点击事件
 // const pageBtnElements = document.getElementsByClassName("btnBox");
 // for (let i = 0; i < pageBtnElements.length; i++) {
@@ -962,7 +976,7 @@ function reflashLongTars(type) {
 
         longTagBox.innerHTML = `<span class="hash" onclick='pickLongTagColor(${key},"active","${tag.color}")'>#</span><span class="longTar" contenteditable="true" tarId="${key}" >${tag.name}</span>
         <div class="rightBox">
-            <div><span>${workStatisticsLongTar.totalHour}</span><span>小时</span></div>
+            <div><span>${workStatisticsLongTar.totalMinute}</span><span>分钟</span></div>
             <div><span>${workStatisticsLongTar.totalTomato}</span><span>番茄</span></div>
             <div><span>${workStatisticsLongTar.totalShortTar}</span><span>小目标</span></div>
         </div>
@@ -998,7 +1012,7 @@ function reflashLongTars(type) {
 
         longTagBox.innerHTML = `<span class="hash"  onclick='pickLongTagColor(${key},"active","${tag.color}")'>#</span><span class="longTar" contenteditable="true" tarId="${key}" >${tag.name}</span>
         <div class="rightBox">
-            <div><span>${workStatisticsLongTar.totalHour}</span><span>小时</span></div>
+            <div><span>${workStatisticsLongTar.totalMinute}</span><span>分钟</span></div>
             <div><span>${workStatisticsLongTar.totalTomato}</span><span>番茄</span></div>
             <div><span>${workStatisticsLongTar.totalShortTar}</span><span>小目标</span></div>
         </div>

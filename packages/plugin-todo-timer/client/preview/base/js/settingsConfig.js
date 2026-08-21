@@ -52,6 +52,28 @@ class settingsConfig {
     this.config = config;
   }
 
+  // 重新从存储加载配置，并触发全套应用回调（供设置页「确定」按钮一键重载，无需手动刷新）
+  reload() {
+    const saved = store.getItem("settings");
+    this.config = { ...this.defaultConfig, ...(saved || {}) };
+    this.saveConfig(this.config);
+
+    this.onchange();
+    this.onClockChange({
+      workDuration: this.config.workDuration,
+      shortBreakDuration: this.config.shortBreakDuration,
+      longBreakDuration: this.config.longBreakDuration,
+      longBreakInterval: this.config.longBreakInterval,
+      autoWork: this.config.autoWork,
+      autoBreak: this.config.autoBreak,
+    });
+    this.onDarkModeChange(this.config.darkMode);
+    this.onOpacityChange(this.config.opacity);
+    this.onShowFloatingWindowChange(this.config.showFloatingWindow);
+    this.onShowTomatoAnimationChange(this.config.showTomatoAnimation);
+    this.onAutoHideAniChange(this.config.autoHideAni);
+  }
+
 
 
   // 更新配置

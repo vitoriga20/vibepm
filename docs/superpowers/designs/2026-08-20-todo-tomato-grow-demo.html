@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>番茄钟 · 种植—生长—收获 动画演示</title>
+<!--
+  独立动画演示页：线稿几何·冷青，契合科研纸感。
+  仅供印证视觉与动画节奏，脱离插件运行，不落 git 依赖。
+  渲染：CSS+SVG 分层。JS 仅做 progress driver，动画由 CSS transition 平滑。
+  阶段(progress 0→1)：0 种子 → 0~25 发芽 → 25~75 茎叶 → 75 开花+小番茄 → 75~100 变大变红。
+  收成：<25% 枯萎(不记账)；25~99% 青果(记黄)；100% 红果(记红)。
+  演示含角落"常驻浮层"形态与右侧控制台三态收成判定。
+-->
+<style>
+/* ——— token 单一源（科研纸感·冷青） ——— */
+:root {
+  --paper: #f6f3ec;            /* 暖白纸面 */
+  --ink: #25322f;              /* 深墨文字 */
+  --ink-soft: #5b6b66;         /* 次级文字 */
+  --line: #c9d3cf;             /* 弱分割线 */
+  --green: #147d78;            /* 单一深青强调 */
+  --green-soft: #4fa49d;       /* 青果·青未熟 */
+  --tomato: #c94f3d;           /* 成熟番茄红（承载语义，点睛） */
+  --shadow: rgba(20, 30, 28, .10);
+  --font: "JetBrains Mono", Consolas, "Microsoft YaHei", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+h1, h2, h3 { font-weight: 600; margin: 0; }
+.page-cap { padding: 18px 26px 8px; }
+.page-cap h1 { font-size: 20px; letter-spacing: .5px; }
+.page-cap p { margin: 6px 0 0; color: var(--ink-soft); font-size: 12.5px; }
+.hr { height: 1px; background: var(--line); margin: 0 26px; }
+
+/* ——— 主舞台 + 控制台 ——— */
+.workbench {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  padding: 18px 26px 26px;
+  min-height: 0;
+}
+.stage-wrap {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 10px;
+}
+.stage { width: 320px; height: 400px; }
+.console {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.console h2 { font-size: 14px; letter-spacing: .5px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.ctl-label { font-size: 12px; color: var(--ink-soft); margin-bottom: 6px; }
+.ctl-bold { color: var(--ink); font-weight: 600; }
+
+/* 进度 */
+.slider {
+  width: 100%; height: 6px; appearance: none; cursor: pointer;
+  background: linear-gradient(to right, var(--green) calc(var(--p,0)*100%), var(--line) 0);
+  border-radius: 3px; outline: none;
+}
+.slider::-webkit-slider-thumb {
+  appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--green); border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--green);
+}
+.pval { font-size: 20px; margin-top: 6px; }
+.pval small { font-size: 12px; color: var(--ink-soft); }
+
+/* 相位 */
+.phase-strip { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  font-size: 11px; padding: 4px 8px; border: 1px solid var(--line);
+  border-radius: 999px; color: var(--ink-soft);
+}
+.chip.on { border-color: var(--green); color: var(--green); background: color-mix(in srgb, var(--green) 8%, transparent); }
+
+/* 收成判定 */
+.verdict {
+  border: 1px dashed var(--line); border-radius: 8px; padding: 12px;
+  font-size: 12.5px; line-height: 1.9;
+}
+.verdict b { font-weight: 600; }
+.v-wither { color: var(--ink-soft); }
+.v-green  { color: var(--green-soft); }
+.v-red    { color: var(--tomato); }
+
+/* 按钮 */
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  flex: 1; min-width: 70px; padding: 9px 0; font-family: var(--font); font-size: 13px;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--green);
+  border-radius: 6px; cursor: pointer; transition: background .15s, color .15s;
+}
+.btn.primary { background: var(--green); color: var(--paper); }
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: translateY(1px); }
+
+/* ——— 角落常驻浮层（形态演示） ——— */
+.pill {
+  position: fixed; right: 22px; bottom: 22px; z-index: 50;
+  width: 190px; background: var(--paper); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: 0 8px 24px var(--shadow);
+  padding: 12px 12px 10px; transition: opacity .3s, transform .3s;
+}
+.pill.hidden { opacity: 0; transform: translateY(12px); pointer-events: none; }
+.pill .pill-stage { position: relative; height: 120px; overflow: hidden; }
+.pill .pill-stage .stage { position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%) scale(.42); transform-origin: bottom center; width: 320px; height: 400px; }
+.pill .pill-head { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 11.5px; }
+.pill .pill-head .st { color: var(--green); }
+.pill .pill-bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.pill .pill-bar i { display: block; height: 100%; width: calc(var(--p,0)*100%); background: var(--green); border-radius: 2px; }
+.pill .pill-tag { margin-top: 6px; font-size: 11px; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+
+  <div class="page-cap">
+    <h1>番茄钟 · 种植—生长—收获</h1>
+    <p>拖动进度条模拟计时同步；右侧演示暂停/重置/收成三态。右下角为「常驻浮层」形态。</p>
+  </div>
+  <div class="hr"></div>
+
+  <!-- 角落常驻浮层（形态演示） -->
+  <div class="pill hidden" id="pill">
+    <div class="pill-stage"><svg class="stage" viewBox="0 0 320 400" id="pill-svg"></svg></div>
+    <div class="pill-head"><span class="st" id="pill-state">专注中</span><span id="pill-verdict">…</span></div>
+    <div class="pill-bar"><i></i></div>
+    <div class="pill-tag" id="pill-note">常驻浮层形态（角落）」</div>
+  </div>
+
+  <div class="workbench">
+    <!-- 主舞台 -->
+    <div class="stage-wrap">
+      <svg class="stage" viewBox="0 0 320 400" id="main-svg"></svg>
+    </div>
+
+    <!-- 控制台 -->
+    <div class="console">
+      <h2>控制台</h2>
+
+      <div>
+        <div class="ctl-label">进度 <span class="ctl-bold">progress = 1 − timeLeft / totalTime</span>（模拟计时同步）</div>
+        <input class="slider" id="slider" type="range" min="0" max="100" value="0" />
+        <div class="pval"><span id="pval">0</span><small>%</small></div>
+      </div>
+
+      <div>
+        <div class="ctl-label">生长相位</div>
+        <div class="phase-strip" id="phase-strip"></div>
+      </div>
+
+      <div>
+        <div class="ctl-label">收成判定（停止时）</div>
+        <div class="verdict" id="verdict">
+          <b class="v-wither">低于 25%</b> 停止 → 种子枯萎，不记账<br/>
+          <b class="v-green">25% ~ 99%</b> 停止 → 青未熟番茄，记黄番茄<br/>
+          <b class="v-red">100%</b> → 红番茄成熟，记红番茄
+        </div>
+      </div>
+
+      <div class="btns">
+        <button class="btn primary" id="play">播放专注</button>
+        <button class="btn" id="pause">暂停</button>
+        <button class="btn" id="reset">重置(枯萎)</button>
+      </div>
+
+      <div style="font-size:11px;color:var(--ink-soft);line-height:1.7">
+        暂停即停（动画随 progress 冻结，非固定速度）；继续续播；重置归零演示枯萎。
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ————————————————————
+ * SVG 植株几何（线稿几何·冷青）
+ * 分层：土壤 / 种子 / 芽 / 茎·叶 / 花苞 / 花 / 番茄
+ * ———————————————————— */
+/* 演示可配项：一次专注(演示快进)耗时秒数；插件真机改造时改由番茄钟 totalTime 驱动 */
+const DEMO_FOCUS_SECONDS = 30;
+const SVG_XML = `
+  <rect width="320" height="400" fill="transparent"/>
+  <!-- 土壤 -->
+  <g id="soil">
+    <ellipse cx="160" cy="356" rx="96" ry="14" fill="none" stroke="#147d78" stroke-width="2"/>
+    <ellipse cx="160" cy="352" rx="66" ry="10" fill="#147d78" opacity=".9"/>
+    <path d="M120 356 C140 344 180 344 200 356" fill="none" stroke="#147d78" stroke-width="2"/>
+  </g>
+  <!-- 茎（变长） -->
+  <g id="stem-g">
+    <line id="stem" x1="160" y1="352" x2="160" y2="352" stroke="#147d78" stroke-width="4" stroke-linecap="round"/>
+    <line id="stem-core" x1="160" y1="352" x2="160" y2="352" stroke="#f6f3ec" stroke-width="1.5"/>
+  </g>
+  <!-- 种子 -->
+  <g id="seed">
+    <ellipse cx="160" cy="360" rx="7" ry="5" fill="none" stroke="#147d78" stroke-width="2"/>
+  </g>
+  <!-- 芽（发芽期小芽） -->
+  <g id="sprout">
+    <path id="spr-stem" d="M160 352 Q158 330 160 320" fill="none" stroke="#147d78" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M160 324 Q146 318 142 306 Q150 310 156 312 Q160 314 160 318" fill="#147d78"/>
+    <path d="M160 328 Q174 322 178 310 Q170 314 164 316 Q160 318 160 322" fill="#147d78"/>
+  </g>
+  <!-- 叶片（成株期，随茎展开） -->
+  <g id="leafL">
+    <path d="M160 250 Q120 238 96 244 Q120 248 160 258 Z" fill="#147d78" opacity=".85"/>
+  </g>
+  <g id="leafR">
+    <path d="M160 232 Q202 218 226 224 Q200 230 160 240 Z" fill="#147d78" opacity=".85"/>
+  </g>
+  <g id="leafB">
+    <path d="M160 208 Q132 194 116 198 Q136 204 160 214 Z" fill="#147d78" opacity=".7"/>
+    <path d="M160 198 Q190 184 204 190 Q182 197 160 205 Z" fill="#147d78" opacity=".7"/>
+  </g>
+  <!-- 花苞 -->
+  <g id="bud">
+    <circle cx="160" cy="120" r="8" fill="none" stroke="#147d78" stroke-width="2"/>
+    <path d="M154 116 Q160 104 166 116" fill="#147d78"/>
+  </g>
+  <!-- 花：75% 开放 -->
+  <g id="flower">
+    <g id="petals">
+      <ellipse cx="160" cy="108" rx="5" ry="12" fill="#147d78" opacity=".8"/>
+      <ellipse cx="174" cy="116" rx="5" ry="12" fill="#147d78" opacity=".8" transform="rotate(72 160 120)"/>
+      <ellipse cx="146" cy="116" rx="5" ry="12" fill="#147d78" opacity=".8" transform="rotate(-72 160 120)"/>
+      <ellipse cx="155" cy="104" rx="5" ry="11" fill="#147d78" opacity=".8" transform="rotate(36 160 120)"/>
+      <ellipse cx="165" cy="104" rx="5" ry="11" fill="#147d78" opacity=".8" transform="rotate(-36 160 120)"/>
+    </g>
+    <circle cx="160" cy="120" r="5" fill="#f6f3ec" stroke="#147d78" stroke-width="2"/>
+  </g>
+  <!-- 番茄（青果→红） -->
+  <g id="fruit-g">
+    <circle id="fruit" cx="160" cy="150" r="10" fill="#4fa49d"/>
+    <path d="M154 142 q6 -6 12 0" fill="none" stroke="#147d78" stroke-width="2" id="fruit-stalk"/>
+    <circle id="fruit-l" cx="148" cy="138" r="2.5" fill="#f6f3ec"/>
+  </g>
+  <!-- 小番茄（75% 起，可多果，演示持久化语义） -->
+  <g id="smallfruits">
+    <circle id="sf1" cx="126" cy="230" r="6" fill="#4fa49d" opacity="0"/>
+    <circle id="sf2" cx="196" cy="196" r="4" fill="#4fa49d" opacity="0"/>
+  </g>
+`;
+
+/* 构造两棵辅助 SVG：主舞台 + 浮层 */
+function buildSvg(targetId) {
+  const t = document.getElementById(targetId);
+  t.innerHTML = SVG_XML;
+  return t;
+}
+const main = buildSvg("main-svg");
+buildSvg("pill-svg");
+
+/* 更新一棵 SVG 到进度 p (0~1) */
+function applyStage(svgSel, p) {
+  const S = (id) => svgSel.querySelector("#" + id);
+  const soft = (el, v) => { if (el) el.style.opacity = v; };
+
+  /* 茎高：0.08~0.88 随 p */
+  const stemTop = 352 - (0.08 + p * 0.80) * 290; // 352→~96
+  const stem = S("stem");
+  if (stem) { stem.setAttribute("y1", 352); stem.setAttribute("y2", stemTop); }
+  const suc = S("stem-core");
+  if (suc) { suc.setAttribute("y1", 352); suc.setAttribute("y2", stemTop); }
+
+  /* 种子：仅极早期(归零/刚种下) */
+  soft(S("soil"), 1);
+  const seed = S("seed");
+  soft(seed, p < 0.03 ? 1 : 0);
+
+  /* 芽：0.03~0.30 */
+  const spr = S("sprout");
+  if (spr) { spr.style.opacity = (p >= 0.03 && p <= 0.30) ? 1 : 0; }
+
+  /* 叶片：0.25 起逐个展开 */
+  const leafMap = [
+    ["leafL", 0.25], ["leafR", 0.33], ["leafB", 0.45]
+  ];
+  leafMap.forEach(([id, at]) => {
+    const l = S(id);
+    if (l) { l.style.opacity = p >= at ? 1 : 0; l.style.transform = `scaleY(${Math.min(1, (p - at) / 0.2)})`; }
+  });
+
+  /* 花苞：0.55~0.75 */
+  const bud = S("bud");
+  if (bud) { bud.style.opacity = (p >= 0.55 && p < 0.75) ? 1 : 0; }
+
+  /* 花：0.75 起 */
+  const fl = S("flower");
+  if (fl) { fl.style.opacity = p >= 0.75 ? 1 : 0; fl.style.transform = `scale(${0.4 + Math.min(0.6, (p - 0.75) / 0.06)})`; }
+
+  /* 主番茄：0.78 起长大变大；
+     颜色：p<0.92 青果 #4fa49d，p>=0.92 转红 */
+  const fr = S("fruit");
+  if (fr) {
+    const show = p >= 0.78;
+    const r = show ? 8 + (p - 0.78) * 30 : 10; // 8→~14.6→上限17
+    fr.setAttribute("r", Math.min(r, 17));
+    const col = p >= 0.92 ? "#c94f3d" : "#4fa49d";
+    fr.setAttribute("fill", col);
+  }
+  const fstalk = S("fruit-stalk");
+  if (fstalk) fstalk.setAttribute("opacity", p >= 0.78 ? 1 : 0);
+  const fl1 = S("fruit-l");
+  if (fl1) fl1.setAttribute("opacity", p >= 0.92 ? 1 : 0);
+
+  /* 小番茄（75% 起，演示持久化语义） */
+  const sf = [["sf1", 0.78, 230], ["sf2", 0.82, 196]];
+  sf.forEach(([id, at, y]) => {
+    const e = S(id);
+    if (e) {
+      const show = p >= at;
+      e.setAttribute("opacity", show ? Math.min(1, (p - at) * 6) : 0);
+      e.setAttribute("cy", y);
+    }
+  });
+}
+
+/* ——— 控制台 ——— */
+const slider = document.getElementById("slider");
+const pval = document.getElementById("pval");
+const verdict = document.getElementById("verdict");
+const pill = document.getElementById("pill");
+let p = 0, playing = false, rafId = null;
+
+const PHASES = [
+  [0.00, "种下"], [0.03, "发芽"], [0.30, "幼苗/茎叶"],
+  [0.55, "花苞"], [0.75, "开花·小番茄"], [0.92, "番茄转红"], [1.00, "成熟"]
+];
+function renderPhaseStrip(pp) {
+  const el = document.getElementById("phase-strip");
+  el.innerHTML = PHASES.map(([th, name]) => {
+    const on = pp >= th;
+    return `<span class="chip ${on ? "on" : ""}">${name}</span>`;
+  }).join("");
+}
+
+/* 收成判定（停止时） */
+function renderVerdict(pp) {
+  let html;
+  if (pp < 0.25) {
+    html = `停止(<b class="v-wither">${Math.round(pp*100)}% &lt; 25%</b>) → <span class="v-wither">种子枯萎，不记账</span>`;
+  } else if (pp < 1) {
+    html = `停止(<b class="v-green">${Math.round(pp*100)}%</b>) → <span class="v-green">青未熟番茄，记黄番茄</span>`;
+  } else {
+    html = `完成(<b class="v-red">100%</b>) → <span class="v-red">红番茄成熟，记红番茄</span>`;
+  }
+  verdict.innerHTML = html;
+  document.getElementById("pill-verdict").textContent = pp >= 1 ? "收获红番茄" : (pp < 0.25 ? "枯萎" : "青果");
+  document.getElementById("pill-note").textContent =
+    pp > 0 && pp < 1 ? "专注中 · 暂停即停" : (pp >= 1 ? "专注完成 · 番茄+1" : "未开始");
+}
+
+function setP(next, fromSlider) {
+  p = Math.max(0, Math.min(1, next));
+  applyStage(main, p);
+  applyStage(document.getElementById("pill-svg"), p);
+  slider.value = Math.round(p * 100);
+  pval.textContent = Math.round(p * 100);
+  const r = (p * 100).toFixed(1);
+  document.documentElement.style.setProperty("--p", (p * 100) / 100);
+  slider.style.setProperty("--p", p);
+  /* pill 进度条 */
+  document.querySelector(".pill-bar i").style.width = (p * 100) + "%";
+  renderPhaseStrip(p);
+  renderVerdict(p);
+  /* pill 显隐：开始播放后常驻，重置隐藏 */
+}
+function startPlay() {
+  if (playing) return;
+  playing = true;
+  pill.classList.remove("hidden");
+  const t0 = performance.now(), p0 = p;
+  const step = (now) => {
+    if (!playing) return;
+    const wall = (now - t0) / 1000; // 播放速率快进演示（normal 时按计时器驱动）
+    const np = Math.min(1, p0 + wall / DEMO_FOCUS_SECONDS); // DEMO_FOCUS_SECONDS 走完一次专注（演示快进）
+    setP(np);
+    if (np >= 1) { playing = false; return; }
+    rafId = requestAnimationFrame(step);
+  };
+  rafId = requestAnimationFrame(step);
+}
+function pausePlay() { playing = false; cancelAnimationFrame(rafId); /* 定格，模拟暂停冻结 */ }
+function resetPlay() { playing = false; cancelAnimationFrame(rafId); setP(0); pill.classList.add("hidden"); }
+
+document.getElementById("play").onclick = startPlay;
+document.getElementById("pause").onclick = pausePlay;
+document.getElementById("reset").onclick = resetPlay;
+slider.addEventListener("input", (e) => { pausePlay(); setP(e.target.value / 100, true); });
+
+/* 初始化 */
+setP(0);
+</script>
+</body>
+</html>

@@ -5,6 +5,9 @@
  */
 var timeScale = 60 * 1000;
 
+// 时间换算单一源：1 专注分钟对应的毫秒数（realDuration 以毫秒存储，换算成分钟统一用此常量）
+var MS_PER_MINUTE = 60 * 1000;
+
 // localStorage 存储适配器（等价 utools.dbStorage）
 var store = {
   getItem(key) {

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>番茄的一生 · 专注计时生长叙事</title>
+<!--
+  番茄钟"一生"生长动画(纯 SVG,自包含单 HTML)
+  - 五层 g: 背景 / 花盆底座 / 主干 / 侧枝叶 / 花果
+  - 生物逻辑: 节间分段主干; 互生羽状复叶仅附着侧枝(45-60°); 叶腋抽生总状花序; 子房原位膨大
+  - 物理逻辑: 果增大→侧枝贝塞尔控制点下移(重力); 坠果竖直抛物线+衰减弹跳; 终局全冻结
+  - 分离原则: 花盆/土壤静态; 植物高度/透明/颜色由 CSS 变量 + JS 驱动
+  - 交互: 中央圆"专注"按钮显示进度%, 点击开始/暂停/继续; ~60s 匀速走完
+  - 终局: 100% 后 1.5s 转红催熟 + 金光, 后 ~2s 坠果, 落地 2 次弹跳静止后整幅冻结 + "✓ 收获时刻"
+-->
+<style>
+:root{
+  --paper0:#fbf4e6; --paper1:#f1e3c6;
+  --wood:#d8bd8b; --woodD:#c6a06a;
+  --pot:#c1704a; --potD:#a3552d; --potL:#d08a63;
+  --soil:#4a3521; --soilL:#6b4c2f; --soilHi:rgba(255,244,214,.35);
+  --leaf:#57a04c; --leafD:#2f6b2a; --leafL:#8cca74;
+  --stem:#3f7d3a; --stemD:#2c5c29;
+  --flow:#f2c14e; --flowD:#c98f2b; --flowCore:#fff3c4;
+  --gry:#7fb069; --gryStripe:#f0e9d0;
+  --red:#d9432e; --redD:#a42e1e; --redHL:#ffe9d8;
+  --ink:#3a2f24;
+  font-family:"JetBrains Mono",Consolas,"Microsoft YaHei",monospace;
+  --p:0; --stemH:0; --bloom:0; --petal:0; --fruit:0; --ripe:0; --leafH:0;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none;}
+html,body{width:100%;height:100%;overflow:hidden;}
+body{background:var(--paper0);display:flex;align-items:center;justify-content:center;min-height:100%;}
+.stage{position:relative;box-shadow:0 24px 60px rgba(90,60,30,.32);border-radius:16px;}
+svg{display:block;border-radius:14px;width:min(92vw,84vh);aspect-ratio:600/800;background:var(--paper0);}
+
+/* 呼吸摆动:绕叶自身基点 0.5Hz ±2.5°(CSS 动画,子元素不与 JS transform 冲突) */
+@keyframes sway{0%,100%{transform:rotate(-2deg);}50%{transform:rotate(2.5deg);}}
+.breath{animation:sway 2s ease-in-out infinite;}
+
+/* 主干 */
+.stem{stroke:var(--stem);stroke-width:5;stroke-linecap:round;fill:none;}
+.stem.d{stroke:var(--stemD);stroke-width:6.4;}
+.knot{stroke:var(--stemD);stroke-width:6;stroke-linecap:round;}
+/* 侧枝 */
+.branch{stroke:var(--stem);stroke-width:2.6;stroke-linecap:round;fill:none;}
+/* 叶 */
+.leaf{stroke:none;}
+.leaf.l{fill:var(--leafL);}
+.leaf.m{fill:var(--leaf);}
+.leaf.vein{fill:none;stroke:rgba(30,80,25,.25);stroke-width:.9;stroke-linecap:round;}
+/* 花序 */
+.ped{stroke:var(--stem);stroke-width:2;fill:none;stroke-linecap:round;}
+.petal{fill:var(--flow);stroke:var(--flowD);stroke-width:.9;}
+.petal.core{fill:var(--flowCore);}
+/* 果 */
+.ms{stroke:var(--gryStripe);stroke-width:.7;fill:none;opacity:.55;stroke-linecap:round;}
+
+/* 终局 & 控件 */
+.final{position:absolute;opacity:0;transition:opacity 1.2s;font-size:15px;letter-spacing:2px;color:var(--ink);right:22px;bottom:16px;z-index:6;}
+body.finished .final{opacity:1;}
+.ctrl{
+  position:absolute;z-index:9;width:88px;height:88px;border-radius:50%;
+  border:2px solid rgba(58,47,36,.26);background:rgba(251,244,230,.92);
+  color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  box-shadow:0 8px 22px rgba(90,60,30,.3);font-family:inherit;transition:opacity .3s,transform .1s;
+}
+.ctrl .c1{font-size:14px;font-weight:700;}
+.ctrl .c2{font-size:10px;opacity:.8;}
+.ctrl:hover{background:var(--paper1);}
+.ctrl:active{transform:scale(.96);}
+.ctrl:disabled{cursor:not-allowed;opacity:.55;}
+</style>
+</head>
+<body>
+<div class="stage">
+<svg viewBox="0 0 600 800">
+  <defs>
+    <linearGradient id="gPot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#cc7b52"/><stop offset="1" stop-color="#9f522c"/></linearGradient>
+    <linearGradient id="gSa" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c08058"/><stop offset="1" stop-color="#92502a"/></linearGradient>
+    <linearGradient id="gSoil" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6b4c2f"/><stop offset="1" stop-color="#3a2a17"/></linearGradient>
+    <radialGradient id="gGlow" cx="50%" cy="30%" r="60%"><stop offset="0" stop-color="#fff8e0" stop-opacity=".8"/><stop offset="1" stop-color="#fff8e0" stop-opacity="0"/></radialGradient>
+  </defs>
+
+  <!-- 层1 背景 -->
+  <rect width="600" height="800" fill="url(#gGlow)"/>
+  <path d="M0 620 L600 620 L600 800 L0 800 Z" fill="var(--wood)"/>
+  <line x1="0" y1="620" x2="600" y2="620" stroke="var(--woodD)" stroke-width="6"/>
+  <line x1="0" y1="654" x2="600" y2="654" stroke="var(--woodD)" stroke-width="2" opacity=".5"/>
+  <line x1="0" y1="694" x2="600" y2="694" stroke="var(--woodD)" stroke-width="2" opacity=".5"/>
+  <line x1="0" y1="734" x2="600" y2="734" stroke="var(--woodD)" stroke-width="2" opacity=".5"/>
+  <ellipse cx="300" cy="700" rx="205" ry="40" fill="rgba(60,40,20,.2)"/>
+
+  <!-- 层2 花盆底座(静态) -->
+  <g id="potLayer">
+    <ellipse cx="300" cy="676" rx="142" ry="26" fill="url(#gSa)"/>
+    <ellipse cx="300" cy="676" rx="122" ry="20" fill="var(--potL)"/>
+    <path d="M206 478 L242 672 Q300 706 358 672 L394 478 Z" fill="url(#gPot)"/>
+    <path d="M214 520 Q300 540 386 520" fill="none" stroke="#8a4a27" stroke-width="2" opacity=".5"/>
+    <path d="M226 600 Q300 616 374 600" fill="none" stroke="#8a4a27" stroke-width="2" opacity=".45"/>
+    <ellipse cx="300" cy="478" rx="104" ry="22" fill="#c5714a"/>
+    <ellipse cx="300" cy="474" rx="96" ry="18" fill="url(#gSoil)"/>
+    <path d="M244 480 q16 -6 34 0 M308 486 q18 -5 38 0" stroke="var(--soilHi)" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- 层3 主干 -->
+  <g id="stemLayer">
+    <line id="stemSeg" class="stem" x1="290" y1="494" x2="310" y2="494"/>
+    <line id="knots" class="knot" x1="288" y1="494" x2="312" y2="494"/>
+  </g>
+
+  <!-- 层4 侧枝叶(JS 构建) -->
+  <g id="branchLayer"></g>
+
+  <!-- 层5 花果 -->
+  <g id="fruitLayer"></g>
+</svg>
+
+<div class="final" id="finalMsg">✓ 收获时刻</div>
+<button class="ctrl" id="ctrlBtn"><span class="c1" id="cMain">0%</span><span class="c2" id="cSub">开始专注</span></button>
+</div>
+
+<script>
+"use strict";
+/* ================== 常量(可配集中) ================== */
+const CFG={
+  duration:60,       // 一次专注总秒数(到 100%)
+  ripems:1400,       // 100% 后催熟转红时长
+  fallms:1800,       // 转红结束后坠果时长
+  bounce:2,          // 落地弹跳次数
+};
+/* 主干节点: 自土面向上, 侧枝朝向(-左/+右), 每侧叶数, 全局进度起点 */
+const NODES=[
+  {grow:0.24, dir:-1, n:3},
+  {grow:0.33, dir: 1, n:3},
+  {grow:0.42, dir:-1, n:4},
+  {grow:0.51, dir: 1, n:4},
+  {grow:0.60, dir:-1, n:4},
+  {grow:0.70, dir: 1, n:5},   // 顶叶, 其叶腋抽生花序
+];
+const BOTTOM=492, TOP=170;         // 主干底部(土面)/ 最大顶端
+const stemHFull=BOTTOM-TOP;         // 主干满高
+const FRUIT_LIFT=88;                // 花果层挂在主干顶下多少
+const SOIL_Y=478;                   // 果实落地高度(土壤面)
+
+/* ================== 工具 ================== */
+const NS="http://www.w3.org/2000/svg";
+const S=document.querySelector("svg");
+const root=document.documentElement;
+const setv=(n,v)=>root.style.setProperty(n,v);
+const clamp01=v=>v<0?0:v>1?1:v;
+const seg=(p,a,b)=>clamp01((p-a)/(b-a));
+const el=(n,a,p)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e;};
+const easeInQuad=t=>t*t;
+const stemSeg=document.getElementById("stemSeg");
+const knots=document.getElementById("knots");
+
+/* ================== 构建: 侧枝 + 羽状复叶 ================== */
+const branches=[];
+NODES.forEach((n,i)=>{
+  const w=el("g",{id:`bw${i}`,class:"bw"});
+  const br=el("path",{id:`br${i}`,class:"branch",d:`M0 0 L0 0`});
+  const leafHost=el("g",{id:`leaf${i}`});
+  for(let k=0;k<n.n;k++){
+    const L=el("g",{class:"breath",id:`lf${i}_${k}`});
+    el("path",{class:"leaf m",d:``},L);
+    el("path",{class:"leaf vein",d:``},L);
+    el("path",{class:"leaf l",d:``},L);
+    leafHost.appendChild(L);
+  }
+  w.appendChild(br); w.appendChild(leafHost);
+  branches.push({w,br,leafHost,grow:n.grow,dir:n.dir,n:n.n});
+});
+
+/* 叶形(锯齿羽状) */
+function leafPath(sx,sy,ang,len,wd){
+  const a=ang*Math.PI/180,c=Math.cos(a);
+  const ex=sx+c*len, ey=sy+Math.sin(a)*len;
+  const cx=sx+c*len*0.55, cy=sy+Math.sin(a)*len*0.55;
+  // 半椭圆 + 锯齿
+  return `M${sx} ${sy} Q${cx} ${cy-wd*0.6} ${ex} ${ey} Q${cx+wd*0.4} ${cy+wd*0.33} ${cx+wd*0.15} ${cy+wd*0.05} Q${cx+wd*0.55} ${cy+wd*0.1} ${sx} ${sy} Z`;
+}
+function layoutLeaf(i){
+  const b=branches[i];
+  const leaves=b.leafHost, ns=b.n;
+  for(let k=0;k<ns;k++){
+    const L=leaves.children[k];
+    const px=5+k*21, py=(k%2?8:-8);      // 两侧交错 → 羽状
+    const tilt=(k%2?14:-14)+ (ns%2?4:-4);
+    const lp=leafPath(px,py,tilt*0.7,24,8);
+    L.children[0].setAttribute("d",lp);
+    const a2=tilt*0.7*Math.PI/180;
+    L.children[1].setAttribute("d",`M${px+Math.cos(a2)*5} ${py+Math.sin(a2)*5} L${px+Math.cos(a2)*19} ${py+Math.sin(a2)*19}`);
+    L.children[2].setAttribute("d",leafPath(px,py,tilt*0.7,19,5));
+    L.children[2].style.opacity=0.5;
+    L.setAttribute("transform",`translate(${px} ${py})`);
+  }
+}
+NODES.forEach((n,i)=>layoutLeaf(i));
+
+/* ================== 构建: 花序(叶腋) ================== */
+const flowerG=el("g",{id:"flowerG"});
+const pedF=el("path",{class:"ped",d:`M0 0`});
+flowerG.appendChild(pedF);
+for(let i=0;i<5;i++){
+  const a=i*72*Math.PI/180,px=Math.cos(a)*8,py=Math.sin(a)*8;
+  el("path",{class:"petal",d:`M0 0 L${px*1.8} ${py*1.8} L${px*0.25} ${py*0.25} Z`},flowerG);
+}
+el("circle",{class:"petal core",cx:"0",cy:"0",r:"3"},flowerG);
+
+/* ================== 构建: 果实 ================== */
+const fg=el("g",{id:"fruitG"});
+const fStem=el("path",{class:"ped",d:`M0 0`});
+const fCal=el("path",{class:"ped",d:`M0 0`});
+const fBody=el("ellipse",{cx:"0",cy:"0",rx:"3",ry:"3"});
+const fRip=el("ellipse",{cx:"0",cy:"0",rx:"0",ry:"0"});
+const glint=el("ellipse",{cx:"-3",cy:"-3.4",rx:"2",ry:"1.4"});
+for(let i=0;i<5;i++) el("path",{class:"ms",id:`ms${i}`,d:`M0 0`},fg);
+const glow=el("circle",{r:"60",fill:"#ffe9b0",opacity:"0"});
+fg.appendChild(fStem);fg.appendChild(fCal);fg.appendChild(fBody);fg.appendChild(fRip);fg.appendChild(glint);fg.appendChild(glow);
+
+/* ================== 主循环 & 状态 ================== */
+let p=0, playing=false, ended=false, last=0, rafId=0;
+let phase="grow"; // grow→ripe→fall→done
+let ripeT0=0, fallT0=0;
+const cMain=document.getElementById("cMain");
+const cSub=document.getElementById("cSub");
+const ctrlBtn=document.getElementById("ctrlBtn");
+
+/* —— 主推进循环: 在 grow 阶段推进进度, 之后进入终局时间线 —— */
+function tick(now){
+  if(!playing && phase==="grow"){ rafId=requestAnimationFrame(tick); return; }
+  if(phase==="grow"){
+    if(!last)last=now;
+    const dt=(now-last)/1000; last=now;
+    let np=p + dt/CFG.duration;
+    if(np>=1){ np=1; } 
+    p=np;
+    draw(p);
+    cMain.textContent=Math.round(p*100)+"%";
+    if(p>=1 && playing){
+      playing=false;
+      phase="ripe"; ripeT0=now;
+    }
+  }
+  if(phase==="ripe"){
+    const k=clamp01((now-ripeT0)/CFG.ripems);
+    drawRipe(k);
+    if(k>=1){ phase="fall"; fallT0=now; }
+  }
+  if(phase==="fall"){
+    const k=clamp01((now-fallT0)/CFG.fallms);
+    drawFall(k);
+    if(k>=1){ finish(); return; }
+  }
+  rafId=requestAnimationFrame(tick);
+}
+
+/* —— 按钮 —— */
+function toggle(){
+  if(ended) return;
+  if(phase==="grow"){
+    if(playing){ playing=false; last=0; cSub.textContent="已暂停"; }
+    else{ playing=true; cSub.textContent="专注中"; last=0; }
+  } else {
+    // 不可逆终局,忽略
+  }
+}
+ctrlBtn.addEventListener("click",toggle);
+window.addEventListener("keydown",e=>{ if(e.key===" "){e.preventDefault();toggle();} });
+
+/* ================== 绘图 ================== */
+function draw(np){
+  setv("--p",np);
+  // 主干
+  const sh=seg(np,0.18,0.95);
+  const topY=BOTTOM-stemHFull*clamp01(sh);
+  stemSeg.setAttribute("y2",String(topY+6));
+  knots.setAttribute("y1",String(topY+2));
+  knots.setAttribute("y2",String(topY+10));
+  setv("--stemH",sh);
+
+  // 节点: 从底部逐节出现, 侧枝向 di 方向 45-60°, 叶沿侧枝布置
+  for(let i=0;i<NODES.length;i++){
+    const b=branches[i],n=NODES[i];
+    const grow=seg(np,n.grow,n.grow+0.08);
+    if(grow<=0.001){ b.w.style.opacity=0; continue; }
+    b.w.style.opacity=Math.min(1,grow*1.2);
+    // 节点沿主干自顶向下分布
+    const nodeY= topY + (i+0.5)*( (BOTTOM-topY)/(NODES.length) );
+    b.w.setAttribute("transform",`translate(300 ${nodeY})`);
+    // 侧枝: 朝 dir (45-60°), 长度随 grow 展开; 贝塞尔控制点上抬拟自然斜上
+    const len= 34 + 30*grow;
+    const baseAng = n.dir*(46+10*Math.sin(i));
+    const rad=baseAng*Math.PI/180;
+    const ex=Math.cos(rad)*len*(n.dir>0?1:-1);
+    const bx=Math.cos(rad)*len*0.5*(n.dir>0?1:-1);
+    b.br.setAttribute("d",`M0 0 Q${bx} -6 ${ex} ${-Math.sin(rad)*len*0.9}`);
+    // 叶沿侧枝末段放置
+    const tX=ex*0.7, tY=-Math.sin(rad)*len*0.62;
+    b.leafHost.setAttribute("transform",`translate(${tX} ${tY}) rotate(${-baseAng})`);
+  }
+  const bud=seg(np,0.66,0.70);
+  const bloom=seg(np,0.72,0.80);
+  const petal=seg(np,0.82,0.87);
+  setv("--bud",bud); setv("--bloom",bloom); setv("--petal",petal);
+  // 果实: 子房膨大 + 青果
+  const fruit=seg(np,0.86,0.99);
+  setv("--fruit",fruit);
+  const ripe= np>=1 ? 1:0; setv("--ripe",ripe);
+
+  // 花果层置于主干顶下(顶叶腋位置)
+  const fx=300, fy= topY+FRUIT_LIFT;
+  flowerG.setAttribute("transform",`translate(${fx} ${fy})`);
+  pedF.setAttribute("d",`M0 6 L0 ${-20-bud*30}`);
+  // 花瓣: 绽放后随 petal 凋落
+  flowerG.querySelectorAll(".petal").forEach(pth=>{
+    pth.style.opacity = petal ? (1-petal) : (bloom ? 1 : 0);
+  });
+
+  // 子房 → 果(果随 fruit 膨大, 青→红)
+  const rad= Math.max(1.2, 1.2+fruit*12);
+  radEnd= rad;                                // 同步坠果起始尺寸
+  const isRipe= ripe>=0.5;
+  fBody.setAttribute("rx",rad); fBody.setAttribute("ry",rad*1.05);
+  fBody.setAttribute("fill", isRipe? "var(--red)":"var(--gry)");
+  fRip.setAttribute("rx",rad*0.99); fRip.setAttribute("ry",rad*1.04);
+  fRip.setAttribute("fill", isRipe? "var(--redD)":"none");
+  glint.setAttribute("rx",rad*0.3); glint.setAttribute("ry",rad*0.2);
+  glint.setAttribute("fill", isRipe? "#fff":"rgba(255,255,255,.5)");
+  // 青果放射纹(未熟): 沿果面等分布置短线, 成熟转红后淡隐
+  for(let i=0;i<5;i++){
+    const a=i*72*Math.PI/180, s=Math.sin(a), c=Math.cos(a);
+    const q=`ms${i}`, m=fruitG.querySelector("#"+q);
+    if(m){
+      m.setAttribute("d",`M${c*rad*0.8} ${s*rad*0.8} L${c*rad*1.02} ${s*rad*1.02}`);
+      m.setAttribute("opacity", isRipe? "0":"0.5");
+    }
+  }
+  // 果挂于顶叶旁
+  fg.setAttribute("transform",`translate(${fx+6} ${fy+rad*1.4})`);
+  fStem.setAttribute("d",`M0 0 L0 ${-rad*1.6-4} L-4 ${-rad*1.6} L8 ${-rad*1.6} Z`);
+  fCal.setAttribute("d",`M-7 ${-rad*1.6} L-4 ${-rad*2.1} L0 ${-rad*1.7} L4 ${-rad*2.1} L7 ${-rad*1.6} Z`);
+}
+
+/* —— 催熟: 转红 + 金光 —— */
+function drawRipe(k){
+  setv("--ripe",k);
+  cMain.textContent="100%";
+  glow.setAttribute("opacity",String(k*0.9));
+  glow.setAttribute("transform",`translate(${306} ${258})`);
+}
+
+/* —— 坠果: 抛物线 + 触地衰减弹跳(压扁/恢复) —— */
+function drawFall(k){
+  const startX=306, startY=258;               // 果坠落起点(顶叶下)
+  const targetY=SOIL_Y-14;                     // 落点(土壤面)
+  const kk=clamp01(k);
+  // 竖直抛物下落主管路 + 轻微横移
+  const dx= (startX-145-startX)*kk;            // 略向左偏(坠落侧)
+  let y= startY + (targetY-startY)*easeInQuad(kk);
+  let sy=1, sx=1;
+  // 触地后两次衰减弹跳: 高度用 sin 衰减模拟
+  if(kk>0.7){
+    const b=(kk-0.7)/0.3;
+    const bounce= 0.30*(1-b);                 // 弹跳幅度衰减
+    y = targetY - Math.abs(Math.sin(b*Math.PI*2))* (startY-targetY)*bounce;
+    // 触地瞬间压扁(扁椭圆), 离地恢复圆
+    const squash= kk>0.9 ? 1 : 0.7;
+    sy = 2-squash;                            // 竖直压扁 → ry 加大(视觉扁)
+    sx = squash;
+  }
+  fg.setAttribute("transform",`translate(${startX+dx} ${y})`);
+  fBody.setAttribute("ry",String(radEnd*sy));
+  fBody.setAttribute("rx",String(radEnd*sx));
+}
+let radEnd=13;               // 坠果用的成熟果半径(由 draw 写入,与果一致)
+
+/* —— 终局冻结 —— */
+function finish(){
+  ended=true;
+  cancelAnimationFrame(rafId);
+  // 冻结所有 CSS 动画
+  document.querySelectorAll('.breath').forEach(e=>e.style.animationPlayState='paused');
+  document.body.classList.add('finished');
+  ctrlBtn.disabled=true;
+  cSub.textContent="番茄已收获";
+  // 停掉变体
+  setv("--ripe",1);
+  glint.setAttribute("opacity","1");
+}
+
+/* —— 启动 —— */
+draw(0);
+rafId=requestAnimationFrame(tick);
+</script>
+</body>
+</html>
