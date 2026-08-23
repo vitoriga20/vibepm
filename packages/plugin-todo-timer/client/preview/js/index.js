@@ -39,10 +39,36 @@ function clockStop() {
   waittingClock();
 }
 
+// 在桌面打开独立胶囊窗口（capsule.html 弹窗常驻；同源共用 localStorage → 时钟/任务/设置实时同步）
+function openDesktopCapsule() {
+  const win = window.open(
+    "capsule.html",
+    "vibepmDesktopCapsule",
+    "popup=yes,width=360,height=96,menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=yes"
+  );
+  if (!win && typeof showToast === "function") {
+    showToast("弹窗被拦截：请允许本站打开弹窗后重试");
+  }
+}
+
+// 双页记账互斥锁：桌面胶囊页与本页各自跑时钟，同一段专注/休息结束时仅先落账方记账。
+// 锁走 localStorage（todo-tomato:workEndLock），无监听器 → 不引发 storage 同步乒乓。
+function tryLockWorkEnd(progress) {
+  try {
+    const now = Date.now();
+    const lock = store.getItem("workEndLock");
+    if (lock && now - lock.ts < 5000 && Math.abs(lock.progress - progress) < 0.01) return false;
+    store.setItem("workEndLock", { ts: now, progress });
+    return true;
+  } catch (e) {
+    return true;
+  }
+}
+
 async function onWorkEnd(duration, progress) {
   // 时长持久化：只要专注过（progress>0）就落账——修复「专注一段时间但不足 30% 全部丢失」
   // 番茄个数的 ≥0.3 有效门槛保留在 addTomatoToTask 内（时长与个数口径分离）
-  if (progress > 0) {
+  if (progress > 0 && tryLockWorkEnd(progress)) {
     // 任务-专注耦合：番茄只累计到「开始专注时锁定的绑定任务」（boundTaskId），其它任务不受影响
     const boundTaskId = floatingWindow.clock.config.boundTaskId;
     const result = todoManger_.addTomatoToTask(boundTaskId, duration, progress);
@@ -100,6 +126,7 @@ function jumpToTask(taskId) {
 }
 
 async function onBreakEnd(duration, type, progress) {
+  if (!tryLockWorkEnd(progress)) return; // 双页防重：休息结束同样只记一次
   todoManger_.recordStatistics(duration, type, progress);
   if (settings.config.showSuccessPopup) {
     showToast("休息结束");

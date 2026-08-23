@@ -46,6 +46,19 @@
       0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--kv-orange-color) 40%, transparent); }
       50% { box-shadow: 0 0 0 6px transparent; }
     }
+    /* 胶囊设置：桌面胶囊窗口入口按钮 */
+    .desktopCapsuleBtn {
+      margin-left: auto;
+      padding: 4px 14px;
+      border-radius: 14px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--on-accent);
+      background: var(--kv-orange-color);
+      border: none;
+      transition: opacity .15s;
+    }
+    .desktopCapsuleBtn:hover { opacity: .85; }
   </style>
 </head>
 
@@ -332,6 +345,11 @@
             <div class="switchBox">
               <div id="showFloatingWindow" class="switch"></div>
               <div class="settingLabel">屏幕胶囊</div>
+            </div>
+
+            <div class="liner">
+              <div class="settingLabel">桌面胶囊窗口</div>
+              <div class="desktopCapsuleBtn" id="desktopCapsuleBtn" onclick="openDesktopCapsule()">在桌面打开</div>
             </div>
 
             <div class="liner">

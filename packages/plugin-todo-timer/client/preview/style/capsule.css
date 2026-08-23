@@ -1,0 +1,523 @@
+/* 桌面胶囊页（capsule.html）：独立小窗常驻，参照 ztools pomodoro 悬浮胶囊的条状设计。
+   番茄↔鱼水状态动画 + 计时控制按钮 + 当前任务完成，全部在胶囊内直接操作；
+   与主页面通过 localStorage（todo-tomato:*）+ storage 事件双向同步。 */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* 浅绿主题底色：胶囊条同源渐变的最浅端，让「条+状态栏」融合成一张软卡片 */
+  background: linear-gradient(-97deg, hsl(112, 60%, 94%) 0%, hsl(71, 50%, 96%) 100%);
+}
+
+* {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+#main {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+#main:hover {
+  opacity: 1 !important;
+}
+
+/* ————————————————— 胶囊条 ————————————————— */
+.mainBar {
+  width: 100%;
+  height: 48px;
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(-97deg, hsl(112, 60%, 91%) 0%, hsl(71, 50%, 94%) 100%);
+  border-radius: 30px;
+  box-sizing: border-box;
+  z-index: 10;
+  cursor: default;
+}
+
+.mainBar.break {
+  background: linear-gradient(-97deg, rgb(227, 251, 244) 0%, rgb(234, 247, 255) 100%);
+}
+
+/* 深色模式：条与底改为暗色系，文字反白 */
+body.dark {
+  background: linear-gradient(-97deg, #232d25 0%, #2b2c22 100%);
+}
+body.dark .mainBar {
+  background: linear-gradient(-97deg, hsl(112, 20%, 24%) 0%, hsl(71, 16%, 26%) 100%);
+}
+body.dark .mainBar.break {
+  background: linear-gradient(-97deg, hsl(168, 26%, 24%) 0%, hsl(199, 24%, 26%) 100%);
+}
+
+/* ————————————————— 状态动画区（番茄 ↔ 鱼水） ————————————————— */
+.aniBox {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  overflow: hidden;
+  margin-right: 6px;
+  cursor: none;
+}
+
+.tomatoBox {
+  position: relative;
+  height: 100%;
+  width: 48px;
+  display: none;
+}
+
+.tomatoBox svg.tomato {
+  width: 60px;
+  height: 60px;
+  z-index: 2;
+  position: absolute;
+  top: -1px;
+  left: calc(50% - 30px);
+  transform-origin: 50% -5%;
+}
+
+.tomatoSwing {
+  animation: fadeIn_T 1s forwards cubic-bezier(0.91, -0.4, 0.64, 1.29), swing 2s 1s infinite ease-in-out;
+}
+
+.tomatoFalling {
+  animation: tomatoFalling 1s forwards cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+.stems {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  z-index: 1;
+  height: 48px;
+  animation: fadeIn_L2 0.8s forwards cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+.blurLeaf {
+  position: absolute;
+  bottom: 16px;
+  left: -3px;
+  z-index: 5;
+  width: 42px;
+  transform-origin: 0% 50%;
+  transform: rotate(45deg);
+  animation: fadeIn_L_blur 1s forwards cubic-bezier(0.68, -0.55, 0.27, 1.55), swing4 4s 1s infinite ease-in-out;
+  pointer-events: none;
+}
+
+.Leaf {
+  position: absolute;
+  bottom: 4px;
+  right: -6px;
+  z-index: 1;
+  width: 22px;
+  transform-origin: 100% 0%;
+  animation: fadeIn_R 1s forwards cubic-bezier(0.68, -0.55, 0.27, 1.55), swing3 6s 1s infinite ease-in-out;
+}
+
+/* 休息动画：气泡 + 鱼 + 海草 */
+#breakIcon {
+  position: relative;
+  height: 100%;
+  width: 48px;
+  display: none;
+}
+
+#breakIcon .pop {
+  position: absolute;
+  top: 20px;
+  right: 2px;
+  z-index: 2;
+  width: 4px;
+  animation: pop 4s ease-out infinite;
+}
+#breakIcon .pop.first { animation-delay: 0s; }
+#breakIcon .pop.second { animation-delay: 2s; }
+
+#breakIcon .fish {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  z-index: 1;
+  width: 43px;
+  animation: fadeIn_L 1.1s forwards ease-out, swimming 9s 1.1s infinite ease-in-out;
+  transform-origin: 80% 50%;
+}
+
+#breakIcon .seaweed {
+  position: absolute;
+  transform-origin: 50% 90%;
+  animation: fadeIn_L 0.8s forwards cubic-bezier(0.68, -0.55, 0.27, 1.55), swing2 12s 0.8s infinite ease-in-out;
+  z-index: 0;
+}
+#breakIcon .seaweed.first { top: -5px; left: 0; height: 68px; z-index: 5; }
+#breakIcon .seaweed.second { top: 10px; left: 15px; height: 56px; animation: fadeIn_B 1s forwards cubic-bezier(0.68, -0.55, 0.27, 1.55), swing2 11s 1s infinite ease-in-out; }
+
+/* ————————————————— 计时与控制 ————————————————— */
+.timerBox {
+  position: relative;
+  width: max-content;
+  height: min-content;
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+#timerNum {
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 22px;
+  font-weight: 300;
+  color: #0000006c;
+  z-index: 100;
+  width: 58px;
+  margin-right: 4px;
+  display: none;
+}
+
+body.dark #timerNum { color: #ffffffa0; }
+
+.controlBox {
+  position: relative;
+  align-items: center;
+  display: flex;
+  width: min-content;
+}
+
+.button {
+  width: 0px;
+  height: 28px;
+  background-color: rgba(212, 234, 168, 0.9);
+  border-radius: 8px;
+  box-sizing: border-box;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.button:hover { background-color: rgb(169, 215, 106); }
+
+.break .button { background-color: rgba(132, 213, 228, 0.9); }
+.break .button:hover { background-color: rgb(101, 186, 223); }
+
+.timerBox:hover .button { width: 28px; }
+.timerBox:hover .controlBox { width: max-content; }
+
+#beginBtn {
+  width: 80px;
+  height: 32px;
+  display: flex;
+  color: #16452c9d;
+  font-size: 14px;
+  font-weight: 500;
+  margin-right: 12px;
+}
+
+body.dark #beginBtn { color: #cfe9d9; }
+
+#stopBtn { margin-left: 4px; }
+
+/* ————————————————— 当前任务卡 ————————————————— */
+.todoBox {
+  position: relative;
+  min-width: max-content;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0;
+  padding-left: 10px;
+  padding-bottom: 1px;
+  border-radius: 20px;
+  margin-right: 6px;
+  flex: 1 1 auto;
+}
+
+.todoBox:hover { background-color: #ffffff66; }
+body.dark .todoBox:hover { background-color: #ffffff14; }
+
+.pin { width: 14px; margin-bottom: 2px; flex-basis: 0; }
+
+.tag {
+  border-radius: 8px;
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  opacity: 0.5;
+  color: rgb(118, 139, 118);
+  max-width: min-content;
+  flex: 1 1 30px;
+  font-size: 11px;
+}
+
+.todoBox .text {
+  margin-right: auto;
+  padding-right: 8px;
+  font-weight: 300;
+  font-size: 14px;
+  color: #5e5e5e;
+  flex: 3 0 auto;
+  width: min-content;
+  max-width: max-content;
+  word-break: break-all;
+  word-wrap: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+body.dark .todoBox .text { color: #cfcfcf; }
+
+.completeButton {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 0px;
+  height: 0px;
+  border-radius: 0 22px 22px 0;
+  transition: all 0.2s;
+  opacity: 0;
+  padding: 4px;
+  padding-right: 6px;
+  cursor: pointer;
+}
+
+.completeButton:hover { background: #ffffff; }
+.completeButton:active { background: #ffffff55; }
+body.dark .completeButton:hover { background: #ffffff26; }
+
+.todoBox:hover .completeButton {
+  width: 36px;
+  height: 30px;
+  opacity: 1;
+  flex: 0 0 auto;
+}
+
+#breakBox {
+  display: none;
+  min-width: max-content;
+  height: 30px;
+  align-items: center;
+  padding-left: 10px;
+  font-weight: 300;
+  font-size: 14px;
+  color: #5e5e5e;
+  flex: 1 1 auto;
+}
+
+.break #breakBox { display: flex; }
+.break #todoBox { display: none; }
+body.dark #breakBox { color: #cfcfcf; }
+
+/* 状态变更瞬时收窄（专注结束记账期间，仅保留动画区） */
+.waiting { width: 48px; }
+.waiting .todoBox,
+.waiting #timerBox,
+.waiting #breakBox { display: none !important; }
+
+/* ————————————————— 状态栏（今日番茄 + 菜单） ————————————————— */
+.statusBar {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px 2px;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  color: #5e5e5e;
+  position: relative;
+}
+
+body.dark .statusBar { color: #b5b5b5; }
+
+.statusBar .todayStats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.statusBar .todayStats img { width: 13px; height: 13px; vertical-align: -2px; }
+.statusBar .todayStats .sep { opacity: 0.35; }
+
+.menuBtn {
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  color: currentColor;
+  opacity: 0.6;
+  flex: 0 0 auto;
+}
+.menuBtn:hover { opacity: 1; background: #ffffff88; }
+body.dark .menuBtn:hover { background: #ffffff1a; }
+
+/* 右键 / ⋯ 菜单（浮在状态栏区域，阴影卡片） */
+.dropdown {
+  position: absolute;
+  right: 8px;
+  bottom: 30px;
+  min-width: 120px;
+  background: #fffffffa;
+  border: 1px solid #00000022;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  padding: 4px;
+  z-index: 999;
+  display: none;
+}
+
+body.dark .dropdown { background: #2b2d2b; border-color: #ffffff26; }
+
+.dropdown .menuItem {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+body.dark .dropdown .menuItem { color: #ddd; }
+.dropdown .menuItem:hover { background: #00000010; }
+body.dark .dropdown .menuItem:hover { background: #ffffff14; }
+
+/* 完成/提示 toast（浮在状态栏下方） */
+.capsuleToast {
+  position: fixed;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  max-width: 92%;
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: #fffffffa;
+  color: #333;
+  border: 1px solid #00000022;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  z-index: 998;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.dark .capsuleToast { background: #2b2d2b; color: #ddd; border-color: #ffffff26; }
+
+/* ————————————————— 动画关键帧（参考 ztools ani.css） ————————————————— */
+@keyframes fadeIn_L {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(0px); }
+}
+@keyframes fadeIn_L2 {
+  0% { transform: translateX(-20px); }
+  100% { transform: translateX(0px); }
+}
+@keyframes fadeIn_L_blur {
+  0% { transform: translateX(-100%) rotate(45deg); }
+  100% { transform: translateX(0px) rotate(45deg); }
+}
+@keyframes fadeIn_R {
+  0% { transform: translateX(30px); }
+  100% { transform: translateX(0px); }
+}
+@keyframes fadeIn_T {
+  0% { transform: translateY(-50px) rotate(2deg) scale(0.85); }
+  100% { transform: translateY(0px) rotate(2deg) scale(0.85); }
+}
+@keyframes fadeIn_B {
+  0% { transform: translateY(30px); }
+  100% { transform: translateY(0px); }
+}
+@keyframes swing {
+  0%, 100% { transform: rotate(2deg) scale(0.85); }
+  50% { transform: rotate(-2deg) scale(0.87); }
+}
+@keyframes swing2 {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-2deg); }
+  75% { transform: rotate(2deg); }
+}
+@keyframes swing3 {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes swing4 {
+  0%, 100% { transform: rotate(42deg); }
+  25% { transform: rotate(38deg); }
+  50% { transform: rotate(46deg); }
+}
+@keyframes swimming {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  25% { transform: translateX(4px) rotate(15deg); }
+  75% { transform: translateX(-1px) rotate(5deg); }
+}
+@keyframes pop {
+  0% { transform: translate(0, 10px) scale(1); opacity: 0.1; }
+  50% { opacity: 1; }
+  100% { transform: translate(-4px, -18px) scale(3); opacity: 0.1; }
+}
+@keyframes tomatoFalling {
+  0% { transform: translateY(0) scale(0.87) rotate(0deg); }
+  10% { transform: translateY(0) scale(0.82) rotate(-10deg); }
+  20% { transform: translateY(0) scale(0.77) rotate(10deg); }
+  30% { transform: translateY(0) scale(0.82) rotate(-5deg); }
+  40% { transform: translateY(0) scale(0.87) rotate(0deg); }
+  50% { transform: translateY(0) scale(0.87) rotate(0deg); }
+  100% { transform: translateY(100vh) scale(0.87) rotate(0deg); }
+}
+@keyframes cursorAnimation2 {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.2); }
+  50% { transform: translate(-50%, -30%) rotate(210deg) scale(1.4); }
+  100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.2); }
+}
+
+/* 跟随光标（悬停动画区时的手/太阳）；transform 让图标中心对准指针 */
+#animatedCursor {
+  position: fixed;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+  display: none;
+  z-index: 1000;
+  transform: translate(-50%, -50%);
+}
+
+/* ————————————————— 窄窗自适应（可随意拖窄窗口） ————————————————— */
+@media (max-width: 300px) {
+  .tag, .pin { display: none !important; }
+}
+@media (max-width: 240px) {
+  .todoBox { display: none !important; }
+  #timerNum { display: none !important; }
+  .timerBox:hover .controlBox { display: flex !important; }
+  .timerBox .controlBox { display: none; }
+}
+@media (max-width: 180px) {
+  .statusBar .todayStats .focusMin { display: none; }
+}

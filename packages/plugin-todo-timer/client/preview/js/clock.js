@@ -295,6 +295,9 @@ class TomatoClock {
     this.endTime = this.config.endTime + 500;
 
     this.refreshTime();
+    // 落盘 endTime/startTime/totalTime/timeLeft：桌面胶囊页与主页面跨窗同步的展示计时依赖
+    // 保存的 endTime 推算剩余（countdown 仅在状态切换时调用，不影响每秒读秒）。
+    this.saveConfig();
     this.timer = setInterval(() => {
       this.refreshTime();
 

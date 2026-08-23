@@ -111,6 +111,8 @@ a.link:hover{text-decoration:underline}
    工具
    ============================================================ */
 async function api<T = any>(path: string, method: "GET" | "POST" = "GET", body?: unknown): Promise<T> {
+  // 同源约束：仅接受本插件后端的相对路径（拒绝对//协议相对等逃逸写法，杜绝 SSRF 面）
+  if (!path.startsWith("/") || path.startsWith("//")) throw new Error("api: path must be same-origin relative");
   const r = await fetch(API_PREFIX + path, {
     method,
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
