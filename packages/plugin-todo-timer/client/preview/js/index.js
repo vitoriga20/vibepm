@@ -51,20 +51,8 @@ function openDesktopCapsule() {
   }
 }
 
-// 双页记账互斥锁：桌面胶囊页与本页各自跑时钟，同一段专注/休息结束时仅先落账方记账。
-// 锁走 localStorage（todo-tomato:workEndLock），无监听器 → 不引发 storage 同步乒乓。
-function tryLockWorkEnd(progress) {
-  try {
-    const now = Date.now();
-    const lock = store.getItem("workEndLock");
-    if (lock && now - lock.ts < 5000 && Math.abs(lock.progress - progress) < 0.01) return false;
-    store.setItem("workEndLock", { ts: now, progress });
-    return true;
-  } catch (e) {
-    return true;
-  }
-}
-
+// 双页记账互斥锁在 clockSync.js 单一源（tryLockWorkEnd）：桌面胶囊页与本页各自跑时钟，
+// 同一段专注/休息结束时仅先落账方记账。
 async function onWorkEnd(duration, progress) {
   // 时长持久化：只要专注过（progress>0）就落账——修复「专注一段时间但不足 30% 全部丢失」
   // 番茄个数的 ≥0.3 有效门槛保留在 addTomatoToTask 内（时长与个数口径分离）

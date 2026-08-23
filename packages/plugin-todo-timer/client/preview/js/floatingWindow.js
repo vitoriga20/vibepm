@@ -236,68 +236,19 @@ class FloatingWindow {
     this.refresh();
     syncPill();
 
-    // 跨窗口同步：桌面胶囊页（capsule.html）与本页共用 localStorage（todo-tomato:*）。
-    // 只读重载 + 纯展示计时器：不重建倒计时（避免两页各自跑结束流程互相踩），
-    // 用保存的 endTime 推算剩余时间展示；到点统一走 switchState（记账锁防重）。
-    const resyncClock = () => {
-      const saved = store.getItem("clock");
-      if (!saved) return;
-      clock.config = { ...clock.defaultConfig, ...saved };
-      if (clock.timer) { clearInterval(clock.timer); clock.timer = null; }
-      const st = clock.config.currentState;
-      if (st === "working" || st === "breaking") {
-        clock.config.pauseTimeFlag = false;
-        clock.config.pauseLeftTime = 0;
-        // 过渡态落盘先于 countdown 刷新 endTime：刚切换的保存常带上一段已过期 endTime。
-        // 若缺失/已过期 → 按当前状态重算整段时长，避免接收方瞬间误判结束引发双向连锁。
-        const dur = st === "working"
-          ? clock.config.workTime
-          : (clock.config.currentCycle % clock.config.longBreakInterval === 0
-            ? clock.config.longBreakTime
-            : clock.config.shortBreakTime);
-        if (!(clock.config.endTime - Date.now() > 0)) {
-          clock.config.totalTime = dur;
-          clock.config.endTime = Date.now() + dur;
-        }
-        const tick = () => {
-          clock.config.timeLeft = Math.max(clock.config.endTime - Date.now(), 0);
-          clock.config.progress = clock.config.totalTime ? parseFloat((1 - clock.config.timeLeft / clock.config.totalTime).toFixed(2)) : 0;
-          const cs = Math.floor(clock.config.timeLeft / 1000);
-          if (clock.lastSeconds !== cs) { clock.lastSeconds = cs; clock.onTick(); }
-          if (clock.isWorking()) clock.onWorkTick();
-          if (clock.isBreaking()) clock.onBreakTick();
-          if (clock.config.timeLeft <= 0) {
-            clearInterval(clock.timer); clock.timer = null;
-            clock.config.timeLeft = 0;
-            clock.switchState(); // 统一结束流程；记账锁保证只有一方落账
-          }
-        };
-        tick();
-        clock.onTick();
-        clock.onStateChange();
-        clock.timer = setInterval(tick, 100);
-      } else {
-        clock.onTick();
-        clock.onStateChange();
-      }
-    };
-    window.addEventListener("storage", (e) => {
-      if (!e.key) return;
-      if (e.key === "todo-tomato:clock") {
-        resyncClock();
-        this.refresh();
-      } else if (e.key === "todo-tomato:todoList") {
+    // 跨窗口同步（单一源 clockSync.js）：桌面胶囊页与本页共用 localStorage（todo-tomato:*），
+    // storage 事件双向同步时钟/任务/设置；页面级联动通过钩子注入。
+    installClockStorageSync(clock, {
+      onClockResync: () => this.refresh(),
+      onTodoListChange: () => {
         if (typeof todoManger_ !== "undefined" && todoManger_) {
           todoManger_.getTaskList(); // 重读存储（胶囊页可能已完成任务/落账番茄）
           todoManger_.onChange();    // 触发主列表重渲染
           if (typeof updatePageTodayTomatosNum === "function") updatePageTodayTomatosNum();
         }
         syncFocusTask();
-      } else if (e.key === "todo-tomato:settings") {
-        const s = store.getItem("settings");
-        settings.config = { ...settings.defaultConfig, ...(s || {}) };
-        this.refresh();
-      }
+      },
+      onSettingsChange: () => this.refresh(),
     });
   }
 

@@ -1,11 +1,8 @@
 /**
- * 统计一条任务的累计番茄总数（task.tomato = { progress: [timestamps] }）
- * 数据复盘唯一口径：卡片总数 / 象限汇总 / 计划投入全部走这里
+ * 统计/查找类纯函数已抽到 todoData.js 单一源（countTaskTomato / findTaskInList /
+ * getActiveTaskOf / recordStatisticsToList / addTomatoToTaskInList / statisticsTodayNumOf /
+ * completeActiveTaskInList），本文件 manager 方法委托过去；桌面胶囊页直接用同一份。
  */
-function countTaskTomato(task) {
-  if (!task || !task.tomato) return 0;
-  return Object.values(task.tomato).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
-}
 
 /**
  * 本地日期键 "YYYY-MM-DD"（dueDate 全链路唯一口径；语义同 node 半契约 contract.ts 的
@@ -218,9 +215,7 @@ class todoListManger {
    * 无设定时不算任何任务在做——避免隐式 current[0] 导致按天过滤漏未来待办、专注隐式绑错任务）
    */
   getActiveTask() {
-    const explicit = this.TaskList.current.find((t) => t.active === true);
-    if (explicit) return explicit;
-    return this.TaskList.defaultTask;
+    return getActiveTaskOf(this.TaskList);
   }
 
   /**
@@ -238,8 +233,9 @@ class todoListManger {
    */
   compltedActiveTask() {
     const task = this.getActiveTask();
-    if (task.id === -1) return; // 无显式「在做」：无可完成对象
-    this.done(task.id);
+    if (task.id === -1) return false; // 无显式「在做」：无可完成对象
+    this.done(task.id); // 走 done：saveTaskList + onChange 保持原渲染联动
+    return true;
   }
 
   /**
@@ -250,57 +246,14 @@ class todoListManger {
    * @param {object} [task] - 关联任务（默认取当前在做任务；专注结束时应传绑定任务）
    */
   recordStatistics(duration, type, progress, task = null) {
-
-    console.log("recordStatistics",duration, type, progress);
-    const t = task || this.getActiveTask();
-    const tarId = t.id;
-    const planRef = t.milestoneId || null; // 长期归属：关联的计划里程碑 id（旧长目标 longTarId 语义已被计划取代）
-    const realDuration = duration * progress;
-
-    // title 冗余进统计记录：日历等消费端在任务被删除后仍能显示专注对象（旧记录无此字段→兜底）
-    this.TaskList.statistics.push({ endTimestamp: Date.now(), duration, realDuration, type, progress, tarId, planRef, title: t.title || "" });
-    // 统计记录必须持久化，否则刷新后首页「H」与「统计」的活动时间会丢失
-    this.saveTaskList(this.TaskList);
-    // console.log(this.TaskList.statistics);
+    recordStatisticsToList(this.TaskList, duration, type, progress, task);
   }
 
   /**
    * 统计今天完成和未完成任务的数量
    */
   statisticsTodayNum() {
-    // 获取今天的开始时间
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0); // 设置为今天的0点0分0秒
-
-    // 初始化完成和未完成任务的计数
-    let red = 0;
-    let yellow = 0;
-    let totalFocusTime = 0; // 初始化总专注时间（毫秒）
-
-
-
-    // 反向遍历任务列表
-    for (let i = this.TaskList.statistics.length - 1; i >= 0; i--) {
-      const item = this.TaskList.statistics[i];
-      if (item.endTimestamp < startOfDay.getTime()) {
-        // 一旦发现早于今天开始的数据就结束遍历
-        break;
-      }
-      if (item.type === "work" && item.endTimestamp >= startOfDay.getTime()) {
-        // 只统计 type 为 'work' 且在今天的任务
-        if (item.progress >= 0.9) {
-          red++;
-        } else {
-          yellow++;
-        }
-        totalFocusTime += item.realDuration??0; // 累加专注时间
-      }
-    }
-
-    // 将总专注时间转换为分钟，保留1位小数（以共享常量统一换算）
-    const focusMinutes = parseFloat((totalFocusTime / MS_PER_MINUTE).toFixed(1));
-    // 返回一个对象，包含完成、未完成的数量和总专注时间
-    return { red, yellow, focusMinutes };
+    return statisticsTodayNumOf(this.TaskList);
   }
 
   /**
@@ -404,41 +357,19 @@ class todoListManger {
    * @param {number} id - 绑定任务 id（-1 表示未绑定，仅记统计）
    * @param {number} duration - 番茄钟预设时间(毫秒)
    * @param {number} progress - 完成度(0-1)
-   * @returns {{title: string, total: number}} 任务标题与累计番茄总数（未绑定时 title 为空）
+   * @returns {{title: string, total: number, partial: boolean}} 任务标题与累计番茄总数（未绑定时 title 为空）
    */
   addTomatoToTask(id, duration, progress) {
-    const task = this.findTask(id);
-    // 绑定任务中途被删时 task=null：统计行挂到 defaultTask(tarId=-1)，不张冠李戴到其它任务
-    // 时长持久化：只要专注过（progress>0，由调用方保证）就落 statistics，无 30% 门槛
-    this.recordStatistics(duration, "work", progress, task || this.TaskList.defaultTask);
-
-    if (!task || task.id === -1) {
-      return { title: "", total: 0, partial: false };
-    }
-
-    // 番茄个数门槛：进度 ≥0.3 才算一个有效番茄（时长已无条件落账，与个数口径分离）
-    if (progress >= 0.3) {
-      const currentTime = Date.now();
-
-      if (!task.tomato) task.tomato = {}; // 老数据兜底
-      if (!task.tomato[progress]) {
-        task.tomato[progress] = [];
-      }
-      task.tomato[progress].push(currentTime);
-
-      this.saveTaskList(this.TaskList);
-      this.onChange();
-      return { title: task.title, total: countTaskTomato(task), partial: false };
-    }
-    return { title: task.title, total: countTaskTomato(task), partial: true };
+    const result = addTomatoToTaskInList(this.TaskList, id, duration, progress);
+    if (result.counted) this.onChange(); // 计入一个番茄才触发重渲染（与原行为一致）
+    return result;
   }
 
   /**
    * 跨列表查找任务（current / done / archived）
    */
   findTask(id) {
-    if (id == null || id === -1) return null;
-    return this.TaskList.current.find((todo) => todo.id === id) || this.TaskList.done.find((todo) => todo.id === id) || this.TaskList.archived.find((todo) => todo.id === id) || null;
+    return findTaskInList(this.TaskList, id);
   }
 
   // ———————————————————— 四象限 ————————————————————
