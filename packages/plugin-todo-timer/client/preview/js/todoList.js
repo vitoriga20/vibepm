@@ -901,7 +901,7 @@ todoManger_.onChange = function () {
         <div class="taskBtnBox">
           <span taskId="${task.id}" onclick="toggleImportantBtn(this,event)" class="markBtn imp ${impOn ? "on" : ""}" title="${impOn ? UI_TEXT.markImportantTipOn : UI_TEXT.markImportantTipOff}">${UI_TEXT.markImportant}</span>
           <span taskId="${task.id}" onclick="toggleUrgentBtn(this,event)" class="markBtn urg ${urgOn ? "on" : ""}" title="${urgOn ? UI_TEXT.markUrgentTipOn : UI_TEXT.markUrgentTipOff}">${UI_TEXT.markUrgent}</span>
-          <span taskId="${task.id}" onclick="promptDueDate(this,event)" class="dateBtn" title="${UI_TEXT.setDueBtnTip}">
+          <span taskId="${task.id}" onclick="openDuePicker(this,event)" class="dateBtn" title="${UI_TEXT.setDueBtnTip}">
             <img src="pic/clock.svg" />
           </span>
           <span taskId="${task.id}" onclick="setTopTask(this,event)"   class="settopBtn">
@@ -996,29 +996,93 @@ function toggleUrgentBtn(element, event) {
   todoManger_.toggleUrgent(taskId);
 }
 
-// 计划日期按钮：唤起原生日期选择器（change 提交，选空 = 清除；入参格式 "YYYY-MM-DD"）
-function promptDueDate(element, event) {
+// 计划日期弹层（自制轻量月历，同主题配色；弹在按钮正下方，替代原生 input[date] picker）
+let duePickerClose = null;
+function openDuePicker(element, event) {
   event.stopPropagation();
+  if (duePickerClose) duePickerClose(); // 重复点击：关旧开新
   const taskId = parseInt(element.getAttribute("taskId"));
   const task = todoManger_.findTask(taskId);
-  const input = document.createElement("input");
-  input.type = "date";
-  input.value = task && task.dueDate ? task.dueDate : "";
-  input.style.cssText = "position:fixed;left:-100px;top:-100px;opacity:0;";
-  document.body.appendChild(input);
-  const cleanup = () => setTimeout(() => input.remove(), 200);
-  input.addEventListener("change", () => {
-    todoManger_.setDueDate(taskId, input.value || null);
-    cleanup();
-  });
-  input.addEventListener("blur", cleanup);
-  try {
-    input.showPicker();
-  } catch (e) {
-    // showPicker 不可用（旧浏览器/无手势）→ 聚焦手输兜底
-    input.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:99;";
-    input.focus();
-  }
+  const rect = element.getBoundingClientRect();
+
+  // 视口月份：已选日期所在月，未选 → 今天所在月
+  const initial = task && task.dueDate ? task.dueDate : previewLocalDateKey(new Date());
+  let vy = parseInt(initial.slice(0, 4), 10);
+  let vm = parseInt(initial.slice(5, 7), 10); // 1-12
+
+  const root = document.createElement("div");
+  root.className = "duePicker";
+  // 定位：按钮正下方（贴边时内收，避免溢出视口）
+  root.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 236)) + "px";
+  root.style.top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 292)) + "px";
+
+  const pick = (key) => {
+    todoManger_.setDueDate(taskId, key);
+    close();
+  };
+
+  const renderGrid = () => {
+    const todayKey = previewLocalDateKey(new Date());
+    const selKey = task && task.dueDate ? task.dueDate : "";
+    // 周日起始（与活动日历同一习惯）：本月 1 号回退到首个周日
+    const first = new Date(vy, vm - 1, 1);
+    const start = new Date(first);
+    start.setDate(1 - first.getDay());
+    let html = `<div class="dp-head">
+      <span class="dp-nav" data-nav="-1" title="${UI_TEXT.duePickerPrev}">‹</span>
+      <span class="dp-title">${UI_TEXT.duePickerMonthTitle(vy, vm)}</span>
+      <span class="dp-nav" data-nav="1" title="${UI_TEXT.duePickerNext}">›</span>
+    </div>
+    <div class="dp-weeks">${UI_TEXT.duePickerWeekdays.map((w) => `<span>${w}</span>`).join("")}</div>
+    <div class="dp-days">`;
+    const cur = new Date(start);
+    for (let i = 0; i < 42; i++) {
+      const key = previewLocalDateKey(cur);
+      const cls = [
+        "dp-day",
+        cur.getMonth() !== vm - 1 ? "dp-other" : "",
+        key === todayKey ? "dp-today" : "",
+        key === selKey ? "dp-sel" : "",
+      ].filter(Boolean).join(" ");
+      html += `<span class="${cls}" data-key="${key}">${cur.getDate()}</span>`;
+      cur.setDate(cur.getDate() + 1);
+    }
+    html += `</div>
+    <div class="dp-foot">
+      <span class="dp-today-btn">${UI_TEXT.duePickerToday}</span>
+      <span class="dp-clear-btn">${UI_TEXT.duePickerClear}</span>
+    </div>`;
+    root.innerHTML = html;
+  };
+
+  const onPick = (e) => {
+    const day = e.target.closest(".dp-day");
+    if (day) { pick(day.dataset.key); return; }
+    const nav = e.target.closest(".dp-nav");
+    if (nav) {
+      const m = vm - 1 + parseInt(nav.dataset.nav, 10);
+      vy += Math.floor(m / 12);
+      vm = ((m % 12) + 12) % 12 + 1;
+      renderGrid();
+      return;
+    }
+    if (e.target.closest(".dp-today-btn")) { pick(previewLocalDateKey(new Date())); return; }
+    if (e.target.closest(".dp-clear-btn")) { pick(null); }
+  };
+  const onDocDown = (e) => { if (!root.contains(e.target)) close(); };
+  const close = () => {
+    root.remove();
+    root.removeEventListener("click", onPick);
+    document.removeEventListener("mousedown", onDocDown);
+    duePickerClose = null;
+  };
+  duePickerClose = close;
+
+  renderGrid();
+  root.addEventListener("click", onPick);
+  document.body.appendChild(root);
+  // 同一帧内 mousedown 正在冒泡（按钮 click 前置），延后一拍再挂外点关闭
+  setTimeout(() => document.addEventListener("mousedown", onDocDown), 0);
 }
 
 function activeTask(element, event) {

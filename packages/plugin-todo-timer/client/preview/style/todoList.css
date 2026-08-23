@@ -970,6 +970,111 @@ pointer-events: none;
     font-weight: 700;
 }
 
+/* 计划日期按钮图标：与其他操作图标同尺寸（clock.svg 原始 53px，必须显式限制） */
+.dateBtn img {
+    width: 16px;
+    height: 16px;
+}
+
+/* 计划日期弹层（自制轻量月历：按钮正下方、同主题配色） */
+.duePicker {
+    position: fixed;
+    z-index: 1000;
+    width: 224px;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--taskBox-bg-color);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+    user-select: none;
+}
+.duePicker .dp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.duePicker .dp-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-color-1);
+}
+.duePicker .dp-nav {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 16px;
+    color: var(--text-color-2);
+    cursor: pointer;
+}
+.duePicker .dp-nav:hover {
+    background: var(--mask-color-light);
+    color: var(--text-color-1);
+}
+.duePicker .dp-weeks {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 2px;
+}
+.duePicker .dp-weeks span {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-color-3);
+    padding: 2px 0;
+}
+.duePicker .dp-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+}
+.duePicker .dp-day {
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-color-1);
+    cursor: pointer;
+}
+.duePicker .dp-day:hover {
+    background: var(--mask-color-light);
+}
+.duePicker .dp-day.dp-other {
+    color: var(--text-color-4);
+}
+.duePicker .dp-day.dp-today {
+    color: var(--kv-orange-color);
+    font-weight: 700;
+}
+.duePicker .dp-day.dp-sel {
+    background: var(--kv-orange-color);
+    color: var(--on-accent);
+    font-weight: 700;
+}
+.duePicker .dp-foot {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+.duePicker .dp-today-btn,
+.duePicker .dp-clear-btn {
+    font-size: 12px;
+    color: var(--text-color-2);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+.duePicker .dp-today-btn:hover,
+.duePicker .dp-clear-btn:hover {
+    background: var(--mask-color-light);
+    color: var(--text-color-1);
+}
+
 /* 卡片番茄总数角标（数据复盘：累计专注番茄；挂在番茄盒末尾） */
 .tomatoTotal {
     display: inline-flex;

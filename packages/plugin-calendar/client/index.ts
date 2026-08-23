@@ -20,5 +20,7 @@ modules.register("plugin-calendar", () => ({
     try {
       (ctx as any).services.get("render").register("calendar-panel", "calendar-panel");
     } catch { /* noop */ }
+    // 注入共享事件总线：todoTimer 上报成功派发 SYNC_EVENT → 面板立即拉新（替代纯 3s 轮询）
+    CalendarPanel.syncBus = (ctx as any)?.events ?? null;
   },
 }));

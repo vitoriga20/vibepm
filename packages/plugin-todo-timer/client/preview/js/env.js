@@ -158,6 +158,13 @@ var UI_TEXT = {
   dueToday: "今天",
   dueTagTip: (dateKey) => `计划日期 ${dateKey}`,
   dueTagTipOverdue: (dateKey) => `计划日期 ${dateKey}（已过期）`,
+  // 计划日期弹层（自制月历）
+  duePickerPrev: "上个月",
+  duePickerNext: "下个月",
+  duePickerMonthTitle: (y, m) => `${y}年${m}月`,
+  duePickerWeekdays: ["日", "一", "二", "三", "四", "五", "六"],
+  duePickerToday: "今天",
+  duePickerClear: "清除日期",
   // 任务-专注耦合提示
   toastNoBoundTask: "本次专注未绑定任务：可先在待办里把一条设为在做",
   toastTomatoDone: (title, total) => `专注完成，番茄 +1 ·「${title}」累计 ${total} 个`,

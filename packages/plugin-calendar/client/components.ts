@@ -145,6 +145,13 @@ const CSS = /* css */`
 
 export class CalendarPanel extends HTMLElement {
   static readonly POLL_MS = 3000;
+  /**
+   * 共享事件总线（模块 apply 时由 index.ts 注入）：todoTimer 上报成功会派发 SYNC_EVENT，
+   * 面板立即拉新——把「改了排期/完成番茄 → 日历还是旧数据」的窗口从 3s 轮询压到亚秒级
+   */
+  static syncBus: EventTarget | null = null;
+  /** 同步事件名（语义副本：单一源在 plugin-todo-timer/src/contract.ts 的 SYNC_EVENT，浏览器 bundle 无法跨包 import） */
+  static readonly SYNC_EVENT = "vibepm:todo-sync";
   private _poll: ReturnType<typeof setInterval> | null = null;
   private _cursor = new Date();
   private _selected: string | null = null;
@@ -160,16 +167,23 @@ export class CalendarPanel extends HTMLElement {
       if (!document.hidden) void this.fetchData();
     }, CalendarPanel.POLL_MS);
     document.addEventListener("visibilitychange", this._onVis);
+    CalendarPanel.syncBus?.addEventListener(CalendarPanel.SYNC_EVENT, this._onSync);
   }
 
   disconnectedCallback(): void {
     if (this._poll) clearInterval(this._poll);
     this._poll = null;
     document.removeEventListener("visibilitychange", this._onVis);
+    CalendarPanel.syncBus?.removeEventListener(CalendarPanel.SYNC_EVENT, this._onSync);
   }
 
   private _onVis = (): void => {
     if (!document.hidden && this.isConnected) void this.fetchData();
+  };
+
+  /** todoTimer 数据上报成功 → 立即拉新（不等下一轮轮询） */
+  private _onSync = (): void => {
+    if (this.isConnected) void this.fetchData();
   };
 
   private async fetchData(): Promise<void> {
