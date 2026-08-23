@@ -10,6 +10,7 @@ class settingsConfig {
       showSuccessPopup: false,
 
       showFloatingWindow: true,
+      showDesktopCapsule: false,
       showTomatoAnimation: true,
       autoHideAni: false,
 
@@ -28,6 +29,7 @@ class settingsConfig {
     this.onClockChange = () => { }; // 时钟变更事件
 
     this.onShowFloatingWindowChange = () => { }; // 浮窗显示变更事件
+    this.onShowDesktopCapsuleChange = () => { }; // 桌面胶囊窗口显示变更事件
     this.onShowTomatoAnimationChange = () => { }; // 番茄动画显示变更事件
     this.onAutoHideAniChange = () => { }; // 自动隐藏动画变更事件
   }
@@ -68,6 +70,7 @@ class settingsConfig {
     this.onDarkModeChange(this.config.darkMode);
     this.onOpacityChange(this.config.opacity);
     this.onShowFloatingWindowChange(this.config.showFloatingWindow);
+    this.onShowDesktopCapsuleChange(this.config.showDesktopCapsule);
     this.onShowTomatoAnimationChange(this.config.showTomatoAnimation);
     this.onAutoHideAniChange(this.config.autoHideAni);
   }
@@ -87,6 +90,9 @@ class settingsConfig {
     switch(key) {
       case 'showFloatingWindow':
         this.onShowFloatingWindowChange(value);
+        return;
+      case 'showDesktopCapsule':
+        this.onShowDesktopCapsuleChange(value);
         return;
       case 'showTomatoAnimation':
         this.onShowTomatoAnimationChange(value);

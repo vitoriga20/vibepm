@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>番茄的一生 · 专注</title>
+<title>番茄生长动画</title>
 <!--
   番茄钟「一生」生长动画 —— 线性叙事，不循环。
   ─────────────────────────────────────────────
-  图层（底→顶）：背景光晕 → 桌面 → 花盆/土壤(静态) → 主茎 → 侧枝与叶片 → 花序 → 果实(最顶层)
+  图层（底→顶）：花盆/土壤(静态) → 主茎 → 侧枝与叶片 → 花序 → 果实(最顶层)
   形态规则：真叶只生于侧枝；侧枝自茎节点 45°~60° 萌发；花序生于成熟叶腋；
             花瓣凋落后子房原位膨大；果实增重使所在侧枝分节弯曲下垂。
   驱动方式：几何/透明度/颜色/弯曲形变全部绑定 CSS 自定义变量，JS 只改变量；
@@ -20,9 +20,8 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
-  margin:0;background:radial-gradient(120% 100% at 50% 0%,#fffaf1 0%,#f7e9d2 60%,#efdcc0 100%);
-  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
-  color:#6b4a2a;display:flex;align-items:center;justify-content:center;
+  margin:0;background:transparent;
+  display:flex;align-items:center;justify-content:center;
   -webkit-font-smoothing:antialiased;overflow:hidden;
 }
 .wrap{position:relative;width:min(96vw,960px);aspect-ratio:960/700;max-height:96vh}
@@ -68,13 +67,6 @@ svg#scene{width:100%;height:100%;display:block;overflow:hidden}
   100%{rotate:0deg}
 }
 .sway{animation:sway 2.05s linear infinite}
-@keyframes drift{
-  0%{transform:translate(0,0);opacity:0}
-  15%{opacity:.5}
-  85%{opacity:.42}
-  100%{transform:translate(26px,-52px);opacity:0}
-}
-.mote{animation:drift 12s linear infinite}
 @keyframes flick{
   0%{opacity:.55;transform:scale(.94)}
   35%{opacity:1;transform:scale(1.06)}
@@ -82,7 +74,6 @@ svg#scene{width:100%;height:100%;display:block;overflow:hidden}
   100%{opacity:1;transform:scale(1.04)}
 }
 .flick{animation:flick .42s ease-in-out infinite alternate}
-@keyframes breathe{0%{transform:scale(1)}100%{transform:scale(1.045)}}
 
 /* 终局冻结：一切 CSS animation 停在当前帧 */
 html.frozen *,html.frozen *::before,html.frozen *::after{animation-play-state:paused!important}
@@ -211,61 +202,6 @@ html.frozen *,html.frozen *::before,html.frozen *::after{animation-play-state:pa
 .stub{fill:none;stroke:hsl(102 40% 38%);stroke-width:2.4;stroke-linecap:round}
 .blossomEnd{fill:rgba(255,244,214,.5)}
 
-/* 背景暖光 / 静物光 */
-#warm{opacity:calc(.5*var(--glow) + .55*var(--sl))}
-
-/* ============================================================
-   7. HUD 与圆形「专注」按钮
-   ============================================================ */
-.hud{position:absolute;left:4.2%;top:5.2%;line-height:1.5;user-select:none}
-.hud .t{font-size:clamp(13px,1.55vw,17px);letter-spacing:5px;color:#a2703c;font-weight:600}
-.hud .s{font-size:clamp(11px,1.25vw,13px);letter-spacing:2.5px;color:#b98f5e;margin-top:2px}
-.dock{position:absolute;right:5.4%;bottom:7%;display:flex;flex-direction:column;align-items:center;gap:10px}
-.dial{position:relative;width:96px;height:96px}
-.ring{
-  position:absolute;inset:-11px;border-radius:50%;
-  background:conic-gradient(from -90deg,#e0512f 0 calc(var(--p)*360deg),rgba(150,105,60,.16) 0);
-  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 0 53px,#000 54px);
-          mask:radial-gradient(circle at 50% 50%,transparent 0 53px,#000 54px);
-  transition:opacity .4s ease;
-}
-.hot .ring{background:conic-gradient(from -90deg,#f0a333 0 360deg,#f0a333 0)}
-.done .ring{background:conic-gradient(from -90deg,#a89e93 0 360deg,#a89e93 0)}
-.focus{
-  position:absolute;inset:0;width:96px;height:96px;border:none;border-radius:50%;
-  cursor:pointer;color:#fff5ee;font-size:17px;letter-spacing:4px;font-family:inherit;
-  background:radial-gradient(circle at 34% 27%,#ff8f6d 0%,#e5482c 52%,#b32e1d 100%);
-  box-shadow:0 12px 26px rgba(140,52,28,.3),inset 0 -7px 13px rgba(120,20,10,.34),
-             inset 0 7px 11px rgba(255,196,175,.34);
-  animation:breathe 2.4s ease-in-out infinite alternate;
-}
-.focus::before{ /* 按钮上的小果蒂 */
-  content:"";position:absolute;left:50%;top:-7px;width:16px;height:11px;transform:translateX(-50%);
-  background:radial-gradient(ellipse at 50% 100%,#4e8a34 0 58%,transparent 60%);
-  clip-path:polygon(50% 100%,0 40%,18% 62%,26% 4%,50% 52%,74% 4%,82% 62%,100% 40%);
-}
-.focus:hover{filter:brightness(1.06)}
-.focus:active{transform:scale(.97)}
-.focus.run{animation:none}
-.focus:disabled{cursor:default;animation:none}
-.focus.done{
-  background:radial-gradient(circle at 34% 27%,#d3cbc1 0%,#a79d92 55%,#8a8077 100%);
-  box-shadow:0 8px 18px rgba(120,105,90,.22),inset 0 -6px 11px rgba(90,80,70,.25);
-  color:#f6f2ec;
-}
-.focus.done::before{background:radial-gradient(ellipse at 50% 100%,#9aa093 0 58%,transparent 60%)}
-.meta{font-size:11.5px;letter-spacing:2px;color:#b28755;font-variant-numeric:tabular-nums}
-.harvest{
-  position:absolute;left:5%;bottom:8%;opacity:var(--hv);
-  font-size:clamp(12px,1.4vw,15px);letter-spacing:3px;color:#95642c;
-  border-bottom:1px solid rgba(160,110,50,.35);padding-bottom:4px;
-}
-@media (max-width:560px){
-  .dial,.focus{width:80px;height:80px}
-  .ring{inset:-9px;-webkit-mask:radial-gradient(circle at 50% 50%,transparent 0 44px,#000 45px);
-        mask:radial-gradient(circle at 50% 50%,transparent 0 44px,#000 45px)}
-  .focus{font-size:15px}
-}
 </style>
 </head>
 <body>
@@ -273,27 +209,10 @@ html.frozen *,html.frozen *::before,html.frozen *::after{animation-play-state:pa
 <svg id="scene" viewBox="0 0 960 700" preserveAspectRatio="xMidYMid meet" role="img"
      aria-label="一株番茄从种子到果实坠地的生长静物">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fffaf1"/><stop offset=".55" stop-color="#fdf1de"/>
-      <stop offset="1" stop-color="#f5e2c4"/>
-    </linearGradient>
-    <radialGradient id="halo" cx=".46" cy=".33" r=".62">
-      <stop offset="0" stop-color="#fff7e4" stop-opacity=".95"/>
-      <stop offset=".55" stop-color="#ffeccb" stop-opacity=".42"/>
-      <stop offset="1" stop-color="#ffe3ba" stop-opacity="0"/>
-    </radialGradient>
     <radialGradient id="gold" cx=".5" cy=".5" r=".5">
       <stop offset="0" stop-color="#ffdb92" stop-opacity=".6"/>
       <stop offset=".55" stop-color="#ffc86a" stop-opacity=".22"/>
       <stop offset="1" stop-color="#ffbe52" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="vig" cx=".5" cy=".44" r=".76">
-      <stop offset=".52" stop-color="#5b3a17" stop-opacity="0"/>
-      <stop offset="1" stop-color="#5b3a17" stop-opacity=".17"/>
-    </radialGradient>
-    <radialGradient id="desk" cx=".5" cy=".16" r=".82">
-      <stop offset="0" stop-color="#dcae74"/><stop offset=".45" stop-color="#c2914f"/>
-      <stop offset="1" stop-color="#95642f"/>
     </radialGradient>
     <linearGradient id="pot" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#b25a35"/><stop offset=".17" stop-color="#dd9163"/>
@@ -346,24 +265,7 @@ html.frozen *,html.frozen *::before,html.frozen *::after{animation-play-state:pa
     </clipPath>
   </defs>
 
-  <!-- ░░ 图层 1：背景光晕 ░░ -->
-  <g id="layer-glow">
-    <rect x="0" y="0" width="960" height="700" fill="url(#bg)"/>
-    <ellipse cx="442" cy="232" rx="430" ry="330" fill="url(#halo)"/>
-    <ellipse id="warm" cx="500" cy="300" rx="330" ry="270" fill="url(#gold)"/>
-    <g id="motes"></g>
-    <rect x="0" y="0" width="960" height="700" fill="url(#vig)"/>
-  </g>
-
-  <!-- ░░ 图层 2：木质桌面（静态） ░░ -->
-  <g id="layer-desk">
-    <ellipse cx="480" cy="702" rx="700" ry="292" fill="url(#desk)"/>
-    <path d="M-220 700A700 292 0 0 1 1180 700" fill="none" stroke="#ecc790" stroke-opacity=".5" stroke-width="2.4"/>
-    <g id="grain" opacity=".16"></g>
-    <ellipse cx="518" cy="600" rx="152" ry="38" fill="url(#shad)"/>
-  </g>
-
-  <!-- ░░ 图层 3：陶土花盆 + 深棕土壤（静态） ░░ -->
+  <!-- ░░ 图层 1：陶土花盆 + 深棕土壤（静态） ░░ -->
   <g id="layer-pot">
     <path d="M366 468C371 520 384 570 397 594A84 22 0 0 0 563 594C576 570 589 520 594 468Z" fill="url(#pot)"/>
     <path d="M380 480C388 528 398 566 408 588" fill="none" stroke="#f0b58a" stroke-opacity=".28" stroke-width="7"/>
@@ -376,7 +278,7 @@ html.frozen *,html.frozen *::before,html.frozen *::after{animation-play-state:pa
     <ellipse cx="478" cy="470" rx="60" ry="15" fill="#150c05" opacity=".2"/>
   </g>
 
-  <!-- ░░ 图层 4：主茎（含破土、子叶、顶芽） ░░ -->
+  <!-- ░░ 图层 2：主茎（含破土、子叶、顶芽） ░░ -->
   <g id="layer-stem">
     <g id="breach">
       <g id="moundWrap"><ellipse id="mound" cx="0" cy="0" rx="27" ry="7.5" fill="#4a2f1a"/></g>
@@ -424,23 +326,13 @@ html.frozen *,html.frozen *::before,html.frozen *::after{animation-play-state:pa
     </g>
   </g>
 
-  <!-- ░░ 图层 5：侧枝与叶片（JS 构建） ░░ -->
+  <!-- ░░ 图层 3：侧枝与叶片（JS 构建） ░░ -->
   <g id="layer-branch"></g>
-  <!-- ░░ 图层 6：花序（JS 构建） ░░ -->
+  <!-- ░░ 图层 4：花序（JS 构建） ░░ -->
   <g id="layer-flower"></g>
-  <!-- ░░ 图层 7：果实 —— 永远最顶层（JS 构建） ░░ -->
+  <!-- ░░ 图层 5：果实 —— 永远最顶层（JS 构建） ░░ -->
   <g id="layer-fruit"></g>
 </svg>
-
-<div class="hud"><div class="t">番茄的一生</div><div class="s" id="phase">静候 · 种子</div></div>
-<div class="dock">
-  <div class="dial" id="dial">
-    <div class="ring"></div>
-    <button class="focus" id="btn" aria-label="专注"><span id="btnLabel">专注</span></button>
-  </div>
-  <div class="meta"><span id="pct">00%</span></div>
-</div>
-<div class="harvest" id="harvest">✓ 收获时刻</div>
 </div>
 
 <script>
@@ -453,8 +345,6 @@ var TOTAL_MS = 45000;
 
 var NS='http://www.w3.org/2000/svg';
 var R=document.documentElement, scene=document.getElementById('scene');
-var btn=document.getElementById('btn'), btnLabel=document.getElementById('btnLabel');
-var dial=document.getElementById('dial'), phaseEl=document.getElementById('phase'), pctEl=document.getElementById('pct');
 var LB=document.getElementById('layer-branch'), LF=document.getElementById('layer-flower'),
     LR=document.getElementById('layer-fruit');
 
@@ -516,25 +406,13 @@ function pauseCssAnimations(){
    场景静态碎屑：木纹、土壤颗粒、尘埃、茎毛
    ============================================================ */
 (function decor(){
-  var grain=document.getElementById('grain');
-  for(var i=0;i<11;i++){
-    var rx=140+i*52+rnd()*16;
-    el('ellipse',{cx:480,cy:702,rx:rx.toFixed(1),ry:(rx*292/700).toFixed(1),
-      fill:'none',stroke:'#79491d','stroke-width':(0.8+rnd()*1.5).toFixed(2),
-      'stroke-opacity':(0.35+rnd()*0.45).toFixed(2)},grain);
-  }
+  /* 土壤颗粒（花盆内） */
   var sp=document.getElementById('speck');
   for(var j=0;j<70;j++){
     var a=rnd()*Math.PI*2, r=Math.sqrt(rnd());
     var x=480+Math.cos(a)*r*97, y=474+Math.sin(a)*r*22;
     el('ellipse',{cx:x.toFixed(1),cy:y.toFixed(1),rx:(0.9+rnd()*2.3).toFixed(2),ry:(0.5+rnd()*1.2).toFixed(2),
       fill:rnd()>.55?'#63432a':'#170e05','fill-opacity':(0.3+rnd()*0.5).toFixed(2)},sp);
-  }
-  var mt=document.getElementById('motes');
-  for(var m=0;m<16;m++){
-    var c=el('circle',{cx:(120+rnd()*720).toFixed(0),cy:(90+rnd()*330).toFixed(0),
-      r:(0.9+rnd()*1.8).toFixed(2),fill:'#fff6dd',class:'mote'},mt);
-    c.setAttribute('style','animation-duration:'+(9+rnd()*9).toFixed(1)+'s;animation-delay:-'+(rnd()*14).toFixed(1)+'s');
   }
   /* 茎毛：沿主茎路径取点，按 --stem 逐段解锁 */
   var stem=document.getElementById('stem'), hairs=document.getElementById('hairs');
@@ -809,49 +687,21 @@ var stage='idle';          /* idle | grow | pause | ripe | fall | still | frozen
 var growRAF=0, lastT=0;
 var BENDB_MAX=11, bendAtDetach=BENDB_MAX*0.65;
 
-function phaseText(){
-  if(stage==='still'||stage==='frozen') return '收获 · 静物';
-  if(stage==='fall') return '坠落 · 触地';
-  if(stage==='ripe') return '转色 · 熟成';
-  if(P<=0) return '静候 · 种子';
-  if(P<0.08) return '破土';
-  if(P<0.25) return '子叶展开';
-  if(P<0.34) return '抽茎 · 第一节';
-  if(P<0.50) return '侧枝萌发';
-  if(P<0.60) return '羽状复叶舒展';
-  if(P<0.67) return '叶腋花苞';
-  if(P<0.745) return '五瓣绽放';
-  if(P<0.80) return '花落 · 坐果';
-  if(P<0.99) return '果实膨大';
-  return '临界 · 转色';
-}
-function hud(){
-  phaseEl.textContent=phaseText();
-  pctEl.textContent=(P>=1?'100':(P*100<10?'0':'')+Math.floor(P*100))+'%';
-}
-every(320,hud);
-
 function growLoop(ts){
   if(stage!=='grow') return;
   if(!lastT) lastT=ts;
   var dt=Math.min(64,ts-lastT); lastT=ts;
   var np=P+dt/TOTAL_MS;
-  if(np>=1){ applyProgress(1); hud(); startRipen(); return; }
+  if(np>=1){ applyProgress(1); startRipen(); return; }
   applyProgress(np);
   growRAF=raf(growLoop);
 }
-
-btn.addEventListener('click',function(){
-  if(stage==='idle'){ stage='grow'; lastT=0; btn.classList.add('run'); btnLabel.textContent='暂停'; growRAF=raf(growLoop); }
-  else if(stage==='grow'){ stage='pause'; btnLabel.textContent='继续'; }
-  else if(stage==='pause'){ stage='grow'; lastT=0; btnLabel.textContent='暂停'; growRAF=raf(growLoop); }
-});
 
 /* ============================================================
    100%：1.5s 内转鲜红 + 暖金光晕闪烁 → 2s 后果蒂断开
    ============================================================ */
 function startRipen(){
-  stage='ripe'; btn.disabled=true; btnLabel.textContent='熟成'; dial.classList.add('hot');
+  stage='ripe';
   var ge=document.getElementById('glowEll'); if(ge) ge.classList.add('flick');
   var t0=performance.now();
   (function step(ts){
@@ -994,16 +844,13 @@ function fallStep(ts){
 
 /* ============================================================
    终局冻结：暂停全部 CSS animation、清除全部定时器与帧请求、
-   按钮变灰禁用、承载侧枝向上弹跳、飘落 2 片黄叶、恒定静物暖光
+   承载侧枝向上弹跳、飘落 2 片黄叶、恒定静物暖光
    ============================================================ */
 function finale(){
   /* 1) 停掉全部循环 CSS 动画（摇摆 / 粒子 / 光效），画面即刻定格 */
   pauseCssAnimations();
   R.classList.add('frozen');
-  /* 2) 按钮变灰禁用 */
-  btn.disabled=true; btn.classList.add('done'); btnLabel.textContent='已收获';
-  dial.classList.remove('hot'); dial.classList.add('done');
-  /* 3) 恒定静物暖光 */
+  /* 2) 恒定静物暖光 */
   scene.classList.add('stilllife');
   /* 4) 谢幕：侧枝一次向上弹跳 + 1~2 片黄叶飘落（JS 逐帧，最后自我注销） */
   var b0=bendAtDetach, bEnd=1.6;
@@ -1015,20 +862,18 @@ function finale(){
     sv('--bendB',bEnd+(b0-bEnd)*Math.exp(-t/0.30)*Math.cos(t/0.115));
     /* 撞击尘埃彻底散尽（终局画面里不留悬停颗粒） */
     stepDust(dt,Math.max(0,1-t/0.9));
-    /* 静物暖光与角落文案 */
+    /* 静物暖光 */
     sv('--sl',ss(cl01(t/1.25)));
-    sv('--hv',ss(cl01((t-0.55)/0.95)));
     /* 黄叶脱落 */
     while(made<drop.length&&t>=drop[made]){ var lf=releaseLeaflet(made); if(lf) leafs.push(lf); made++; }
     var moving=false;
     for(var i=0;i<leafs.length;i++) if(stepLeaflet(leafs[i],t)) moving=true;
     if(t<3.0||moving){ raf(curtain); return; }
     /* 5) 最终封帧：清除全部 setInterval / requestAnimationFrame */
-    sv('--bendB',bEnd); sv('--sl',1); sv('--hv',1);
+    sv('--bendB',bEnd); sv('--sl',1);
     pauseCssAnimations();
     killAllTimers();
     stage='frozen';
-    hud();
     document.body.setAttribute('data-frozen','1');
   })(t0);
 }
@@ -1066,16 +911,16 @@ function stepLeaflet(o,t){
 }
 
 /* 初始定格 */
-applyProgress(0); hud();
+applyProgress(0);
 
 /* 调试/嵌入接口（不参与叙事） */
 window.__TOMATO__={
-  set:function(p){ applyProgress(cl01(p)); hud(); },
+  set:function(p){ applyProgress(cl01(p)); },
   get:function(){ return {p:P,stage:stage}; },
-  jump:function(){ applyProgress(1); hud(); if(stage==='idle'||stage==='grow'||stage==='pause'){ stage='grow'; startRipen(); } },
+  jump:function(){ applyProgress(1); if(stage==='idle'||stage==='grow'||stage==='pause'){ stage='grow'; startRipen(); } },
   /* 重跑：解除终局冻结、归还 idle 态、变量归零（供插件下一轮专注） */
   resetAll:function(){
-    applyProgress(0); hud();
+    applyProgress(0);
     stage='idle';
     R.classList.remove('frozen');
     scene.classList.remove('stilllife');

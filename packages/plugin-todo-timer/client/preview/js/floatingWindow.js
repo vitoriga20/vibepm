@@ -6,13 +6,8 @@
  *  - 桌面常驻能力预留：FloatingSurface 抽象点（将来 vibepm 有桌面壳可接入）
  */
 
-const CLOCK_STATE_TEXT = {
-  idle: "休息中",
-  working: "专注中",
-  workPaused: "已暂停",
-  breaking: "休息中",
-  breakPaused: "休息暂停",
-};
+// 状态文案单一源在 env.js UI_TEXT.capsuleStateText（主页面胶囊条 / 桌面胶囊共用）
+const CLOCK_STATE_TEXT = UI_TEXT.capsuleStateText;
 
 // 页面内迷你胶囊同步（生长浮层顶部胶囊）
 function syncPill() {
@@ -248,7 +243,13 @@ class FloatingWindow {
         }
         syncFocusTask();
       },
-      onSettingsChange: () => this.refresh(),
+      onSettingsChange: () => {
+        this.refresh();
+        // 桌面胶囊窗口被手动关闭会回写开关状态（capsule.js pagehide）：同步重渲染设置页开关
+        if (typeof settingsPageComponent !== "undefined" && settingsPageComponent) {
+          settingsPageComponent.forEach((c) => c.component && c.component.render && c.component.render());
+        }
+      },
     });
   }
 

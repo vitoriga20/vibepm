@@ -138,6 +138,8 @@ let settingsPageComponent = {};
 // ————————————————————————————————————————————————————————————
 // 用户可见文案单一源（四象限 / 计划 / 专注耦合提示）：改动只在这里改，全链引用
 var UI_TEXT = {
+  // 时钟状态文案（主页面胶囊条 / 桌面胶囊共用）
+  capsuleStateText: { idle: "休息中", working: "专注中", workPaused: "已暂停", breaking: "休息中", breakPaused: "休息暂停" },
   // 四象限维度与象限名（索引即象限序：0=Q1 重要+紧急 … 3=Q4 一般）
   dimImportant: "重要",
   dimUrgent: "紧急",

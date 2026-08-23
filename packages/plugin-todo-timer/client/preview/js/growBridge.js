@@ -13,11 +13,10 @@
   let loaded = false;
   let dragging = false, offX = 0, offY = 0;
 
-  /* —— 隐藏动画自带 UI：注入 iframe 内部样式（不碰源文件） —— */
+  /* —— 让动画铺满浮层（画内 HUD/按钮/背景已从源文件删除，无需再隐藏） —— */
   const HIDE_CSS = `html,body{height:100%;margin:0;overflow:hidden;display:block;background:transparent;}
     body{align-items:flex-start;justify-content:flex-start;}
-    .wrap{position:relative;width:100%!important;height:100%!important;max-height:none!important;aspect-ratio:auto!important;}
-    .hud,.dial,.meta,#btn,.focus{display:none!important;}`;
+    .wrap{position:relative;width:100%!important;height:100%!important;max-height:none!important;aspect-ratio:auto!important;}`;
 
   /* —— 拖拽 —— */
   function onDown(e) {

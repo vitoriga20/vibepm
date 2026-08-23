@@ -1,0 +1,246 @@
+/* ============================================================
+   flap.css · 工业科研终端风格翻牌倒计时器（桌面胶囊右侧设备面板）
+   ------------------------------------------------------------
+   结构（每块数字 .flap 内 4 个半片，见 capsule.html）：
+     .fh-top   静态上半片（当前值）
+     .fh-bot   静态下半片（当前值）
+     .fh-fold  临时上半片（旧值，翻牌时自上向下折叠，转轴在中间缝）
+     .fh-rise  临时下半片（新值，前半程藏在后，后半程自下向上翻起）
+   翻牌时序（总 ~460ms）：上半片折叠(230ms) → 下半片翻起(230ms)；
+   z 序保证折叠片盖在旧画面上、翻起片盖住旧下半片；结束后两片回隐藏位。
+   机械卡扣感：.flap.flipping 整块瞬间压暗 + 缝线阴影加深 + 运行灯闪一次。
+   色板：近黑/石墨灰/冷白为主；安全黄只用于运行状态、警示边缘与进度线；
+   冰蓝仅用于分隔双指示灯。颜色集中在 :root 变量，便于整体换色。
+   ============================================================ */
+:root {
+  --dev-bg: #15161a;
+  --dev-line: #3a3d44;
+  --dev-ink: #e7e4db;          /* 冷白主字 */
+  --dev-ink-dim: #b8bcc4;      /* 石墨灰 */
+  --dev-ink-faint: #6a6f78;    /* 极低对比校准信息 */
+  --dev-yellow: #e8c64a;       /* 安全黄 */
+  --dev-yellow-dim: #7c6b26;
+  --dev-blue: #9fd4e8;         /* 冰蓝（指示点） */
+  --dev-red: #b0544a;          /* 低饱和红（收窗） */
+  --dev-red-dim: #5f322e;
+}
+
+.capPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  background: var(--dev-bg);
+  border-left: 1px solid var(--dev-line);
+  position: relative;
+  min-width: 0;
+}
+/* 警示边缘：面板顶部 1px 安全黄细线，运行中点亮（收窗后转红） */
+.capPanel::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 2px;
+  background: var(--dev-yellow);
+  opacity: .85;
+  box-shadow: 0 0 6px rgba(232, 198, 74, .35);
+  transition: background .3s, opacity .3s;
+}
+#capsuleWin.idle .capPanel::before { opacity: .12; }
+#capsuleWin.workPaused .capPanel::before,
+#capsuleWin.breakPaused .capPanel::before { opacity: .4; }
+#capsuleWin.closed .capPanel::before { background: var(--dev-red); opacity: .8; box-shadow: 0 0 6px rgba(176, 84, 74, .3); }
+
+/* —————— 设备头：系统编号 + 运行灯 —————— */
+.devHead { display: flex; align-items: center; justify-content: space-between; }
+.devId {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--dev-ink-faint);
+  text-transform: uppercase;
+}
+.devLed {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--dev-yellow);
+  box-shadow: 0 0 6px rgba(232, 198, 74, .5);
+  opacity: .15;
+  transition: opacity .25s;
+}
+#capsuleWin.working .devLed, #capsuleWin.breaking .devLed { opacity: 1; }
+#capsuleWin.workPaused .devLed, #capsuleWin.breakPaused .devLed { opacity: .35; }
+#capsuleWin.closed .devLed { background: var(--dev-red); box-shadow: 0 0 6px rgba(176, 84, 74, .5); }
+.devLed.flash { animation: ledFlash .46s steps(1, end); }
+@keyframes ledFlash {
+  0% { opacity: 1; } 30% { opacity: .15; } 60% { opacity: 1; } 100% { opacity: 1; }
+}
+
+/* —————— 翻牌数字组：MM:SS 居中，视觉焦点 —————— */
+.devClock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 0 6px;
+}
+
+.flap {
+  position: relative;
+  width: 52px; height: 76px;
+  perspective: 520px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 9px, rgba(255, 255, 255, .025) 9px 10px),
+    linear-gradient(180deg, #26282e 0%, #1d1f24 55%, #17181d 100%);
+  border: 1px solid var(--dev-line);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04), inset 0 -3px 6px rgba(0, 0, 0, .4), 0 2px 6px rgba(0, 0, 0, .45);
+}
+/* 中间缝线（翻牌转轴） */
+.flap::after {
+  content: "";
+  position: absolute; left: 0; right: 0; top: 50%;
+  height: 2px;
+  background: linear-gradient(180deg, #0c0d10, #24262b);
+  transform: translateY(-50%);
+  z-index: 7;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .05);
+}
+/* 侧边编号刻度（弱装饰） */
+.flap::before {
+  content: "";
+  position: absolute; right: 2px; top: 8px; bottom: 8px; width: 1px;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .14) 0 3px, transparent 3px 7px);
+  opacity: .35;
+}
+
+.fh { position: absolute; left: 0; width: 100%; height: 50%; overflow: hidden; backface-visibility: hidden; }
+.fh-top { top: 0; transform-origin: 50% 100%; z-index: 4; }
+.fh-bot { bottom: 0; transform-origin: 50% 0%; z-index: 1; }
+.fh-fold { top: 0; transform-origin: 50% 100%; z-index: 6; transform: rotateX(-90deg); }
+.fh-rise { bottom: 0; transform-origin: 50% 0%; z-index: 3; transform: rotateX(90deg); }
+
+.fv {
+  position: absolute; left: 0; width: 100%; height: 200%;
+  display: flex; align-items: center; justify-content: center;
+  font: 700 42px/1 "ui-monospace", "SF Mono", Consolas, "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--dev-ink);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .7), 0 0 12px rgba(0, 0, 0, .25);
+  letter-spacing: 1px;
+}
+.fh-top .fv, .fh-fold .fv { top: 0; }
+.fh-bot .fv, .fh-rise .fv { bottom: 0; }
+
+/* —————— 翻牌动效：上半片先折叠，下半片随后翻起（~460ms） —————— */
+.flap.flipping .fh-fold { animation: foldDown 230ms cubic-bezier(.55, .06, .68, .19) forwards; }
+.flap.flipping .fh-rise { animation: riseUp 230ms cubic-bezier(.22, .61, .36, 1) 230ms forwards; }
+@keyframes foldDown { from { transform: rotateX(0deg); } to { transform: rotateX(-90deg); } }
+@keyframes riseUp { from { transform: rotateX(90deg); } to { transform: rotateX(0deg); } }
+
+/* 机械卡扣感：翻牌瞬间整块压暗 + 边缘阴影加深 */
+.flap.flipping { animation: flapThud 460ms linear; }
+@keyframes flapThud {
+  0% { filter: brightness(.72); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35), 0 4px 10px rgba(0, 0, 0, .55); }
+  18% { filter: brightness(.92); }
+  38% { filter: brightness(.72); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .45), 0 5px 12px rgba(0, 0, 0, .6); }
+  70% { filter: brightness(.98); }
+  100% { filter: brightness(1); }
+}
+
+/* 悬停：只给极弱冷白边缘高亮 */
+.flap:hover {
+  border-color: #6f747d;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07), 0 2px 6px rgba(0, 0, 0, .45);
+}
+
+/* —————— 分隔符：两个冰蓝状态点（设备双指示灯） —————— */
+.flapColon { display: flex; flex-direction: column; gap: 14px; padding: 0 2px; }
+.flapColon .dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--dev-blue);
+  box-shadow: 0 0 5px rgba(159, 212, 232, .45);
+  opacity: .9;
+  transition: opacity .3s, background .3s;
+}
+#capsuleWin.working .flapColon .dot,
+#capsuleWin.breaking .flapColon .dot { animation: dotPulse 2.2s ease-in-out infinite; }
+#capsuleWin.workPaused .flapColon .dot,
+#capsuleWin.breakPaused .flapColon .dot { opacity: .3; }
+#capsuleWin.closed .flapColon .dot { background: var(--dev-red); box-shadow: 0 0 5px rgba(176, 84, 74, .4); opacity: .8; }
+@keyframes dotPulse {
+  0%, 100% { opacity: .55; } 50% { opacity: 1; }
+}
+
+/* —————— 状态栏：极简一行 + 细进度线 —————— */
+.devStatus {
+  font-size: 9.5px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--dev-ink-dim);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#devRun { color: var(--dev-yellow); }
+#capsuleWin.idle #devRun { color: var(--dev-ink-faint); }
+#capsuleWin.closed #devRun { color: var(--dev-red); }
+#capsuleWin.workPaused #devRun,
+#capsuleWin.breakPaused #devRun { color: var(--dev-yellow-dim); }
+/* 收窗：单行 WINDOW CLOSED（隐藏 " / " 与运行字） */
+.devStatus.no-run #devStatusSep,
+.devStatus.no-run #devRun { display: none; }
+
+.devProgress {
+  height: 2px;
+  background: #26282d;
+  position: relative;
+  overflow: hidden;
+}
+.devProgressBar {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0%;
+  background: var(--dev-yellow);
+  box-shadow: 0 0 4px rgba(232, 198, 74, .4);
+  transition: width .5s linear;
+}
+#capsuleWin.closed .devProgressBar { background: var(--dev-red); box-shadow: 0 0 4px rgba(176, 84, 74, .4); }
+
+/* —————— 控制按钮：低调硬边矩形、短标签 —————— */
+.devCtl { display: flex; justify-content: center; gap: 6px; padding-top: 2px; }
+.devBtn {
+  font-family: inherit;
+  font-size: 9.5px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--dev-ink-dim);
+  background: #1a1c21;
+  border: 1px solid var(--dev-line);
+  border-radius: 2px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.devBtn:hover:not(:disabled) { border-color: #7a808a; color: var(--dev-ink); }
+.devBtn:active:not(:disabled) { background: #23252b; }
+.devBtn:disabled { opacity: .3; cursor: default; }
+.devBtn.primary { color: var(--dev-yellow); border-color: var(--dev-yellow-dim); }
+.devBtn.primary:hover:not(:disabled) { background: rgba(232, 198, 74, .08); }
+
+/* —————— 设备脚注：极低对比度校准信息 —————— */
+.devFoot { display: flex; justify-content: flex-end; }
+.devCal {
+  font-size: 8px;
+  letter-spacing: 1.2px;
+  color: var(--dev-ink-faint);
+  text-transform: uppercase;
+}
+
+/* 小尺寸窗口：数字与间距收紧 */
+@media (max-width: 420px) {
+  .capPanel { padding: 10px 10px 8px; gap: 6px; }
+  .flap { width: 44px; height: 64px; }
+  .fv { font-size: 35px; }
+  .devClock { gap: 6px; }
+}
