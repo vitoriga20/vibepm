@@ -78,11 +78,14 @@ export class TodoTimerService {
         focusMs: 0,
         lastFocusAt: 0,
         focusOnDay: {},
+        focusMsOnDay: {},
       };
+      const ms = Number.isFinite(v.realDuration) ? v.realDuration : 0;
       s.focusCount += 1;
-      s.focusMs += Number.isFinite(v.realDuration) ? v.realDuration : 0;
+      s.focusMs += ms;
       if (v.endTimestamp > s.lastFocusAt) s.lastFocusAt = v.endTimestamp;
       s.focusOnDay[v.dateKey] = (s.focusOnDay[v.dateKey] ?? 0) + 1;
+      s.focusMsOnDay[v.dateKey] = (s.focusMsOnDay[v.dateKey] ?? 0) + ms;
       map[v.tarId] = s;
     }
     return map;

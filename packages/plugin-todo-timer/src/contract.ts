@@ -160,6 +160,8 @@ export interface TaskStat {
   lastFocusAt: number;
   /** 按天番茄数：本地日期键 → 当日专注条数 */
   focusOnDay: Record<string, number>;
+  /** 按天专注时长：本地日期键 → 当日 realDuration 合计（毫秒） */
+  focusMsOnDay: Record<string, number>;
 }
 
 /** 任务维度统计：tarId → TaskStat */

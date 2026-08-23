@@ -189,9 +189,11 @@ test("任务维度聚合：番茄数/时长/最近专注按 tarId 累计，休�
   assert.equal(doc.focusCount, 3);
   assert.equal(doc.focusMs, 70 * 60000);
   assert.equal(doc.lastFocusAt, day2);
-  // 按天分布：昨天 2 颗、今天 1 颗（本地日期键口径）
+  // 按天分布：昨天 2 颗、今天 1 颗（本地日期键口径）；时长按天同步累计
   assert.equal(doc.focusOnDay[localDateKey(day1)], 2);
   assert.equal(doc.focusOnDay[localDateKey(day2)], 1);
+  assert.equal(doc.focusMsOnDay[localDateKey(day1)], 45 * 60000);
+  assert.equal(doc.focusMsOnDay[localDateKey(day2)], 25 * 60000);
   // title 冗余优先于反查（任务 8 不在列表里也不丢标题）
   assert.equal(stats[8].title, "读论文");
 });

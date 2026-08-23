@@ -36,6 +36,8 @@ const UI_TEXT = {
   // 详情卡
   detailTitle: (key: string) => `${key} · 活动详情`,
   detailFocus: (min: number, t: number) => `专注 ${min} 分钟（${t} 番茄）`,
+  detailFocusByTaskTitle: "当日专注（按任务）：",
+  detailTaskRow: (title: string, min: number, t: number) => `${title} — ${min} 分钟（${t} 番茄）`,
   detailDoneTitle: "完成的任务：",
   detailPlannedTitle: "计划任务：",
   detailPlannedDone: (done: number, total: number) => `已完成 ${done}/${total}`,
@@ -81,12 +83,22 @@ interface PlanLite {
   state: string;
   milestones: Array<{ id: string; title: string }>;
 }
+/** 任务维度统计（todoTimer.getTaskStats 的轻量形状；focusOnDay 供详情卡按日过滤） */
+interface TaskStatLite {
+  tarId: number;
+  title: string;
+  focusCount: number;
+  focusMs: number;
+  focusOnDay: Record<string, number>;
+  focusMsOnDay: Record<string, number>;
+}
 interface DaysPayload {
   ok: boolean;
   updatedAt: number | null;
   days: Record<string, DayAggLite>;
   plans: PlanLite[];
   todayKey: string;
+  taskStats?: Record<number, TaskStatLite>;
 }
 
 const CSS = /* css */`
@@ -376,6 +388,23 @@ export class CalendarPanel extends HTMLElement {
       r.className = "row";
       r.textContent = UI_TEXT.detailFocus(fmtMin(agg.focusMs), agg.focusCount);
       box.appendChild(r);
+    }
+    // 按任务明细：taskStats.focusOnDay 命中当天，按当日番茄数降序（当日时长 = focusMsOnDay）
+    const dayTasks = Object.values(this._data?.taskStats ?? {})
+      .filter((t) => (t.focusOnDay?.[key] ?? 0) > 0)
+      .sort((a, b) => (b.focusOnDay[key] ?? 0) - (a.focusOnDay[key] ?? 0));
+    if (dayTasks.length) {
+      const r = document.createElement("div");
+      r.className = "row";
+      r.textContent = UI_TEXT.detailFocusByTaskTitle;
+      box.appendChild(r);
+      const ul = document.createElement("ul");
+      for (const t of dayTasks) {
+        const li = document.createElement("li");
+        li.textContent = UI_TEXT.detailTaskRow(t.title, fmtMin(t.focusMsOnDay?.[key] ?? 0), t.focusOnDay[key]);
+        ul.appendChild(li);
+      }
+      box.appendChild(ul);
     }
     if (agg.doneTitles.length) {
       const r = document.createElement("div");

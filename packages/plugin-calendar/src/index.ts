@@ -30,7 +30,8 @@ class CalendarPlugin {
       offs.push(ws.register({ kind: "exact", path: CALENDAR_API_PATH, handler: (req, res) => {
         if (req.method !== "GET" && req.method !== "HEAD") { sendJson(res, 405, { ok: false }); return; }
         const d = todo.getDistribution();
-        sendJson(res, 200, { ok: true, ...d });
+        // taskStats：按任务累计的番茄数/时长（详情卡「当日专注·按任务」明细用）
+        sendJson(res, 200, { ok: true, ...d, taskStats: todo.getTaskStats() });
       }}));
       return offs;
     };
