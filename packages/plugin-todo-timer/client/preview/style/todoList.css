@@ -419,7 +419,8 @@ background: var(--bg-color); /* 颜色 */
 
 
 
-.currentList> :first-child::after {
+/* 「在做」高亮：判定由渲染层 isActive 类承载（存储 current[0]），不再用 :first-child（渲染顺序已是象限视图） */
+.currentList> .taskItem.isActive::after {
     content: "";
     position: absolute;
     top: 0px;
@@ -679,7 +680,7 @@ background: var(--bg-color); /* 颜色 */
 
 }
 
-.currentList>:first-child .settopBtn {
+.currentList> .taskItem.isActive .settopBtn {
     display: none;
 }
 
@@ -832,87 +833,6 @@ pointer-events: none;
 }
 
 
-.hashSelect {
-    display: flex;
-    display: none;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 8px;
-    position: absolute;
-    top:-16px;
-    transform: translateY(-100%);
-    /* width: max-content; */
-    overflow-x: visible;
-
-    width: calc(100% - 32px);
-    height: max-content;
-
-}
-
-.hashTag {
-    color: var(--tag-ink);
-
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 16px;
-    cursor: pointer;
-
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: max-content;
-
-
-
-
-
-}
-
-.hashTag>div {
-    border-radius: 4px;
-    /* border: #fff 1px solid; */
-    background-color: #00000022;
-    color: var(--text-color-6);
-    font-size: 12px;
-    width: 22px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    flex: 0 0 auto;
-
-}
-
-
-.tag {
-    color: var(--tag-ink);
-    margin-left: 4px;
-    padding: 2px 8px;
-    padding-bottom: 3px;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 400;
-    margin: 8px 0;
-    /* display: none; */
-    width: max-content;
-    flex: 0 0 auto;
-    max-width: 90px;
-    /* 超长截断 */
-    white-space: nowrap;      /* 禁止文本换行 */
-    overflow: hidden;         /* 隐藏超出容器的文本 */
-    text-overflow: ellipsis;  /* 使用省略号表示截断的文本 */
-
-    user-select: none;
-    -webkit-user-select: none;
-
-    cursor: pointer;
-
-
-}
-
-
-
 .taskBtnBox {
     display: none;
     /* display: flex; */
@@ -970,8 +890,108 @@ pointer-events: none;
     background-color: color-mix(in srgb, var(--ink-ok) 10%, transparent);
 }
 
-.currentList> :first-child .doneBtn:hover{
+.currentList> .taskItem.isActive .doneBtn:hover{
     background-color: var(--panel-alt);
+}
+
+/* ---------------------------- 四象限组件 ---------------------------- */
+/* 象限角标（卡片左上，一眼识别所属象限；Q4 无角标保持安静） */
+.quadrantBadge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 2;
+
+    padding: 2px 6px;
+    border-radius: 6px;
+
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--text-color-6);
+    pointer-events: none;
+}
+.quadrantBadge.q0 { background-color: var(--danger); }
+.quadrantBadge.q1 { background-color: var(--accent); color: var(--on-accent); }
+.quadrantBadge.q2 { background-color: var(--ink-ok); }
+
+/* 重要/紧急标记按钮（hover 展开的任务按钮区，与置顶/删除/完成同排） */
+.markBtn {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-color-3);
+    user-select: none;
+}
+.markBtn.imp.on { color: var(--accent); }
+.markBtn.urg.on { color: var(--danger); }
+.markBtn:hover {
+    background-color: var(--mask-color-light);
+}
+
+/* 里程碑标签（任务卡上显示来源计划里程碑，悬停见计划名） */
+.milestoneTag {
+    align-self: flex-start;
+    max-width: 60%;
+    padding: 1px 8px;
+    border-radius: 6px;
+    border: 1px dashed var(--text-color-4);
+
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text-color-2);
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* 卡片番茄总数角标（数据复盘：累计专注番茄；挂在番茄盒末尾） */
+.tomatoTotal {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--kv-orange-color) 16%, transparent);
+
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-color-1);
+}
+.tomatoTotal img {
+    width: 14px !important;
+    height: 14px !important;
+}
+
+/* 计划页跳转回首页的定位闪烁（jumpToTask） */
+.taskItem.flash .taskContent {
+    animation: taskFlash 0.8s ease-in-out 2;
+}
+@keyframes taskFlash {
+    0%, 100% { box-shadow: none; }
+    50% { box-shadow: 0 0 0 2px var(--accent); }
+}
+
+/* 专注任务名：主时钟旁（验收一·3） */
+.focusTaskLabel {
+    margin-top: 8px;
+    max-width: 70vw;
+    font-size: 13px;
+    color: var(--text-color-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 专注任务名：右下角胶囊顶部（验收一·3） */
+#growWin .pill-task {
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-color-2);
 }
 
 

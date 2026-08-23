@@ -25,6 +25,7 @@ type IName =
   | "github"        // GitHub 猫（简线）
   | "feed"          // 动态信号流
   | "plugins"       // 拼图/插件（plugin-manager 用）
+  | "calendar"      // 日历（plugin-calendar 用）
   | "help";         // 帮助（onboarding 快速说明用）
 
 /** 直接返回 SVG 字符串（innerHTML 可用），或者在 shadow DOM 里当 innerHTML。
@@ -136,6 +137,13 @@ export function iconSVG(name: IName): string {
         <path d="M10 12 V18.8 a1.2 1.2 0 0 0 1.8 1 L14 17"/>
         <path d="M14 12 V18.8 a1.2 1.2 0 0 1 1.8 1 L20 16.5"/>
         <path d="M14 12 l6 3 a1.2 1.2 0 0 1 0 2.1 L16 19.5"/>
+      `);
+    case "calendar":
+      return c(`
+        <rect x="3.5" y="5" width="17" height="15.5" rx="2"/>
+        <path d="M3.5 10 h17"/>
+        <path d="M8 3 v4 M16 3 v4"/>
+        <path d="M7.5 14 h2 M11 14 h2 M14.5 14 h2 M7.5 17.5 h2 M11 17.5 h2"/>
       `);
     case "help":
       return c(`

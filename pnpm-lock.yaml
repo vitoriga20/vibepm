@@ -82,6 +82,34 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/plugin-calendar:
+    dependencies:
+      '@vitoriga20/core':
+        specifier: workspace:*
+        version: link:../core
+      '@vitoriga20/plugin-ide-view':
+        specifier: workspace:*
+        version: link:../plugin-ide-view
+      '@vitoriga20/plugin-todo-timer':
+        specifier: workspace:*
+        version: link:../plugin-todo-timer
+      '@vitoriga20/plugin-web-ui':
+        specifier: workspace:*
+        version: link:../plugin-web-ui
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.10
+        version: 22.20.1
+      esbuild:
+        specifier: ^0.24.2
+        version: 0.24.2
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.1.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/plugin-github:
     dependencies:
       '@vitoriga20/core':
@@ -224,6 +252,9 @@ importers:
       '@vitoriga20/plugin-ide-view':
         specifier: workspace:*
         version: link:../plugin-ide-view
+      '@vitoriga20/plugin-web-ui':
+        specifier: workspace:*
+        version: link:../plugin-web-ui
     devDependencies:
       '@types/node':
         specifier: ^22.10.10

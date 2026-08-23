@@ -1,3 +1,12 @@
+/**
+ * 统计一条任务的累计番茄总数（task.tomato = { progress: [timestamps] }）
+ * 数据复盘唯一口径：卡片总数 / 象限汇总 / 计划投入全部走这里
+ */
+function countTaskTomato(task) {
+  if (!task || !task.tomato) return 0;
+  return Object.values(task.tomato).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+}
+
 class todoListManger {
   constructor(type) {
     this.type = type;
@@ -7,13 +16,9 @@ class todoListManger {
       current: [],
       currentId: 0,
       statistics: [],
-      longTagList: {
-        0: { name: "默认", color: "#DADADA", state: "active" },
-        1: { name: "考上研", color: "#FFBE73", state: "active" },
-        2: { name: "瘦二十斤", color: "#BCD986", state: "active" },
-        3: { name: "赚20万", color: "#E2BCBC", state: "active" },
-      },
-      currentLongTarId: 4,
+      // 计划（长期目标/里程碑）：任务长期归属的唯一通道
+      plans: [],
+      currentPlanId: 1,
       defaultTask: {
         id: -1,
         title: "",
@@ -24,10 +29,12 @@ class todoListManger {
         beginTimestamp: 0,
         endTimestamp: 0,
         doneTimestamp: 0,
-        tag: 0,
         priority: 0,
         star: false,
         tomato: {},
+        important: false, // 四象限·重要
+        urgent: false, // 四象限·紧急
+        milestoneId: null, // 关联的计划里程碑 id（如 "p1m2"；null=未关联）
       },
     }
 
@@ -39,8 +46,8 @@ class todoListManger {
     this.onActiveTaskChange = () => { }; // 用于监听当前任务变化
     this.onTomatoFinish = () => { }; // 用于监听番茄钟完成
     this.onUpdate = () => { }; // 用于监听更新
-    this.onLongTarUpdate = () => { }; // 用于监听长标签更新
     this.onActiveTaskInfoChange = () => { }; // 用于监听当前任务信息变化
+    this.onPlanChange = () => { }; // 用于监听计划（长期目标/里程碑）变化
     let lastActiveTask = this.getActiveTask();
   }
 
@@ -53,7 +60,8 @@ class todoListManger {
       TaskList = this.defaultTaskList;
       this.saveTaskList(TaskList); // 只有在第一次初始化时保存默认配置
     } else {
-      this.TaskList = TaskList; // 直接使用存储的配置
+      // 新旧数据兼容：顶层浅合并默认结构，老数据缺失的新字段（plans 等）自动补默认值
+      this.TaskList = { ...this.defaultTaskList, ...TaskList };
     }
   }
 
@@ -76,7 +84,6 @@ class todoListManger {
 
     // 使用 JSON.parse(JSON.stringify(todo)) 深拷贝 todo 对象
     this.TaskList.current.push(JSON.parse(JSON.stringify(todo)));
-    // this.TaskList.longTagList[todo.tag].shortTar.add(currentId);
 
     this.TaskList.currentId++; // currentId 自增
     this.saveTaskList(this.TaskList);
@@ -88,9 +95,6 @@ class todoListManger {
    * 删除任务
    */
   remove(id) {
-    // 删除 longTagList 中对应的 shortTar
-    const longTarId = this.TaskList.current.find((todo) => todo.id === id).tag;
-    // this.TaskList.longTagList[longTarId].shortTar.delete(id);
     this.TaskList.current = this.TaskList.current.filter((todo) => todo.id !== id);
 
     this.saveTaskList(this.TaskList);
@@ -126,55 +130,21 @@ class todoListManger {
   /**
    * 更新任务
    */
-  update(id, title, tag) {
+  update(id, title) {
     // 定位到要更新的任务，不论是在 current、done 还是 archived 列表中
     const todo = this.TaskList.current.find((todo) => todo.id === id) || this.TaskList.done.find((todo) => todo.id === id) || this.TaskList.archived.find((todo) => todo.id === id);
-    // 更新任务的标题和标签
+    // 更新任务的标题
     todo.title = title;
-    todo.tag = tag;
     // 记录修改时间
     todo.modifiedTimestamp = Date.now();
     // 保存更新后的任务列表
     this.saveTaskList(this.TaskList);
-    // 调用监听函数
 
-
-
-    this.onUpdate(id, title, tag);
+    this.onUpdate(id, title);
 
     if(id == this.getActiveTask().id){
       this.onActiveTaskInfoChange();
     }
-
-    // this.onChange();
-  }
-
-  /**
-   * 更新长标签
-   */
-  updateLongTar(id, title = null, state = null, color = null) {
-    // id装换为数字
-    id = Number(id);
-
-    title == null ? null : this.TaskList.longTagList[id].name = title;
-    state == null ? null : this.TaskList.longTagList[id].state = state;
-    color == null ? null : this.TaskList.longTagList[id].color = color;
-
-    this.saveTaskList(this.TaskList);
-    this.onLongTarUpdate();
-    // this.onChange();
-  }
-
-  /**
-   * 添加长标签
-   */
-  addLongTar() {
-
-
-    // 添加新的长标签
-    this.TaskList.longTagList[this.TaskList.currentLongTarId++] = { name: " ", color: "#DADADA", state: "active" };
-    this.saveTaskList(this.TaskList);
-    this.onLongTarUpdate();
   }
 
   /**
@@ -236,16 +206,18 @@ class todoListManger {
    * @param {number} duration - 番茄钟持续时间(毫秒)
    * @param {string} type - 类型('work'|'shortBreak'|'longBreak')
    * @param {number} progress - 完成度(0-1)
+   * @param {object} [task] - 关联任务（默认取当前在做任务；专注结束时应传绑定任务）
    */
-  recordStatistics(duration, type, progress) {
+  recordStatistics(duration, type, progress, task = null) {
 
     console.log("recordStatistics",duration, type, progress);
-    const task = this.getActiveTask();
-    const tarId = task.id;
-    const longTarId = task.tag;
+    const t = task || this.getActiveTask();
+    const tarId = t.id;
+    const planRef = t.milestoneId || null; // 长期归属：关联的计划里程碑 id（旧长目标 longTarId 语义已被计划取代）
     const realDuration = duration * progress;
 
-    this.TaskList.statistics.push({ endTimestamp: Date.now(), duration, realDuration, type, progress, tarId, longTarId });
+    // title 冗余进统计记录：日历等消费端在任务被删除后仍能显示专注对象（旧记录无此字段→兜底）
+    this.TaskList.statistics.push({ endTimestamp: Date.now(), duration, realDuration, type, progress, tarId, planRef, title: t.title || "" });
     // 统计记录必须持久化，否则刷新后首页「H」与「统计」的活动时间会丢失
     this.saveTaskList(this.TaskList);
     // console.log(this.TaskList.statistics);
@@ -366,36 +338,6 @@ class todoListManger {
   }
 
   /**
-   * 查询指定 longTarId 对应的所有 type=work 的项
-   */
-  getWorkStatisticsByLongTarId(longTarId) {
-    const filteredItems = this.TaskList.statistics.filter((item) => item.type == "work" && item.longTarId == longTarId);
-
-    // 计算总时间（用 realDuration 加和，单位为分钟，保留一位小数）
-    const totalTime = filteredItems.reduce((sum, item) => sum + item.realDuration, 0) / MS_PER_MINUTE;
-    const totalTimeMinutes = totalTime.toFixed(1);
-
-    // 计算总项数
-    const totalItems = filteredItems.length;
-
-    // 计算对应的 shortTar 数
-    const subLists = ["current", "done", "archived"];
-    let shortTarNum = 0;
-
-    subLists.forEach((listName) => {
-      if (this.TaskList[listName] && Array.isArray(this.TaskList[listName])) {
-        shortTarNum += this.TaskList[listName].filter((task) => task.tag == longTarId).length;
-      }
-    });
-
-    return {
-      totalMinute: parseFloat(totalTimeMinutes),
-      totalTomato: totalItems,
-      totalShortTar: shortTarNum,
-    };
-  }
-
-  /**
    * 统计 type=work 的所有项的日期和数量分布
    */
   getWorkDateDistribution() {
@@ -417,32 +359,247 @@ class todoListManger {
   }
 
   /**
-   * 添加番茄到当前任务
+   * 添加番茄到指定任务（专注绑定记账：无论跑满或中断，只累计到绑定任务）
+   * @param {number} id - 绑定任务 id（-1 表示未绑定，仅记统计）
    * @param {number} duration - 番茄钟预设时间(毫秒)
    * @param {number} progress - 完成度(0-1)
+   * @returns {{title: string, total: number}} 任务标题与累计番茄总数（未绑定时 title 为空）
    */
-  addTomatoToActiveTask(duration,progress) {
-    const activeTask = this.getActiveTask();
-    this.recordStatistics(duration, "work", progress);
+  addTomatoToTask(id, duration, progress) {
+    const task = this.findTask(id);
+    // 绑定任务中途被删时 task=null：统计行挂到 defaultTask(tarId=-1)，不张冠李戴到其它任务
+    this.recordStatistics(duration, "work", progress, task || this.TaskList.defaultTask);
 
-    if (activeTask) {
+    if (task && task.id !== -1) {
       // 获取当前时间戳
       const currentTime = Date.now();
 
+      if (!task.tomato) task.tomato = {}; // 老数据兜底
       // 如果键不存在，则创建一个空数组
-      if (!activeTask.tomato[progress]) {
-        activeTask.tomato[progress] = [];
+      if (!task.tomato[progress]) {
+        task.tomato[progress] = [];
       }
 
       // 将当前时间戳添加到对应的进度数组中
-      activeTask.tomato[progress].push(currentTime);
-
-
+      task.tomato[progress].push(currentTime);
 
       this.saveTaskList(this.TaskList);
 
       this.onChange();
+      return { title: task.title, total: countTaskTomato(task) };
     }
+    return { title: "", total: 0 };
+  }
+
+  /**
+   * 跨列表查找任务（current / done / archived）
+   */
+  findTask(id) {
+    if (id == null || id === -1) return null;
+    return this.TaskList.current.find((todo) => todo.id === id) || this.TaskList.done.find((todo) => todo.id === id) || this.TaskList.archived.find((todo) => todo.id === id) || null;
+  }
+
+  // ———————————————————— 四象限 ————————————————————
+
+  /**
+   * 任务所属象限：0=Q1(重要+紧急) 1=Q2(重要) 2=Q3(紧急) 3=Q4(一般)
+   */
+  quadrantOf(task) {
+    const imp = task.important === true;
+    const urg = task.urgent === true;
+    if (imp && urg) return 0;
+    if (imp) return 1;
+    if (urg) return 2;
+    return 3;
+  }
+
+  /**
+   * 标记/取消「重要」（实时重排由 onChange 渲染层保证）
+   */
+  toggleImportant(id) {
+    const todo = this.TaskList.current.find((todo) => todo.id === id);
+    if (!todo) return;
+    todo.important = todo.important !== true;
+    todo.modifiedTimestamp = Date.now();
+    this.saveTaskList(this.TaskList);
+    this.onChange();
+  }
+
+  /**
+   * 标记/取消「紧急」
+   */
+  toggleUrgent(id) {
+    const todo = this.TaskList.current.find((todo) => todo.id === id);
+    if (!todo) return;
+    todo.urgent = todo.urgent !== true;
+    todo.modifiedTimestamp = Date.now();
+    this.saveTaskList(this.TaskList);
+    this.onChange();
+  }
+
+  /**
+   * 待办列表渲染顺序：象限优先（Q1→Q4），同象限内按创建时间新到旧
+   * （只算视图顺序，不改存储数组；「在做」仍由 current[0] 承载）
+   */
+  sortedCurrentTasks() {
+    return [...this.TaskList.current].sort((a, b) => {
+      const qa = this.quadrantOf(a);
+      const qb = this.quadrantOf(b);
+      if (qa !== qb) return qa - qb;
+      return (b.createdTimestamp || 0) - (a.createdTimestamp || 0);
+    });
+  }
+
+  /**
+   * 四象限汇总：各象限任务数与番茄投入（复盘视角，含待办/已完成/已归档全部任务）
+   */
+  getQuadrantSummary() {
+    const all = [...this.TaskList.current, ...this.TaskList.done, ...this.TaskList.archived];
+    const summary = [0, 1, 2, 3].map((q) => ({ quadrant: q, taskCount: 0, tomatoCount: 0 }));
+    all.forEach((t) => {
+      const q = this.quadrantOf(t);
+      summary[q].taskCount++;
+      summary[q].tomatoCount += countTaskTomato(t);
+    });
+    return summary;
+  }
+
+  // ———————————————————— 计划（长期目标/里程碑） ————————————————————
+
+  /**
+   * 添加计划
+   */
+  addPlan(title) {
+    const plan = {
+      id: this.TaskList.currentPlanId++,
+      title,
+      state: "active", // active=进行中 done=已归档
+      createdTimestamp: Date.now(),
+      doneTimestamp: 0,
+      nextMilestoneId: 1,
+      milestones: [], // {id, title, createdTimestamp, doneTimestamp}
+    };
+    this.TaskList.plans.push(plan);
+    this.saveTaskList(this.TaskList);
+    this.onPlanChange();
+  }
+
+  /**
+   * 更新计划标题
+   */
+  updatePlanTitle(id, title) {
+    const plan = this.TaskList.plans.find((p) => p.id === id);
+    if (!plan) return;
+    plan.title = title;
+    this.saveTaskList(this.TaskList);
+    this.onPlanChange();
+  }
+
+  /**
+   * 完成计划（归档，可回看）
+   */
+  completePlan(id) {
+    const plan = this.TaskList.plans.find((p) => p.id === id);
+    if (!plan) return;
+    plan.state = "done";
+    plan.doneTimestamp = Date.now();
+    this.saveTaskList(this.TaskList);
+    this.onPlanChange();
+  }
+
+  /**
+   * 恢复计划（从归档回到进行中）
+   */
+  resumePlan(id) {
+    const plan = this.TaskList.plans.find((p) => p.id === id);
+    if (!plan) return;
+    plan.state = "active";
+    plan.doneTimestamp = 0;
+    this.saveTaskList(this.TaskList);
+    this.onPlanChange();
+  }
+
+  /**
+   * 添加里程碑（id 形如 p1m2，全局唯一，供任务 milestoneId 单向引用）
+   */
+  addMilestone(planId, title) {
+    const plan = this.TaskList.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    plan.milestones.push({
+      id: `p${planId}m${plan.nextMilestoneId++}`,
+      title,
+      createdTimestamp: Date.now(),
+      doneTimestamp: 0,
+    });
+    this.saveTaskList(this.TaskList);
+    this.onPlanChange();
+  }
+
+  /**
+   * 更新里程碑标题
+   */
+  updateMilestoneTitle(planId, milestoneId, title) {
+    const plan = this.TaskList.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    const ms = plan.milestones.find((m) => m.id === milestoneId);
+    if (!ms) return;
+    ms.title = title;
+    this.saveTaskList(this.TaskList);
+    this.onPlanChange();
+  }
+
+  /**
+   * 切换里程碑达成状态（达成=打勾划线；再点取消达成）
+   */
+  toggleMilestone(planId, milestoneId) {
+    const plan = this.TaskList.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    const ms = plan.milestones.find((m) => m.id === milestoneId);
+    if (!ms) return;
+    ms.doneTimestamp = ms.doneTimestamp ? 0 : Date.now();
+    this.saveTaskList(this.TaskList);
+    this.onPlanChange();
+  }
+
+  /**
+   * 关联/解除任务到里程碑（单一源：任务.milestoneId；里程碑关联列表由反查得到）
+   * @param {number} taskId
+   * @param {string|null} milestoneId - null 解除关联
+   */
+  assignTaskToMilestone(taskId, milestoneId) {
+    const task = this.findTask(taskId);
+    if (!task) return;
+    task.milestoneId = milestoneId;
+    task.modifiedTimestamp = Date.now();
+    this.saveTaskList(this.TaskList);
+    this.onPlanChange();
+    this.onChange(); // 任务卡上的里程碑标签同步刷新
+  }
+
+  /**
+   * 反查某里程碑挂的所有任务（含待办/已完成/已归档）
+   */
+  tasksOfMilestone(milestoneId) {
+    return [...this.TaskList.current, ...this.TaskList.done, ...this.TaskList.archived].filter((t) => t.milestoneId === milestoneId);
+  }
+
+  /**
+   * 查找里程碑及其所属计划
+   */
+  findMilestone(milestoneId) {
+    if (!milestoneId) return null;
+    for (const plan of this.TaskList.plans) {
+      const ms = plan.milestones.find((m) => m.id === milestoneId);
+      if (ms) return { plan, milestone: ms };
+    }
+    return null;
+  }
+
+  /**
+   * 计划番茄总投入（计划下所有里程碑关联任务的番茄累计）
+   */
+  planTomatoTotal(plan) {
+    return plan.milestones.reduce((sum, ms) => sum + this.tasksOfMilestone(ms.id).reduce((s, t) => s + countTaskTomato(t), 0), 0);
   }
 
   /**
@@ -545,7 +702,7 @@ function generateTomatosBoxHtml(taskTomato) {
 
     });
 
-    return tomatosBoxHtml;
+    return tomatosBoxHtml + tomatoTotalHtml(tomatoList.length);
   } else {
     // 生成最终的 HTML 字符串
     let tomatosBoxHtml = "";
@@ -553,8 +710,16 @@ function generateTomatosBoxHtml(taskTomato) {
       tomatosBoxHtml += `<img src="${item.imgSrc}" style="width:${item.key * 12 + 10}px; height:${item.key * 12 + 10}px;" />`;
     });
 
-    return tomatosBoxHtml;
+    return tomatosBoxHtml + tomatoTotalHtml(tomatoList.length);
   }
+}
+
+/**
+ * 卡片番茄总数角标（数据复盘：每张任务卡显示累计番茄；0 时不显示，避免噪音）
+ */
+function tomatoTotalHtml(total) {
+  if (!total) return "";
+  return `<span class="tomatoTotal" title="${UI_TEXT.tomatoTotalTip(total)}"><img src="pic/tomato_1.svg" />×${total}</span>`;
 }
 
 const todoManger_ = new todoListManger("todoList");
@@ -591,14 +756,6 @@ todoManger_.onChange = function () {
 
     item.setAttribute("taskId", task.id);
 
-    let tag = "";
-    if (this.TaskList.longTagList[task.tag] != undefined) {
-      tag = `
-        <div class="tags" style="background-color:${this.TaskList.longTagList[task.tag].color}">
-            # ${this.TaskList.longTagList[task.tag].name}
-        </div>`;
-    }
-
     item.innerHTML = `            
             <div class="scale">
               <div class="s short op" ></div>
@@ -608,7 +765,6 @@ todoManger_.onChange = function () {
               <div class="s short op" ></div>
             </div>
             <div class="taskContent"> 
-                ${tag}
                 <div class="title">${task.title}</div>
 
 
@@ -646,22 +802,31 @@ todoManger_.onChange = function () {
   const todoList = document.getElementById("todoList");
   todoList.innerHTML = "";
   // console.log(this.TaskList.current);
-  this.TaskList.current.forEach((task, index) => {
+  // 「在做」判定：存储数组 current[0]（不再用渲染首位 :first-child，渲染顺序已交给象限视图）
+  const activeTaskId = this.getActiveTask().id;
+  // 渲染顺序 = 象限视图（Q1→Q4，同象限新到旧）；标记重要/紧急后 onChange 重渲染即实时重排
+  this.sortedCurrentTasks().forEach((task, index) => {
     let item = document.createElement("div");
     item.classList.add("taskItem");
+    const isActive = task.id === activeTaskId;
+    if (isActive) item.classList.add("isActive");
     item.ondblclick = function (e) {
       fillEditBox(task, e);
     };
 
     item.setAttribute("taskId", task.id);
 
-    let tag = "";
-    if (this.TaskList.longTagList[task.tag] != undefined) {
-      tag = `
-        <div class="tags" style="background-color:${this.TaskList.longTagList[task.tag].color}">
-            # ${this.TaskList.longTagList[task.tag].name}
-        </div>`;
+    // 象限角标（Q4 一般象限无角标，保持安静）
+    const quadrant = this.quadrantOf(task);
+    const quadrantBadge = UI_TEXT.quadrantBadges[quadrant] ? `<div class="quadrantBadge q${quadrant}">${UI_TEXT.quadrantBadges[quadrant]}</div>` : "";
+
+    // 里程碑标签：关联了计划的任务一眼可见来源（悬停显示所属计划名）
+    let milestoneTag = "";
+    if (task.milestoneId) {
+      const found = this.findMilestone(task.milestoneId);
+      if (found) milestoneTag = `<div class="milestoneTag" title="${found.plan.title}">${found.milestone.title}</div>`;
     }
+
     let scale = `
     <div class="scale">
         <div class="s short op" ></div>
@@ -669,9 +834,9 @@ todoManger_.onChange = function () {
         <div class="s mid   op"   ></div>
         <div class="s short op" ></div>
         <div class="s short op" ></div>
-    </div>  
+    </div>
     `;
-    if (index == 0) {
+    if (isActive) {
       scale = `
         <div class="scale">
             <div class="s short op" ></div>
@@ -679,18 +844,23 @@ todoManger_.onChange = function () {
             <div class="s long op"   ></div>
             <div class="s short op" ></div>
             <div class="s short op" ></div>
-        </div>  
+        </div>
         `;
     }
 
-    item.innerHTML = `       
-    ${scale} 
-    <div class="taskContent">
-            ${tag}
-        <div class="title">${task.title}</div>
+    const impOn = task.important === true;
+    const urgOn = task.urgent === true;
 
+    item.innerHTML = `
+    ${scale}
+    <div class="taskContent">
+        ${quadrantBadge}
+        <div class="title">${task.title}</div>
+        ${milestoneTag}
 
         <div class="taskBtnBox">
+          <span taskId="${task.id}" onclick="toggleImportantBtn(this,event)" class="markBtn imp ${impOn ? "on" : ""}" title="${impOn ? UI_TEXT.markImportantTipOn : UI_TEXT.markImportantTipOff}">${UI_TEXT.markImportant}</span>
+          <span taskId="${task.id}" onclick="toggleUrgentBtn(this,event)" class="markBtn urg ${urgOn ? "on" : ""}" title="${urgOn ? UI_TEXT.markUrgentTipOn : UI_TEXT.markUrgentTipOff}">${UI_TEXT.markUrgent}</span>
           <span taskId="${task.id}" onclick="setTopTask(this,event)"   class="settopBtn">
             <img src="pic/settop.svg" />
           </span>
@@ -699,17 +869,14 @@ todoManger_.onChange = function () {
           </span>
           <span taskId="${task.id}" onclick="compltedTask(this,event)" class="doneBtn">
             <img src="pic/done.svg" />
-          </span> 
+          </span>
         </div>
         <div class="tomatos">
             ${generateTomatosBoxHtml(task.tomato)}
         </div>
     </div>`;
 
-    if (taskMode) {
-      setElementCanDrop(item);
-    }
-
+    // 拖拽排序已停用：列表顺序由四象限视图派生，手动拖拽会与象限重排冲突
     todoList.appendChild(item);
   });
 
@@ -745,22 +912,12 @@ todoManger_.onChange = function () {
   this.isActivedTaskChanged();
 };
 
-todoManger_.onLongTarUpdate = function () {
-  updateTaskTitle(this.getActiveTask());
-}
-
 todoManger_.onActiveTaskInfoChange = function () {
   updateTaskTitle(this.getActiveTask());
 }
 
 
 function compltedTask(element, event) {
-  if (settings.config.soundEffect) {
-    // 播放音乐
-    const audio = new Audio("audio/achievement_s.aac");
-    audio.play();
-  }
-
   event.stopPropagation();
   const taskId = parseInt(event.target.getAttribute("taskId"));
   console.log(taskId);
@@ -782,6 +939,18 @@ function setTopTask(element, event) {
   const taskId = parseInt(event.target.getAttribute("taskId"));
   console.log(taskId);
   todoManger_.activeTask(taskId, "current");
+}
+
+// 四象限标记按钮（卡片上实时切换，onChange 重渲染即实时重排）
+function toggleImportantBtn(element, event) {
+  event.stopPropagation();
+  const taskId = parseInt(element.getAttribute("taskId"));
+  todoManger_.toggleImportant(taskId);
+}
+function toggleUrgentBtn(element, event) {
+  event.stopPropagation();
+  const taskId = parseInt(element.getAttribute("taskId"));
+  todoManger_.toggleUrgent(taskId);
 }
 
 function activeTask(element, event) {
@@ -908,14 +1077,6 @@ function renderArchivedTasks(date, tasks) {
 
     item.setAttribute("taskId", task.id);
 
-    let tag = "";
-    if (todoManger_.TaskList.longTagList[task.tag] != undefined) {
-      tag = `
-        <div class="tags" style="background-color:${todoManger_.TaskList.longTagList[task.tag].color}">
-            # ${todoManger_.TaskList.longTagList[task.tag].name}
-        </div>`;
-    }
-
     item.innerHTML = `      
             <div class="scale">
               <div class="s short op" ></div>
@@ -925,7 +1086,6 @@ function renderArchivedTasks(date, tasks) {
               <div class="s short op" ></div>
             </div>      
             <div class="taskContent"> 
-                            ${tag}
                 <div class="title">${task.title}</div>
 
                 <div class="taskBtnBox">
@@ -963,15 +1123,12 @@ function renderArchivedTasks(date, tasks) {
 const a = todoManger_.getWorkStatistics();
 // console.log(a);
 
-todoManger_.onUpdate = (id, title, tag) => {
+todoManger_.onUpdate = (id, title) => {
   // 获取对应的标签属性taskid=id 的 element
   let element = document.querySelector(`.taskItem[taskid="${id}"]`);
-  // 修改对应的文本和标签
+  // 修改对应的文本
   element.querySelector(".title").innerText = title;
-  element.querySelector(".tags").style.backgroundColor = todoManger_.TaskList.longTagList[tag].color;
-  element.querySelector(".tags").innerText = `#${todoManger_.TaskList.longTagList[tag].name}`;
 };
-
 
 
 
@@ -979,7 +1136,6 @@ todoManger_.onUpdate = (id, title, tag) => {
 async function updateTaskTitle(task) {
 
   floatingWindow.sendMessage({ type: "updateTask", content: task });
-  floatingWindow.sendMessage({ type: "updateTag", content: task.tag in todoManger_.TaskList.longTagList ? todoManger_.TaskList.longTagList[task.tag].name : "" });
 
 }
 

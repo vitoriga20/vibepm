@@ -37,7 +37,7 @@
   /* backdrop-filter: blur(10px); */
   background-color: #2a262ef0;
   /* cursor: url(../pic/thanks.svg), auto; */
-  border: #ffffff22 1px solid;
+  border: color-mix(in srgb, var(--panel, #fff) 13.33%, transparent) 1px solid;
 
   /* display: none; */
 
@@ -45,7 +45,7 @@
 }
 
 .shop_popup_title {
-  color: #fff;
+  color: var(--panel, #fff);
   font-size: 18px;
   font-weight: 900;
   /* padding: 8px 16px; */
@@ -78,7 +78,7 @@
 
   /* background: linear-gradient(80deg, #b862ff66 0%, #2c80ff66 25%, #b862ff66 50%, #2c80ff66 75%, #b862ff66 100%); */
   background:  linear-gradient(84.2deg, rgba(255, 221, 183, 0.08) 0%, rgba(255, 148, 23, 0.08) 19.24%, rgba(184, 229, 168, 0.08) 47.29%, rgba(164, 230, 214, 0.08) 61.35%, rgba(116, 205, 255, 0.08) 83.13%, rgba(255, 221, 183, 0.08) 100%)
-  #fff
+  var(--panel, #fff)
   ;
 
 
@@ -127,7 +127,7 @@
 
 .vip_card_unactive {
   background: linear-gradient(265.88deg, #2C80FF11 2.17%, #AA3FFF11 98.57%);
-  border: #ffffff55 1px solid;
+  border: color-mix(in srgb, var(--panel, #fff) 33.33%, transparent) 1px solid;
 }
 
 .vip_card_unactive::after {
@@ -144,7 +144,7 @@
   height: 32px;
   /* border: #fff 1px solid; */
   border-radius: 24px;
-  color: #fff;
+  color: var(--panel, #fff);
   font-weight: 600;
   font-size: 16px;
 
@@ -152,12 +152,12 @@
 }
 
 .good:hover {
-  background-color: #ffffff22;
+  background-color: color-mix(in srgb, var(--panel, #fff) 13.33%, transparent);
 }
 
 /* 点击效果 */
 .good:active {
-  background-color: #ffffff33;
+  background-color: color-mix(in srgb, var(--panel, #fff) 20%, transparent);
 }
 
 .good :last-child {
@@ -202,7 +202,7 @@
   padding: 8px;
   border-radius: 24px;
   box-sizing: border-box;
-  background-color: #ffffff22;
+  background-color: color-mix(in srgb, var(--panel, #fff) 13.33%, transparent);
   cursor: pointer;
 }
 
@@ -224,7 +224,7 @@
   justify-content: center;
   align-items: center;
 
-  color: #fff;
+  color: var(--panel, #fff);
   font-size: 16px;
   line-height: 16px;
   font-weight: 100;

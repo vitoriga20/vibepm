@@ -1,0 +1,347 @@
+/**
+ * 计划页（长期目标/里程碑）样式
+ * 色值全部引用皮肤 token（color.css 映射层），不出现硬编码字面量
+ */
+
+/* ———————————— 计划添加 ———————————— */
+.planAddBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+.planAddBox input {
+  flex-grow: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background-color: var(--taskBox-bg-color);
+  color: var(--text-color-1);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.planAddBox input:focus {
+  border-color: var(--text-color-4);
+}
+
+.planAddBtn {
+  padding: 10px 18px;
+  border-radius: 12px;
+  background-color: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  flex: 0 0 auto;
+}
+
+.planAddBtn:hover {
+  filter: brightness(1.05);
+}
+
+/* ———————————— 计划卡片 ———————————— */
+.plans {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planCard {
+  background-color: var(--setting-bg-color);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-sizing: border-box;
+}
+
+.planHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.planTitle {
+  flex-grow: 1;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text-color-1);
+  outline: none;
+  border-bottom: 1px solid transparent;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planTitle[contenteditable="true"]:focus {
+  border-bottom-color: var(--text-color-1);
+}
+
+/* 计划番茄总投入（数据复盘·计划视角） */
+.planTomato {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background-color: color-mix(in srgb, var(--kv-orange-color) 16%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-color-1);
+  flex: 0 0 auto;
+}
+
+.planTomato img {
+  width: 14px;
+  height: 14px;
+}
+
+.planStateBtn {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-color-2);
+  cursor: pointer;
+  user-select: none;
+  flex: 0 0 auto;
+}
+
+.planStateBtn:hover {
+  background-color: var(--mask-color-light);
+  color: var(--text-color-1);
+}
+
+/* 归档卡片：弱化呈现，可回看；隐藏交互入口（恢复按钮除外） */
+.planCard.archived {
+  opacity: 0.75;
+}
+.planCard.archived .msCheck,
+.planCard.archived .msLinkBtn {
+  display: none;
+}
+
+/* ———————————— 里程碑 ———————————— */
+.milestones {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.milestone {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.milestone:hover {
+  background-color: var(--mask-color-light);
+}
+
+/* 达成勾选框（状态标记：达成=打勾+划线） */
+.msCheck {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  border: 1.5px solid var(--text-color-3);
+  border-radius: 5px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.milestone.done .msCheck {
+  background-color: var(--ink-ok);
+  border-color: var(--ink-ok);
+}
+
+.milestone.done .msCheck::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--text-color-6);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.milestone.done .msTitle {
+  text-decoration: line-through;
+  color: var(--text-color-3);
+}
+
+.msBody {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.msTitle {
+  font-size: 14px;
+  color: var(--text-color-1);
+  outline: none;
+  border-bottom: 1px solid transparent;
+}
+
+.msTitle:focus {
+  border-bottom-color: var(--text-color-1);
+}
+
+/* 关联待办芯片组（点击芯片跳回首页定位任务） */
+.msTasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.msTask {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background-color: var(--taskBox-bg-color);
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-color-1);
+  cursor: pointer;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msTask:hover {
+  border-color: var(--accent);
+}
+
+.msTask i {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--kv-orange-color);
+  margin-left: 2px;
+}
+
+.msLinkBtn {
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px dashed var(--text-color-4);
+  font-size: 12px;
+  color: var(--text-color-3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.msLinkBtn:hover {
+  color: var(--text-color-1);
+  border-color: var(--text-color-3);
+}
+
+/* 关联待办选择器（展开列出当前待办，点选关联/解除） */
+.msPicker {
+  margin-top: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  background-color: var(--taskBox-bg-color);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.msPickerItem {
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-color-2);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msPickerItem:hover {
+  background-color: var(--mask-color-light);
+}
+
+.msPickerItem.linked {
+  color: var(--text-color-1);
+  font-weight: 700;
+  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.msPickerEmpty {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text-color-3);
+  text-align: center;
+}
+
+.msAddBox {
+  margin-top: 4px;
+}
+
+.msAddInput {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px dashed var(--text-color-4);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-color-1);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.msAddInput:focus {
+  border-color: var(--text-color-3);
+  border-style: solid;
+}
+
+.planEmpty {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-color-3);
+}
+
+/* ———————————— 四象限汇总（统计页） ———————————— */
+.quadrantSummary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.quadrantCell {
+  background-color: var(--setting-bg-color);
+  border-radius: 14px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--text-color-4);
+}
+
+.quadrantCell.q0 { border-left-color: var(--danger); }
+.quadrantCell.q1 { border-left-color: var(--accent); }
+.quadrantCell.q2 { border-left-color: var(--ink-ok); }
+.quadrantCell.q3 { border-left-color: var(--text-color-4); }
+
+.quadrantName {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text-color-1);
+}
+
+.quadrantNums {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-color-2);
+}

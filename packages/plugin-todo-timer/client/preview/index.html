@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="style/switch.css" />
   <link rel="stylesheet" href="style/calendar.css" />
   <link rel="stylesheet" href="style/select.css" />
+  <link rel="stylesheet" href="style/plans.css" />
   <script src="js/theme.js"></script>
   <style>
     /* 右下角生长浮层：胶囊在上 + 番茄动画在下（可拖拽） */
@@ -54,6 +55,13 @@
     <div class="btnBox homePage" data-title="首页" id="clockPageBtn">
       <div class="avatar">
         <img class="svg" src="pic/clock.svg" />
+      </div>
+    </div>
+
+    <!-- 计划（长期目标/里程碑）独立入口：data-title 由 plans.js 从 UI_TEXT 注入 -->
+    <div class="btnBox" data-title="" id="planPageBtn">
+      <div class="avatar">
+        <img class="svg" src="pic/plan.svg" />
       </div>
     </div>
 
@@ -125,6 +133,9 @@
           |
           <div id="focusHours"></div>
         </div>
+
+        <!-- 专注任务名（验收一·3：专注进行中，时钟旁显示正在专注哪条任务；文案由 syncFocusTask 注入） -->
+        <div class="focusTaskLabel" id="focusTaskLabel" style="display:none"></div>
       </div>
 
       <div class="listBox" id="listBox">
@@ -199,15 +210,13 @@
         </div>
       </div>
       <div class="taskAddBox" id="taskAddBox">
-        <div class="hashSelect" id="hashSelect"></div>
         <div class="inputBox">
           <div class="editingIcon" id="editingIcon" onclick="exitEditModel()">
             编辑
             <br />
             模式
           </div>
-          <span class="tag" id="inputTag" onclick="toggleHashSelect(event)"></span>
-          <div contenteditable="true" class="editable empty" id="editor" data-placeholder="输入眼下聚焦的小目标，按 # 键关联长目标"></div>
+          <div contenteditable="true" class="editable empty" id="editor" data-placeholder="输入眼下聚焦的小目标，回车提交"></div>
 
 
           <div class="submitBtn" id="submitBtn" onclick="submitTask(event)">↩︎</div>
@@ -242,158 +251,28 @@
           <div id="calendar"></div>
         </div>
 
-        <div class="setting_group_item" id="longTarsGroupBox">
-          <div class="setting_group_title">
-            进行中的长目标：
-            <span class="addLongTar" onclick="addLongTar() ">添加</span>
-          </div>
+        <!-- 四象限汇总（验收四·3：各象限任务数与番茄投入一览；标题与内容均由 JS 从 UI_TEXT 注入） -->
+        <div class="setting_group_item">
+          <div class="setting_group_title" id="quadrantSummaryTitle"></div>
+          <div class="quadrantSummary" id="quadrantSummary"></div>
+        </div>
 
-          <div class="longTars" id="longTars_active">
-            <div class="longTagBox" style="background-color: #ffbe73">
-              <span class="longTar">考上研</span>
-              <div class="rightBox">
-                <div>
-                  <span>13.5</span>
-                  <span>分钟</span>
-                </div>
-                <div>
-                  <span>50</span>
-                  <span>番茄</span>
-                </div>
-                <div>
-                  <span>23</span>
-                  <span>小目标</span>
-                </div>
-              </div>
-            </div>
-            <div class="longTagBox" style="background-color: #bcd986">
-              <span class="longTar">瘦二十斤</span>
-              <div class="rightBox">
-                <div>
-                  <span>13.5</span>
-                  <span>分钟</span>
-                </div>
-                <div>
-                  <span>50</span>
-                  <span>番茄</span>
-                </div>
-                <div>
-                  <span>23</span>
-                  <span>小目标</span>
-                </div>
-              </div>
-            </div>
-            <div class="longTagBox" style="background-color: #e2bcbc">
-              <span class="longTar">开发AI输入法</span>
-              <div class="rightBox">
-                <div>
-                  <span>13.5</span>
-                  <span>分钟</span>
-                </div>
-                <div>
-                  <span>50</span>
-                  <span>番茄</span>
-                </div>
-                <div>
-                  <span>23</span>
-                  <span>小目标</span>
-                </div>
-              </div>
-            </div>
-            <div class="longTagBox" style="background-color: #b7afea">
-              <span class="longTar">其它</span>
-              <div class="rightBox">
-                <div>
-                  <span>13.5</span>
-                  <span>分钟</span>
-                </div>
-                <div>
-                  <span>50</span>
-                  <span>番茄</span>
-                </div>
-                <div>
-                  <span>23</span>
-                  <span>小目标</span>
-                </div>
-              </div>
-            </div>
+      </div>
+    </div>
+    <!-- 计划（长期目标/里程碑）：与日常待办平级的独立页（验收三·1）；文案由 plans.js 从 UI_TEXT 注入 -->
+    <div class="page" id="planPage">
+      <div class="setting_group planGroup">
+        <div class="setting_group_item">
+          <div class="setting_group_title" id="planActiveTitle"></div>
+          <div class="planAddBox">
+            <input id="planAddInput" type="text" />
+            <div class="planAddBtn" id="planAddBtn"></div>
           </div>
-          <div class="setting_group_title">已完成的长目标：</div>
-
-          <div class="longTars" id="longTars_done">
-            <div class="longTagBox" style="background-color: #ffbe73">
-              <span class="longTar">考上研</span>
-              <div class="rightBox">
-                <div>
-                  <span>13.5</span>
-                  <span>分钟</span>
-                </div>
-                <div>
-                  <span>50</span>
-                  <span>番茄</span>
-                </div>
-                <div>
-                  <span>23</span>
-                  <span>小目标</span>
-                </div>
-              </div>
-            </div>
-            <div class="longTagBox" style="background-color: #bcd986">
-              <span class="longTar">瘦二十斤</span>
-              <div class="rightBox">
-                <div>
-                  <span>13.5</span>
-                  <span>分钟</span>
-                </div>
-                <div>
-                  <span>50</span>
-                  <span>番茄</span>
-                </div>
-                <div>
-                  <span>23</span>
-                  <span>小目标</span>
-                </div>
-              </div>
-            </div>
-            <div class="longTagBox" style="background-color: #e2bcbc">
-              <span class="longTar">开发AI输入法</span>
-              <div class="rightBox">
-                <div>
-                  <span>13.5</span>
-                  <span>分钟</span>
-                </div>
-                <div>
-                  <span>50</span>
-                  <span>番茄</span>
-                </div>
-                <div>
-                  <span>23</span>
-                  <span>小目标</span>
-                </div>
-              </div>
-            </div>
-            <div class="longTagBox" style="background-color: #b7afea">
-              <span class="longTar">其它</span>
-              <div class="rightBox">
-                <div>
-                  <span>13.5</span>
-                  <span>分钟</span>
-                </div>
-                <div>
-                  <span>50</span>
-                  <span>番茄</span>
-                </div>
-                <div>
-                  <span>23</span>
-                  <span>小目标</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- <span class="longTar" style="background-color:#BCD986;">瘦二十斤</span>
-                            <span class="longTar" style="background-color:#E2BCBC;">开发AI输入法</span>
-                            <span class="longTar" style="background-color:#b7afea;">其它</span> -->
-          </div>
+          <div class="plans" id="plansActive"></div>
+        </div>
+        <div class="setting_group_item">
+          <div class="setting_group_title" id="planArchivedTitle"></div>
+          <div class="plans" id="plansArchived"></div>
         </div>
       </div>
     </div>
@@ -445,13 +324,9 @@
                 <div id="showSuccessPopup" class="switch"></div>
                 <div class="settingLabel">专注结束弹窗</div>
               </div>
-              <div class="switchBox">
-                <div id="soundEffect" class="switch"></div>
-                <div class="settingLabel">提示音效</div>
-              </div>
             </div>
           </div>
-          <div class="setting_group_title">屏幕胶囊设置：</div>
+          <div class="setting_group_title">胶囊设置：</div>
           <div class="timeSet">
             <div class="switchBox">
               <div id="showFloatingWindow" class="switch"></div>
@@ -465,30 +340,15 @@
                 <div id="slider-thumb-opacity" class="slider-thumb"></div>
               </div>
             </div>
-          </div>
-          <div class="setting_group_title">番茄堆设置（需启用屏幕胶囊）：</div>
-          <div class="timeSet pileSet">
-            <!-- 分割线 -->
-            <line>
-              <div class="switchBox">
-                <div id="showTomatoAnimation" class="switch"></div>
-                <div class="settingLabel">番茄堆</div>
-              </div>
-            </line>
+
+            <div class="switchBox">
+              <div id="showTomatoAnimation" class="switch"></div>
+              <div class="settingLabel">生长动画</div>
+            </div>
             <div class="switchBox">
               <div id="autoHideAni" class="switch"></div>
               <div class="settingLabel">专注时隐藏</div>
             </div>
-
-            <form class="radioTomatoAni" id="tomatoBoxRange">
-              <div class="settingLabel">时间范围</div>
-              <input type="radio" id="_1" name="tomatoBoxRange" value="1" checked />
-              <label for="_1">今天</label>
-              <input type="radio" id="_2" name="tomatoBoxRange" value="7" />
-              <label for="_2">本周</label>
-              <input type="radio" id="_3" name="tomatoBoxRange" value="30" />
-              <label for="_3">本月</label>
-            </form>
           </div>
           <div class="confirm_box">
             <div class="confirm_btn" onclick="onConfirmSettings()">确定</div>
@@ -569,6 +429,7 @@
   <script src="js/select.js"></script>
   <script src="js/drag.js"></script>
   <script src="js/todoList.js"></script>
+  <script src="js/plans.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/index.js"></script>
   <!-- 右下角生长浮层：胶囊在上 + 番茄动画在下（可拖拽） -->
@@ -576,9 +437,11 @@
     <div class="growHead" id="growHead" title="拖拽移动 · 点击回主时钟">
       <span class="pill-state" id="growState">休息中</span>
       <span class="pill-dot"></span>
+      <!-- 专注任务名（验收一·3：胶囊顶部显示正在专注哪条任务；由 syncFocusTask 注入） -->
+      <span class="pill-task" id="pill-task" style="display:none"></span>
       <span class="pill-time" id="growTime">30 min</span>
     </div>
-    <iframe id="tomatoLife" src="tomato-life.html" allow="autoplay" title="番茄生长动画"></iframe>
+    <iframe id="tomatoLife" src="tomato-life.html" title="番茄生长动画"></iframe>
   </div>
   <script src="js/growBridge.js"></script>
 </body>

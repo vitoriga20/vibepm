@@ -28,7 +28,7 @@ export class TodoTimerPanel extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.shadowRoot!.innerHTML = `
       <style>${CSS}</style>
-      <iframe src="/plugins/plugin-todo-timer/preview/index.html" allow="autoplay"></iframe>
+      <iframe src="/plugins/plugin-todo-timer/preview/index.html"></iframe>
     `;
   }
 }

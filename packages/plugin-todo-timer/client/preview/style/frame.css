@@ -85,7 +85,7 @@ border-radius: 5px; /* 圆角 */
 }
 
 .page::-webkit-scrollbar-track {
-background: #ffffffff; /* 颜色 */
+background: var(--panel, #fff); /* 颜色（白纸面板 token，独立打开回落 #fff） */
 }
 
 @font-face {

@@ -7,13 +7,11 @@ class settingsConfig {
       longBreakInterval: 4,
       autoWork: false,
       autoBreak: false,
-      soundEffect: true,
       showSuccessPopup: false,
 
       showFloatingWindow: true,
       showTomatoAnimation: true,
       autoHideAni: false,
-      tomatoBoxRange: 1,
 
       darkMode: "light",
 

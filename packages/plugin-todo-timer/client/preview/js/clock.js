@@ -19,6 +19,7 @@ class TomatoClock {
       pauseTimeFlag: false, // 是否暂停
       leftTime: 0, // 剩余时间
       progress: 0, // 进度
+      boundTaskId: -1, // 本次专注绑定的任务 id（开始专注时锁定；-1=未绑定）
     };
 
     // 初始化配置

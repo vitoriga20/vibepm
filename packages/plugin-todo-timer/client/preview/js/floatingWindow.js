@@ -14,17 +14,6 @@ const CLOCK_STATE_TEXT = {
   breakPaused: "休息暂停",
 };
 
-function playSound(src) {
-  try {
-    if (typeof settings !== "undefined" && settings.config.soundEffect === false) return;
-    const audio = new Audio(src);
-    audio.volume = 0.6;
-    audio.play();
-  } catch (e) {
-    console.warn("playSound 失败:", e);
-  }
-}
-
 // 页面内迷你胶囊同步（生长浮层顶部胶囊）
 function syncPill() {
   const pill = document.getElementById("growWin");
@@ -41,6 +30,49 @@ function syncPill() {
     timeEl.textContent = t.minutes + ":" + t.seconds;
   }
   pill.classList.toggle("active", state !== "idle");
+  syncFocusTask();
+}
+
+/**
+ * 专注任务名同步（验收：专注进行中，时钟旁与胶囊顶部都显示「正在专注哪条任务」）
+ *  - 专注/暂停中：显示绑定任务（clock.config.boundTaskId，开始专注时锁定）
+ *  - 其余状态：预览当前「在做」任务（下一次开始专注即绑定它）
+ */
+function syncFocusTask() {
+  if (typeof floatingWindow === "undefined" || !floatingWindow.clock) return;
+  if (typeof todoManger_ === "undefined") return;
+  const clock = floatingWindow.clock;
+  const focusing = clock.config.currentState === "working" || clock.config.currentState === "workPaused";
+  const task = focusing ? todoManger_.findTask(clock.config.boundTaskId) : todoManger_.getActiveTask();
+  const title = task && task.id !== -1 ? task.title : "";
+
+  const label = document.getElementById("focusTaskLabel");
+  if (label) {
+    label.textContent = title ? UI_TEXT.focusIdlePrefix + title : "";
+    label.style.display = title ? "" : "none";
+  }
+  const pillTask = document.getElementById("pill-task");
+  if (pillTask) {
+    pillTask.textContent = title;
+    pillTask.style.display = title ? "" : "none";
+  }
+}
+
+/**
+ * 开始专注绑定锁定（验收：开始专注时，当前「在做」任务成为本次专注的绑定对象）
+ * @param {TomatoClock} clock
+ * @param {boolean} silent - true=休息结束自动开启的专注，不弹提示（避免每周期噪音）
+ */
+function bindActiveTaskToClock(clock, silent = false) {
+  if (typeof todoManger_ === "undefined") return;
+  const active = todoManger_.getActiveTask();
+  clock.config.boundTaskId = active && active.id !== -1 ? active.id : -1;
+  clock.saveConfig();
+  // 没有「在做」任务：温和提示，不强制打断专注
+  if (clock.config.boundTaskId === -1 && !silent && typeof showToast === "function") {
+    showToast(UI_TEXT.toastNoBoundTask);
+  }
+  syncFocusTask();
 }
 
 class FloatingWindow {
@@ -57,11 +89,17 @@ class FloatingWindow {
     this.bound = true;
     const clock = this.clock;
     const $ = (id) => document.getElementById(id);
-    // 只切换生长动画 iframe 显隐，胶囊（growWin 顶部）任何时段都常驻
+    // 只切换生长动画 iframe 显隐，胶囊（growWin 顶部）任何时段都常驻。
+    // 尊重「生长动画」开关与「专注时隐藏」（专注中强制隐藏动画）。
     const setGrowVisible = (on) => {
       const f = $("tomatoLife");
-      if (f) f.style.display = on ? "block" : "none";
+      if (!f) return;
+      const eff = on &&
+        settings.config.showTomatoAnimation !== false &&
+        !(settings.config.autoHideAni && this.clock.config.currentState === "working");
+      f.style.display = eff ? "block" : "none";
     };
+    this.setGrowVisible = setGrowVisible;
 
     // 终局观测器：专注跑满后，让「转红→坠果→冻结」完整放映，再收回成仅胶囊并回种子
     // 注意：onWorkEnd / onStateChange 回调内 this 是 clock，故终局状态挂在 clock 上
@@ -163,13 +201,12 @@ class FloatingWindow {
       syncPill();
     };
 
-    // 工作结束：提示音 + 回调主页面统计/记番茄；同时驱动生长动画终局
+    // 工作结束：回调主页面统计/记番茄；同时驱动生长动画终局
     clock.onWorkEnd = async function () {
       const raw = this.config.progress || 0;
       const full = raw >= 0.99;   // 用原始进度判断是否跑满，避免 round 损耗
       const progress = Math.round(this.config.progress * 10) / 10;
       const duration = this.config.totalTime;
-      playSound("audio/353206__rhodesmas__intro-01.aac");
       if (typeof growBridge !== "undefined" && growBridge) {
         if (full) {
           // 跑满：标记终局待放映，触发转红→坠果，并让画面从休息切出时保持可见
@@ -185,17 +222,18 @@ class FloatingWindow {
       return Promise.resolve();
     };
 
-    // 休息结束：提示音 + 回调统计
+    // 休息结束：回调统计；随后若自动进入下一段专注，绑定对象=当时的「在做」任务（静默，不弹提示）
     clock.onBreakEnd = async function () {
       const duration = this.isLongBreak() ? this.config.longBreakTime : this.config.shortBreakTime;
       const type = this.isLongBreak() ? "longBreak" : "shortBreak";
       const progress = this.config.progress.toFixed(1);
-      playSound("audio/76405__dsp9000__old-church-bell.aac");
       if (typeof onBreakEnd === "function") await onBreakEnd(duration, type, progress);
+      bindActiveTaskToClock(this, true);
       return Promise.resolve();
     };
 
     clock.continueState(); // 恢复跨会话计时
+    this.refresh();
     syncPill();
   }
 
@@ -204,6 +242,7 @@ class FloatingWindow {
     const clock = this.clock;
     switch (message.type) {
       case "clockBegin":
+        bindActiveTaskToClock(clock); // 开始专注即锁定绑定当前「在做」任务
         clock.begin();
         break;
       case "clockPause":
@@ -219,10 +258,34 @@ class FloatingWindow {
         clock.settingChanged(message.content);
         break;
       case "opacityChange":
-        const body = document.getElementById("mainBody");
-        if (body) body.style.opacity = message.content;
+        this.setOpacity(message.content);
+        break;
+      case "updateTask":
+      case "updateTag":
+        // 当前任务变更：同步刷新时钟旁/胶囊上的任务名（专注中仍显示绑定任务）
+        syncFocusTask();
         break;
     }
+  }
+
+  // 按当前胶囊设置整体刷新 growWin：主开关显隐 / 透明度 / 生长动画可见性
+  refresh() {
+    const cap = document.getElementById("growWin");
+    if (cap) {
+      cap.style.display = settings.config.showFloatingWindow === false ? "none" : "";
+      cap.style.opacity = settings.config.opacity != null ? settings.config.opacity : 1;
+    }
+    // 依当前时钟状态重判动画可见性（尊重 生长动画 / 专注时隐藏）
+    const st = this.clock.config.currentState;
+    let animOn = false;
+    if (st === "working" || st === "workPaused") animOn = true;
+    else if ((st === "breaking" || st === "breakPaused") && this.clock.endgamePlaying) animOn = true;
+    if (this.setGrowVisible) this.setGrowVisible(animOn);
+  }
+
+  setOpacity(value) {
+    const cap = document.getElementById("growWin");
+    if (cap) cap.style.opacity = value;
   }
 
   // 桌面浮层开关（页面内版为预留接口，暂空实现）

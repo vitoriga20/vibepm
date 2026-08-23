@@ -6,10 +6,11 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "composite": true
   },
-  "include": ["src/**/*.ts", "client/**/*.ts", "client/**/*.d.ts"],
+  "include": ["src/**/*.ts", "client/**/*.ts"],
   "references": [
     { "path": "../core/tsconfig.json" },
     { "path": "../plugin-ide-view/tsconfig.json" },
-    { "path": "../plugin-web-ui/tsconfig.json" }
+    { "path": "../plugin-web-ui/tsconfig.json" },
+    { "path": "../plugin-todo-timer/tsconfig.json" }
   ]
 }
