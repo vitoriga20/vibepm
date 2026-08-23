@@ -73,7 +73,7 @@
   const FLAP = {
     els: [],
     prev: ["0", "0", "0", "0"],
-    HALF_MS: 230,     // 单片半程（上片折叠 / 下片翻起）
+    HALF_MS: 250,     // 单片半程（上片折叠 / 下片翻起）
     STAGGER: 130,     // 多位连续翻牌的级差
   };
   (function initFlaps() {
@@ -185,7 +185,8 @@
         pause.textContent = "RESUME";
         break;
       case "breaking":
-        show(begin, false); show(pause, false); show(stop, true);
+        show(begin, false); show(pause, true); show(stop, true);
+        pause.textContent = "PAUSE";
         break;
       case "breakPaused":
         show(begin, false); show(pause, true); show(stop, true);

@@ -116,8 +116,10 @@
 .fh { position: absolute; left: 0; width: 100%; height: 50%; overflow: hidden; backface-visibility: hidden; }
 .fh-top { top: 0; transform-origin: 50% 100%; z-index: 4; }
 .fh-bot { bottom: 0; transform-origin: 50% 0%; z-index: 1; }
-.fh-fold { top: 0; transform-origin: 50% 100%; z-index: 6; transform: rotateX(-90deg); }
-.fh-rise { bottom: 0; transform-origin: 50% 0%; z-index: 3; transform: rotateX(90deg); }
+/* 折叠片/翻起片平时用 visibility 隐藏（而非预旋转），翻牌时再可见 →
+   基态与动画起点一致，不会出现"先按基态渲染一帧再跳到动画起点"的闪现 */
+.fh-fold { top: 0; transform-origin: 50% 100%; z-index: 6; transform: rotateX(0deg); visibility: hidden; }
+.fh-rise { bottom: 0; transform-origin: 50% 0%; z-index: 3; transform: rotateX(90deg); visibility: hidden; }
 
 .fv {
   position: absolute; left: 0; width: 100%; height: 200%;
@@ -131,19 +133,39 @@
 .fh-top .fv, .fh-fold .fv { top: 0; }
 .fh-bot .fv, .fh-rise .fv { bottom: 0; }
 
-/* —————— 翻牌动效：上半片先折叠，下半片随后翻起（~460ms） —————— */
-.flap.flipping .fh-fold { animation: foldDown 230ms cubic-bezier(.55, .06, .68, .19) forwards; }
-.flap.flipping .fh-rise { animation: riseUp 230ms cubic-bezier(.22, .61, .36, 1) 230ms forwards; }
-@keyframes foldDown { from { transform: rotateX(0deg); } to { transform: rotateX(-90deg); } }
-@keyframes riseUp { from { transform: rotateX(90deg); } to { transform: rotateX(0deg); } }
+/* —————— 翻牌动效：上半片折叠(250ms) → 下半片翻起(250ms)，总 ~500ms ——————
+   折叠 ease-in（下落加速）、翻起 ease-out 带 2.5° 过冲回位（咔哒到位）；
+   折叠/翻起各自带折缝阴影扫过（foldShadow 淡入 / riseShadow 淡出），
+   盖住中缝生硬切换，给翻牌重量感。 */
+.flap.flipping .fh-fold { visibility: visible; animation: foldDown 250ms cubic-bezier(.37, .08, .2, .98) forwards; }
+.flap.flipping .fh-rise { visibility: visible; animation: riseUp 250ms cubic-bezier(.2, .7, .28, 1) 250ms forwards; }
+@keyframes foldDown { 0% { transform: rotateX(0deg); } 100% { transform: rotateX(-90deg); } }
+@keyframes riseUp {
+  0% { transform: rotateX(90deg); }
+  78% { transform: rotateX(-2.5deg); }
+  100% { transform: rotateX(0deg); }
+}
 
-/* 机械卡扣感：翻牌瞬间整块压暗 + 边缘阴影加深 */
-.flap.flipping { animation: flapThud 460ms linear; }
+/* 折缝阴影：折叠时在转轴处淡入，翻起时随之淡出 */
+.fh-fold::after, .fh-bot::after, .fh-rise::after {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none; opacity: 0;
+}
+.fh-fold::after { background: linear-gradient(to bottom, rgba(0, 0, 0, .05), rgba(0, 0, 0, .5)); }
+.fh-bot::after { background: linear-gradient(to top, rgba(0, 0, 0, .5), rgba(0, 0, 0, .05)); }
+.fh-rise::after { background: linear-gradient(to top, rgba(0, 0, 0, .05), rgba(0, 0, 0, .5)); }
+.flap.flipping .fh-fold::after,
+.flap.flipping .fh-bot::after { animation: foldShadow 250ms ease-in forwards; }
+.flap.flipping .fh-rise::after { animation: riseShadow 250ms ease-out 250ms forwards; }
+@keyframes foldShadow { from { opacity: 0; } to { opacity: 1; } }
+@keyframes riseShadow { from { opacity: 1; } to { opacity: 0; } }
+
+/* 机械卡扣感：翻牌瞬间整块一次压暗后快速还原（单次明暗，避免振荡造成的闪烁） */
+.flap.flipping { animation: flapThud 260ms linear; }
 @keyframes flapThud {
-  0% { filter: brightness(.72); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35), 0 4px 10px rgba(0, 0, 0, .55); }
-  18% { filter: brightness(.92); }
-  38% { filter: brightness(.72); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .45), 0 5px 12px rgba(0, 0, 0, .6); }
-  70% { filter: brightness(.98); }
+  0% { filter: brightness(.78); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35), 0 4px 10px rgba(0, 0, 0, .55); }
+  18% { filter: brightness(.97); }
   100% { filter: brightness(1); }
 }
 
