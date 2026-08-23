@@ -315,6 +315,23 @@
   white-space: nowrap;
 }
 
+/* 编辑表单取消按钮 */
+.msTaskCancel {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-color-3);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.msTaskCancel:hover {
+  color: var(--text-color-1);
+  border-color: var(--text-color-3);
+}
+
 /* 关联待办选择器（展开列出当前待办，点选关联/解除） */
 .msPicker {
   margin-top: 6px;

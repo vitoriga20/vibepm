@@ -2,7 +2,8 @@
  * 计划页（长期目标/里程碑）渲染与交互
  *  - 数据层全部走 todoManger_（plans / milestones / 任务.milestoneId 单一源）
  *  - 文案全部走 UI_TEXT 单一源，本文件不出现用户可见字面量
- *  - 双向关联：里程碑挂若干待办（关联待办选择器），待办芯片点击跳回首页定位（jumpToTask）
+ *  - 里程碑下双入口：「＋待办」直接创建（创建即归属）、「关联」挂靠已有待办；
+ *    待办芯片点击就地展开编辑表单（名称/描述/日期，与创建界面一致）
  */
 
 // 关联待办选择器当前挂靠的里程碑 id（模块级 UI 状态；null=关闭）
@@ -12,6 +13,16 @@ let linkPickerMilestoneId = null;
 let taskFormMilestoneId = null;
 // 表单里已选的计划日期（""=未选；本地日期键）
 let taskFormDueDate = "";
+
+// 「编辑待办」表单当前编辑的任务 id（模块级 UI 状态；null=收起）
+let editingTaskId = null;
+// 编辑表单里已选的计划日期（""=未选；打开时初始化为任务现有值）
+let editFormDueDate = "";
+
+/** HTML 属性值最小转义（input value / title 拼接防注入破版） */
+function escAttr(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
 
 // ———————————————————— 静态文案注入 ————————————————————
 
@@ -30,7 +41,7 @@ document.getElementById("planAddBtn").innerText = UI_TEXT.planAddBtn;
  */
 function milestoneHtml(plan, ms) {
   const done = !!ms.doneTimestamp;
-  // 关联待办芯片：标题 + 番茄累计（数据复盘·计划视角投入分布），点击跳回首页定位
+  // 关联待办芯片：标题 + 番茄累计（数据复盘·计划视角投入分布），点击就地编辑
   const tasks = todoManger_.tasksOfMilestone(ms.id);
   const taskChips = tasks
     .map((t) => {
@@ -41,7 +52,7 @@ function milestoneHtml(plan, ms) {
         t.dueDate ? UI_TEXT.dueTagTip(t.dueDate) : "",
         `🍅×${countTaskTomato(t)}`,
       ].filter(Boolean).join("\n");
-      return `<span class="msTask" taskId="${t.id}" title="${tip}">${t.title}<i>×${countTaskTomato(t)}</i></span>`;
+      return `<span class="msTask" taskId="${t.id}" title="${escAttr(tip)}">${escAttr(t.title)}<i>×${countTaskTomato(t)}</i></span>`;
     })
     .join("");
 
@@ -74,6 +85,19 @@ function milestoneHtml(plan, ms) {
     </div>`;
   }
 
+  // 编辑待办表单（点击芯片就地展开，与创建表单同构；预填现有值，保存走 updateTaskMeta）
+  let editForm = "";
+  if (tasks.some((t) => t.id === editingTaskId)) {
+    const et = tasks.find((t) => t.id === editingTaskId);
+    editForm = `<div class="msTaskForm edit" data-taskid="${et.id}">
+      <input class="msTaskTitle" type="text" value="${escAttr(et.title)}" placeholder="${UI_TEXT.planTaskTitlePlaceholder}" />
+      <input class="msTaskDesc" type="text" value="${escAttr(et.desc)}" placeholder="${UI_TEXT.planTaskDescPlaceholder}" />
+      <span class="msTaskDateBtn" title="${UI_TEXT.setDueBtnTip}">${UI_TEXT.planTaskDateBtn(editFormDueDate)}</span>
+      <span class="msTaskSubmit">${UI_TEXT.planTaskSave}</span>
+      <span class="msTaskCancel">${UI_TEXT.planTaskCancel}</span>
+    </div>`;
+  }
+
   return `
   <div class="milestone ${done ? "done" : ""}" msId="${ms.id}">
     <div class="msCheck" planId="${plan.id}" msId="${ms.id}" title="${done ? UI_TEXT.milestoneDoneTip : UI_TEXT.milestoneTodoTip}"></div>
@@ -84,6 +108,7 @@ function milestoneHtml(plan, ms) {
         <span class="msLinkBtn" msId="${ms.id}">${linkPickerMilestoneId === ms.id ? UI_TEXT.planLinkClose : UI_TEXT.planLinkBtn}</span>
         <span class="msTaskAddBtn" msId="${ms.id}">${taskFormMilestoneId === ms.id ? UI_TEXT.planTaskAddClose : UI_TEXT.planTaskAddBtn}</span>
       </div>
+      ${editForm}
       ${taskForm}
       ${picker}
     </div>
@@ -198,7 +223,7 @@ document.getElementById("planPage").addEventListener("click", (e) => {
     return;
   }
 
-  // 新增待办表单开合（打开时重置日期，避免上个表单的残留）
+  // 新增待办表单开合（打开时重置日期；与编辑表单互斥）
   if (t.classList.contains("msTaskAddBtn")) {
     const msId = t.getAttribute("msId");
     if (taskFormMilestoneId === msId) {
@@ -206,29 +231,79 @@ document.getElementById("planPage").addEventListener("click", (e) => {
     } else {
       taskFormMilestoneId = msId;
       taskFormDueDate = "";
+      editingTaskId = null;
     }
     renderPlans();
     // 展开后聚焦名称输入框（提升输入效率）
     requestAnimationFrame(() => {
-      const input = document.querySelector(`.msTaskForm .msTaskTitle`);
+      const input = document.querySelector(`.msTaskForm:not(.edit) .msTaskTitle`);
       if (input) input.focus();
     });
     return;
   }
 
-  // 表单日期按钮：弹自制月历（复用任务卡同款；选中回填表单状态，不立即写任务）
+  // 待办芯片：点击就地展开编辑表单（名称/描述/日期与创建界面一致；不再跳首页）
+  // closest 兜底：芯片内的番茄计数 <i> 也是合法点击目标
+  const msTaskChip = t.closest(".msTask");
+  if (msTaskChip) {
+    const taskId = parseInt(msTaskChip.getAttribute("taskId"));
+    editingTaskId = editingTaskId === taskId ? null : taskId;
+    taskFormMilestoneId = null; // 编辑与创建表单互斥
+    const et = todoManger_.findTask(taskId);
+    editFormDueDate = editingTaskId && et ? (et.dueDate || "") : "";
+    renderPlans();
+    if (editingTaskId) {
+      requestAnimationFrame(() => {
+        const input = document.querySelector(`.msTaskForm.edit .msTaskTitle`);
+        if (input) { input.focus(); input.select(); }
+      });
+    }
+    return;
+  }
+
+  // 表单日期按钮：弹自制月历（按所在表单模式回填对应日期状态，不立即写任务）
   if (t.classList.contains("msTaskDateBtn")) {
-    openDueCalendar(t, taskFormDueDate, (key) => {
-      taskFormDueDate = key || "";
-      const btn = document.querySelector(".msTaskForm .msTaskDateBtn");
-      if (btn) btn.textContent = UI_TEXT.planTaskDateBtn(taskFormDueDate);
+    const isEdit = !!t.closest(".msTaskForm.edit");
+    const current = isEdit ? editFormDueDate : taskFormDueDate;
+    openDueCalendar(t, current, (key) => {
+      const k = key || "";
+      if (isEdit) editFormDueDate = k; else taskFormDueDate = k;
+      const btn = isEdit
+        ? document.querySelector(".msTaskForm.edit .msTaskDateBtn")
+        : document.querySelector(".msTaskForm:not(.edit) .msTaskDateBtn");
+      if (btn) btn.textContent = UI_TEXT.planTaskDateBtn(k);
     });
     return;
   }
 
-  // 表单提交：创建待办（名称必填；描述/日期可选；创建即归属该里程碑）
+  // 编辑表单取消
+  if (t.classList.contains("msTaskCancel")) {
+    editingTaskId = null;
+    editFormDueDate = "";
+    renderPlans();
+    return;
+  }
+
+  // 表单提交：编辑模式（data-taskid）→ updateTaskMeta；创建模式 → 新建归属该里程碑
   if (t.classList.contains("msTaskSubmit")) {
     const form = t.closest(".msTaskForm");
+    if (form.classList.contains("edit")) {
+      const taskId = parseInt(form.getAttribute("data-taskid"));
+      const title = form.querySelector(".msTaskTitle").value.trim();
+      if (!title) {
+        form.querySelector(".msTaskTitle").focus();
+        return;
+      }
+      todoManger_.updateTaskMeta(taskId, {
+        title,
+        desc: form.querySelector(".msTaskDesc").value.trim(),
+        dueDate: editFormDueDate || null,
+      });
+      editingTaskId = null;
+      editFormDueDate = "";
+      renderPlans();
+      return;
+    }
     const msId = taskFormMilestoneId;
     const title = form.querySelector(".msTaskTitle").value.trim();
     if (!title) {
@@ -264,12 +339,6 @@ document.getElementById("planPage").addEventListener("click", (e) => {
     const msId = t.getAttribute("msId");
     const linked = t.classList.contains("linked");
     todoManger_.assignTaskToMilestone(taskId, linked ? null : msId);
-    return;
-  }
-
-  // 关联待办芯片：点击跳回首页定位该任务（双向关联的「→ 待办」方向）
-  if (t.classList.contains("msTask")) {
-    jumpToTask(parseInt(t.getAttribute("taskId")));
     return;
   }
 });

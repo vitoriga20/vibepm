@@ -214,6 +214,8 @@ function submitTask(event) {
     state: "待办", //待办、进行中、完成、删除
     desc: "",
     milestoneId: msId,
+    // 首页创建的待办默认就是「今天做」：带上当天日期（之后可用时钟按钮改期/清除）
+    dueDate: previewLocalDateKey(new Date()),
     // 当前时间戳
     createdTimestamp: Date.now(),
     modifiedTimestamp: 0,

@@ -180,6 +180,8 @@ var UI_TEXT = {
   planTaskDescPlaceholder: "描述（可选）",
   planTaskDateBtn: (dateKey) => (dateKey ? `${dateKey.slice(5).replace("-", "/")} 📅` : "日期 📅"),
   planTaskSubmit: "添加",
+  planTaskSave: "保存",
+  planTaskCancel: "取消",
   // 专注时长落账提示（不足 30% 未计番茄）
   toastPartialFocus: (min) => `专注 ${min} 分钟已记录（不足 30% 未计番茄）`,
   // 任务-专注耦合提示

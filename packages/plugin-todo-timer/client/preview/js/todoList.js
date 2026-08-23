@@ -484,12 +484,23 @@ class todoListManger {
    * 只改字段不动列表：done/archived 的任务也可排期（跨表 findTask）
    */
   setDueDate(id, dateKey) {
+    this.updateTaskMeta(id, { dueDate: dateKey || null });
+  }
+
+  /**
+   * 编辑待办元信息（名称/描述/日期；计划页编辑表单与任务卡改期共用入口）
+   * 传了的字段才改：title 空串忽略；desc/dueDate 传 null 即清除
+   */
+  updateTaskMeta(id, meta) {
     const todo = this.findTask(id);
     if (!todo) return;
-    todo.dueDate = dateKey || null;
+    if (meta.title !== undefined && String(meta.title).trim()) todo.title = String(meta.title).trim();
+    if (meta.desc !== undefined) todo.desc = meta.desc || "";
+    if (meta.dueDate !== undefined) todo.dueDate = meta.dueDate || null;
     todo.modifiedTimestamp = Date.now();
     this.saveTaskList(this.TaskList);
     this.onChange();
+    this.onPlanChange();
   }
 
   /**
