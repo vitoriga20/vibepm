@@ -1016,13 +1016,7 @@ pointer-events: none;
     border-color: var(--kv-orange-color);
 }
 
-/* 计划日期按钮图标：与其他操作图标同尺寸（clock.svg 原始 53px，必须显式限制） */
-.dateBtn img {
-    width: 16px;
-    height: 16px;
-}
-
-/* 计划日期弹层（自制轻量月历：按钮正下方、同主题配色） */
+/* 计划日期弹层（自制轻量月历：锚点正下方、同主题配色） */
 .duePicker {
     position: fixed;
     z-index: 1000;

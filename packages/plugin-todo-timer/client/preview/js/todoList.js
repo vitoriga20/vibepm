@@ -958,9 +958,6 @@ todoManger_.onChange = function () {
         <div class="taskBtnBox">
           <span taskId="${task.id}" onclick="toggleImportantBtn(this,event)" class="markBtn imp ${impOn ? "on" : ""}" title="${impOn ? UI_TEXT.markImportantTipOn : UI_TEXT.markImportantTipOff}">${UI_TEXT.markImportant}</span>
           <span taskId="${task.id}" onclick="toggleUrgentBtn(this,event)" class="markBtn urg ${urgOn ? "on" : ""}" title="${urgOn ? UI_TEXT.markUrgentTipOn : UI_TEXT.markUrgentTipOff}">${UI_TEXT.markUrgent}</span>
-          <span taskId="${task.id}" onclick="openDuePicker(this,event)" class="dateBtn" title="${UI_TEXT.setDueBtnTip}">
-            <img src="pic/clock.svg" />
-          </span>
           <span taskId="${task.id}" onclick="setTopTask(this,event)"   class="settopBtn">
             <img src="pic/settop.svg" />
           </span>
@@ -1155,15 +1152,7 @@ function openDueCalendar(anchor, currentKey, onPick) {
   setTimeout(() => document.addEventListener("mousedown", onDocDown), 0);
 }
 
-// 任务卡的时钟按钮入口：选中即写任务的 dueDate（null = 清除）
-function openDuePicker(element, event) {
-  event.stopPropagation();
-  const taskId = parseInt(element.getAttribute("taskId"));
-  const task = todoManger_.findTask(taskId);
-  openDueCalendar(element, task && task.dueDate ? task.dueDate : "", (key) => {
-    todoManger_.setDueDate(taskId, key);
-  });
-}
+// 任务卡日期徽标仅展示状态；改期入口收敛到计划页编辑表单（openDueCalendar 通用月历保留供其使用）
 
 function activeTask(element, event) {
   event.stopPropagation();
