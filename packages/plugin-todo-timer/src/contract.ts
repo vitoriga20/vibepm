@@ -74,6 +74,8 @@ export interface Task {
   urgent?: boolean;
   /** 计划日期（本地日期键 "YYYY-MM-DD"；未指定为 null/缺省，旧数据天然兼容） */
   dueDate?: string | null;
+  /** 描述（计划页创建待办时填写；可缺省） */
+  desc?: string | null;
   [k: string]: unknown;
 }
 

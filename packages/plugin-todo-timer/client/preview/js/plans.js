@@ -8,6 +8,11 @@
 // 关联待办选择器当前挂靠的里程碑 id（模块级 UI 状态；null=关闭）
 let linkPickerMilestoneId = null;
 
+// 「新增待办」表单当前挂靠的里程碑 id（模块级 UI 状态；null=收起）
+let taskFormMilestoneId = null;
+// 表单里已选的计划日期（""=未选；本地日期键）
+let taskFormDueDate = "";
+
 // ———————————————————— 静态文案注入 ————————————————————
 
 document.getElementById("planPageBtn").setAttribute("data-title", UI_TEXT.planPageTitle);
@@ -28,7 +33,16 @@ function milestoneHtml(plan, ms) {
   // 关联待办芯片：标题 + 番茄累计（数据复盘·计划视角投入分布），点击跳回首页定位
   const tasks = todoManger_.tasksOfMilestone(ms.id);
   const taskChips = tasks
-    .map((t) => `<span class="msTask" taskId="${t.id}" title="${t.title}">${t.title}<i>×${countTaskTomato(t)}</i></span>`)
+    .map((t) => {
+      // tooltip：描述 + 计划日期 + 番茄投入（有则拼上）
+      const tip = [
+        t.title,
+        t.desc || "",
+        t.dueDate ? UI_TEXT.dueTagTip(t.dueDate) : "",
+        `🍅×${countTaskTomato(t)}`,
+      ].filter(Boolean).join("\n");
+      return `<span class="msTask" taskId="${t.id}" title="${tip}">${t.title}<i>×${countTaskTomato(t)}</i></span>`;
+    })
     .join("");
 
   // 关联待办选择器（仅当前挂靠此里程碑时展开）
@@ -49,6 +63,17 @@ function milestoneHtml(plan, ms) {
     }</div>`;
   }
 
+  // 新增待办表单（仅当前挂靠此里程碑时展开；创建即归属此里程碑，非关联模式）
+  let taskForm = "";
+  if (taskFormMilestoneId === ms.id) {
+    taskForm = `<div class="msTaskForm">
+      <input class="msTaskTitle" type="text" placeholder="${UI_TEXT.planTaskTitlePlaceholder}" />
+      <input class="msTaskDesc" type="text" placeholder="${UI_TEXT.planTaskDescPlaceholder}" />
+      <span class="msTaskDateBtn" title="${UI_TEXT.setDueBtnTip}">${UI_TEXT.planTaskDateBtn(taskFormDueDate)}</span>
+      <span class="msTaskSubmit">${UI_TEXT.planTaskSubmit}</span>
+    </div>`;
+  }
+
   return `
   <div class="milestone ${done ? "done" : ""}" msId="${ms.id}">
     <div class="msCheck" planId="${plan.id}" msId="${ms.id}" title="${done ? UI_TEXT.milestoneDoneTip : UI_TEXT.milestoneTodoTip}"></div>
@@ -57,7 +82,9 @@ function milestoneHtml(plan, ms) {
       <div class="msTasks">
         ${taskChips}
         <span class="msLinkBtn" msId="${ms.id}">${linkPickerMilestoneId === ms.id ? UI_TEXT.planLinkClose : UI_TEXT.planLinkBtn}</span>
+        <span class="msTaskAddBtn" msId="${ms.id}">${taskFormMilestoneId === ms.id ? UI_TEXT.planTaskAddClose : UI_TEXT.planTaskAddBtn}</span>
       </div>
+      ${taskForm}
       ${picker}
     </div>
   </div>`;
@@ -167,6 +194,66 @@ document.getElementById("planPage").addEventListener("click", (e) => {
   if (t.classList.contains("msLinkBtn")) {
     const msId = t.getAttribute("msId");
     linkPickerMilestoneId = linkPickerMilestoneId === msId ? null : msId;
+    renderPlans();
+    return;
+  }
+
+  // 新增待办表单开合（打开时重置日期，避免上个表单的残留）
+  if (t.classList.contains("msTaskAddBtn")) {
+    const msId = t.getAttribute("msId");
+    if (taskFormMilestoneId === msId) {
+      taskFormMilestoneId = null;
+    } else {
+      taskFormMilestoneId = msId;
+      taskFormDueDate = "";
+    }
+    renderPlans();
+    // 展开后聚焦名称输入框（提升输入效率）
+    requestAnimationFrame(() => {
+      const input = document.querySelector(`.msTaskForm .msTaskTitle`);
+      if (input) input.focus();
+    });
+    return;
+  }
+
+  // 表单日期按钮：弹自制月历（复用任务卡同款；选中回填表单状态，不立即写任务）
+  if (t.classList.contains("msTaskDateBtn")) {
+    openDueCalendar(t, taskFormDueDate, (key) => {
+      taskFormDueDate = key || "";
+      const btn = document.querySelector(".msTaskForm .msTaskDateBtn");
+      if (btn) btn.textContent = UI_TEXT.planTaskDateBtn(taskFormDueDate);
+    });
+    return;
+  }
+
+  // 表单提交：创建待办（名称必填；描述/日期可选；创建即归属该里程碑）
+  if (t.classList.contains("msTaskSubmit")) {
+    const form = t.closest(".msTaskForm");
+    const msId = taskFormMilestoneId;
+    const title = form.querySelector(".msTaskTitle").value.trim();
+    if (!title) {
+      form.querySelector(".msTaskTitle").focus();
+      return;
+    }
+    const desc = form.querySelector(".msTaskDesc").value.trim();
+    todoManger_.add({
+      title,
+      desc,
+      dueDate: taskFormDueDate || null,
+      milestoneId: msId,
+      type: "short",
+      state: "待办",
+      modifiedTimestamp: 0,
+      beginTimestamp: 0,
+      endTimestamp: 0,
+      remindBefore: [],
+      remindAfter: [],
+      priority: 0,
+      star: false,
+      tomato: {},
+    });
+    taskFormMilestoneId = null;
+    taskFormDueDate = "";
     renderPlans();
     return;
   }

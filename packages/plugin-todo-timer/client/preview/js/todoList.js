@@ -18,6 +18,20 @@ function previewLocalDateKey(date) {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
+/**
+ * 任务累计专注毫秒（statistics 里 type=work 且 tarId 命中的 realDuration 合计）
+ * 数据复盘口径：任务卡时长徽标 / tooltip 全走这里
+ */
+function taskFocusMs(task) {
+  if (!task) return 0;
+  const list = todoManger_.TaskList.statistics || [];
+  let ms = 0;
+  for (const e of list) {
+    if (e && e.type === "work" && e.tarId === task.id && Number.isFinite(e.realDuration)) ms += e.realDuration;
+  }
+  return ms;
+}
+
 /** 计划日期徽标 HTML（今天=accent 提亮 / 过期=警示色 / 未来=常规；title 带原文与状态） */
 function dueTagHtml(task) {
   if (!task.dueDate) return "";
@@ -191,6 +205,8 @@ class todoListManger {
 
     // 将任务添加到 current 列表的第一个位置
     this.TaskList.current.unshift(todo);
+    // 「在做」显式化：唯一 active 标志（旧数据无此字段=无在做；点卡片显式设定）
+    for (const t of this.TaskList.current) t.active = t.id === id;
     // 保存更新后的任务列表
     this.saveTaskList(this.TaskList);
     // 调用监听函数
@@ -198,12 +214,13 @@ class todoListManger {
   }
 
   /**
-   * 获取当前任务
+   * 获取当前任务（「在做」= 用户点卡片显式设定的 active 标志；
+   * 无设定时不算任何任务在做——避免隐式 current[0] 导致按天过滤漏未来待办、专注隐式绑错任务）
    */
   getActiveTask() {
-    if (this.TaskList.current.length == 0) return this.TaskList.defaultTask
-
-    return this.TaskList.current[0];
+    const explicit = this.TaskList.current.find((t) => t.active === true);
+    if (explicit) return explicit;
+    return this.TaskList.defaultTask;
   }
 
   /**
@@ -221,6 +238,7 @@ class todoListManger {
    */
   compltedActiveTask() {
     const task = this.getActiveTask();
+    if (task.id === -1) return; // 无显式「在做」：无可完成对象
     this.done(task.id);
   }
 
@@ -391,27 +409,28 @@ class todoListManger {
   addTomatoToTask(id, duration, progress) {
     const task = this.findTask(id);
     // 绑定任务中途被删时 task=null：统计行挂到 defaultTask(tarId=-1)，不张冠李戴到其它任务
+    // 时长持久化：只要专注过（progress>0，由调用方保证）就落 statistics，无 30% 门槛
     this.recordStatistics(duration, "work", progress, task || this.TaskList.defaultTask);
 
-    if (task && task.id !== -1) {
-      // 获取当前时间戳
+    if (!task || task.id === -1) {
+      return { title: "", total: 0, partial: false };
+    }
+
+    // 番茄个数门槛：进度 ≥0.3 才算一个有效番茄（时长已无条件落账，与个数口径分离）
+    if (progress >= 0.3) {
       const currentTime = Date.now();
 
       if (!task.tomato) task.tomato = {}; // 老数据兜底
-      // 如果键不存在，则创建一个空数组
       if (!task.tomato[progress]) {
         task.tomato[progress] = [];
       }
-
-      // 将当前时间戳添加到对应的进度数组中
       task.tomato[progress].push(currentTime);
 
       this.saveTaskList(this.TaskList);
-
       this.onChange();
-      return { title: task.title, total: countTaskTomato(task) };
+      return { title: task.title, total: countTaskTomato(task), partial: false };
     }
-    return { title: "", total: 0 };
+    return { title: task.title, total: countTaskTomato(task), partial: true };
   }
 
   /**
@@ -474,11 +493,25 @@ class todoListManger {
   }
 
   /**
+   * 当天可见待办（主列表「按天」视图）：
+   *  - 无 dueDate（随时可做）∪ dueDate ≤ 今天（到期/逾期；逾期由 dueTag 红标提醒）
+   *  - 「在做」任务无条件可见（正在专注的对象不能从列表凭空消失）
+   */
+  visibleTodayTasks() {
+    const todayKey = previewLocalDateKey(new Date());
+    const activeId = this.getActiveTask().id;
+    return this.TaskList.current.filter((t) => {
+      if (t.id === activeId) return true;
+      return !t.dueDate || t.dueDate <= todayKey;
+    });
+  }
+
+  /**
    * 待办列表渲染顺序：象限优先（Q1→Q4），同象限内按创建时间新到旧
    * （只算视图顺序，不改存储数组；「在做」仍由 current[0] 承载）
    */
   sortedCurrentTasks() {
-    return [...this.TaskList.current].sort((a, b) => {
+    return this.visibleTodayTasks().sort((a, b) => {
       const qa = this.quadrantOf(a);
       const qb = this.quadrantOf(b);
       if (qa !== qb) return qa - qb;
@@ -487,10 +520,11 @@ class todoListManger {
   }
 
   /**
-   * 四象限汇总：各象限任务数与番茄投入（复盘视角，含待办/已完成/已归档全部任务）
+   * 四象限汇总：各象限任务数与番茄投入
+   * 待办侧取「当天可见集」（与主列表口径一致，未来排期不混入）；已完成/归档保持全量复盘视角
    */
   getQuadrantSummary() {
-    const all = [...this.TaskList.current, ...this.TaskList.done, ...this.TaskList.archived];
+    const all = [...this.visibleTodayTasks(), ...this.TaskList.done, ...this.TaskList.archived];
     const summary = [0, 1, 2, 3].map((q) => ({ quadrant: q, taskCount: 0, tomatoCount: 0 }));
     all.forEach((t) => {
       const q = this.quadrantOf(t);
@@ -866,6 +900,17 @@ todoManger_.onChange = function () {
     // 计划日期徽标（dueDate 已设置时显示；点击卡片上的时钟按钮可改/清除）
     const dueTag = dueTagHtml(task);
 
+    // 描述（计划页创建待办时填写；主列表小字展示，悬停看全文）
+    const descTag = task.desc
+      ? `<div class="taskDesc" title="${task.desc}">${task.desc}</div>`
+      : "";
+
+    // 专注时长徽标（statistics 聚合，任务卡直接可见；番茄盒旁边）
+    const focusMin = Math.round(taskFocusMs(task) / 60000);
+    const focusMsBadge = focusMin > 0
+      ? `<span class="focusMsBadge" title="${UI_TEXT.taskFocusTip(focusMin, countTaskTomato(task))}">${focusMin} ${UI_TEXT.focusMinuteUnit}</span>`
+      : "";
+
     let scale = `
     <div class="scale">
         <div class="s short op" ></div>
@@ -897,6 +942,7 @@ todoManger_.onChange = function () {
         <div class="title">${task.title}</div>
         ${milestoneTag}
         ${dueTag}
+        ${descTag}
 
         <div class="taskBtnBox">
           <span taskId="${task.id}" onclick="toggleImportantBtn(this,event)" class="markBtn imp ${impOn ? "on" : ""}" title="${impOn ? UI_TEXT.markImportantTipOn : UI_TEXT.markImportantTipOff}">${UI_TEXT.markImportant}</span>
@@ -916,6 +962,7 @@ todoManger_.onChange = function () {
         </div>
         <div class="tomatos">
             ${generateTomatosBoxHtml(task.tomato)}
+            ${focusMsBadge}
         </div>
     </div>`;
 
@@ -934,6 +981,20 @@ todoManger_.onChange = function () {
         <div class="s short op" ></div>
       </div>
       <span style="border:none;">未设小目标</span>
+    </div>
+    `;
+  } else if (todoList.children.length === 0) {
+    // 有待办但都不是今天（全部排在未来）：给出「今天无排期」引导而非空白
+    todoList.innerHTML = `
+    <div class=" date">
+      <div class="scale">
+        <div class="s short op" ></div>
+        <div class="s short op" ></div>
+        <div class="s mid op"   ></div>
+        <div class="s short op" ></div>
+        <div class="s short op" ></div>
+      </div>
+      <span style="border:none;">${UI_TEXT.todayNoDueTip}</span>
     </div>
     `;
   }
@@ -996,34 +1057,32 @@ function toggleUrgentBtn(element, event) {
   todoManger_.toggleUrgent(taskId);
 }
 
-// 计划日期弹层（自制轻量月历，同主题配色；弹在按钮正下方，替代原生 input[date] picker）
+// 计划日期弹层（自制轻量月历，同主题配色；弹在锚点正下方）
+// 通用版：openDueCalendar(锚点, 当前值, 回调(key|null)) —— 任务卡与计划页新增表单共用
 let duePickerClose = null;
-function openDuePicker(element, event) {
-  event.stopPropagation();
-  if (duePickerClose) duePickerClose(); // 重复点击：关旧开新
-  const taskId = parseInt(element.getAttribute("taskId"));
-  const task = todoManger_.findTask(taskId);
-  const rect = element.getBoundingClientRect();
+function openDueCalendar(anchor, currentKey, onPick) {
+  if (duePickerClose) duePickerClose(); // 重复打开：关旧开新
+  const rect = anchor.getBoundingClientRect();
 
-  // 视口月份：已选日期所在月，未选 → 今天所在月
-  const initial = task && task.dueDate ? task.dueDate : previewLocalDateKey(new Date());
+  // 视口月份：已有值所在月，无值 → 今天所在月
+  const initial = currentKey || previewLocalDateKey(new Date());
   let vy = parseInt(initial.slice(0, 4), 10);
   let vm = parseInt(initial.slice(5, 7), 10); // 1-12
 
   const root = document.createElement("div");
   root.className = "duePicker";
-  // 定位：按钮正下方（贴边时内收，避免溢出视口）
+  // 定位：锚点正下方（贴边时内收，避免溢出视口）
   root.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 236)) + "px";
   root.style.top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 292)) + "px";
 
   const pick = (key) => {
-    todoManger_.setDueDate(taskId, key);
+    onPick(key);
     close();
   };
 
   const renderGrid = () => {
     const todayKey = previewLocalDateKey(new Date());
-    const selKey = task && task.dueDate ? task.dueDate : "";
+    const selKey = currentKey || "";
     // 周日起始（与活动日历同一习惯）：本月 1 号回退到首个周日
     const first = new Date(vy, vm - 1, 1);
     const start = new Date(first);
@@ -1055,7 +1114,7 @@ function openDuePicker(element, event) {
     root.innerHTML = html;
   };
 
-  const onPick = (e) => {
+  const onPickEvent = (e) => {
     const day = e.target.closest(".dp-day");
     if (day) { pick(day.dataset.key); return; }
     const nav = e.target.closest(".dp-nav");
@@ -1072,17 +1131,27 @@ function openDuePicker(element, event) {
   const onDocDown = (e) => { if (!root.contains(e.target)) close(); };
   const close = () => {
     root.remove();
-    root.removeEventListener("click", onPick);
+    root.removeEventListener("click", onPickEvent);
     document.removeEventListener("mousedown", onDocDown);
     duePickerClose = null;
   };
   duePickerClose = close;
 
   renderGrid();
-  root.addEventListener("click", onPick);
+  root.addEventListener("click", onPickEvent);
   document.body.appendChild(root);
-  // 同一帧内 mousedown 正在冒泡（按钮 click 前置），延后一拍再挂外点关闭
+  // 同一帧内 mousedown 正在冒泡（锚点 click 前置），延后一拍再挂外点关闭
   setTimeout(() => document.addEventListener("mousedown", onDocDown), 0);
+}
+
+// 任务卡的时钟按钮入口：选中即写任务的 dueDate（null = 清除）
+function openDuePicker(element, event) {
+  event.stopPropagation();
+  const taskId = parseInt(element.getAttribute("taskId"));
+  const task = todoManger_.findTask(taskId);
+  openDueCalendar(element, task && task.dueDate ? task.dueDate : "", (key) => {
+    todoManger_.setDueDate(taskId, key);
+  });
 }
 
 function activeTask(element, event) {

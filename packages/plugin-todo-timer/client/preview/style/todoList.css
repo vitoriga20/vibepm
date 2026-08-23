@@ -970,6 +970,52 @@ pointer-events: none;
     font-weight: 700;
 }
 
+/* 任务描述（计划页创建待办时填写；主列表小字展示） */
+.taskDesc {
+    align-self: flex-start;
+    max-width: 90%;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-color-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* 专注时长徽标（番茄盒旁；数据来自 statistics 聚合） */
+.focusMsBadge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 8px;
+    background-color: var(--mask-color-light);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-color-2);
+    white-space: nowrap;
+}
+
+/* 主界面新增待办的里程碑下拉（必选） */
+.msSelect {
+    flex: 0 0 auto;
+    max-width: 170px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--taskBox-bg-color);
+    color: var(--text-color-2);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+    align-self: center;
+}
+
+.msSelect:focus {
+    border-color: var(--kv-orange-color);
+}
+
 /* 计划日期按钮图标：与其他操作图标同尺寸（clock.svg 原始 53px，必须显式限制） */
 .dateBtn img {
     width: 16px;

@@ -165,6 +165,23 @@ var UI_TEXT = {
   duePickerWeekdays: ["日", "一", "二", "三", "四", "五", "六"],
   duePickerToday: "今天",
   duePickerClear: "清除日期",
+  // 任务卡专注时长徽标
+  focusMinuteUnit: "分钟",
+  taskFocusTip: (min, n) => `累计专注 ${min} 分钟 · ${n} 番茄`,
+  // 主界面按天视图
+  todayNoDueTip: "今天没有排期的待办（排在未来，到点自动出现）",
+  // 主界面新增待办（必选里程碑）
+  msSelectPlaceholder: "选里程碑（必选）",
+  msSelectRequired: "请先选择所属里程碑（没有就先去计划页建一个）",
+  // 计划页·里程碑下直接创建待办
+  planTaskAddBtn: "＋ 待办",
+  planTaskAddClose: "收起",
+  planTaskTitlePlaceholder: "待办名称（必填）",
+  planTaskDescPlaceholder: "描述（可选）",
+  planTaskDateBtn: (dateKey) => (dateKey ? `${dateKey.slice(5).replace("-", "/")} 📅` : "日期 📅"),
+  planTaskSubmit: "添加",
+  // 专注时长落账提示（不足 30% 未计番茄）
+  toastPartialFocus: (min) => `专注 ${min} 分钟已记录（不足 30% 未计番茄）`,
   // 任务-专注耦合提示
   toastNoBoundTask: "本次专注未绑定任务：可先在待办里把一条设为在做",
   toastTomatoDone: (title, total) => `专注完成，番茄 +1 ·「${title}」累计 ${total} 个`,

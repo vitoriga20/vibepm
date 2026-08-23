@@ -40,14 +40,19 @@ function clockStop() {
 }
 
 async function onWorkEnd(duration, progress) {
-  // 如果进度大于0.3，则视为成功
-  if (progress >= 0.3) {
+  // 时长持久化：只要专注过（progress>0）就落账——修复「专注一段时间但不足 30% 全部丢失」
+  // 番茄个数的 ≥0.3 有效门槛保留在 addTomatoToTask 内（时长与个数口径分离）
+  if (progress > 0) {
     // 任务-专注耦合：番茄只累计到「开始专注时锁定的绑定任务」（boundTaskId），其它任务不受影响
     const boundTaskId = floatingWindow.clock.config.boundTaskId;
     const result = todoManger_.addTomatoToTask(boundTaskId, duration, progress);
-    // 完成反馈：本次番茄 +1 + 该任务累计总数；未绑定任务时明确提示
+    // 完成反馈：满门槛 → 本次番茄 +1 + 该任务累计总数；不足 → 时长已记录提示；未绑定任务 → 明确提示
     if (settings.config.showSuccessPopup) {
-      showToast(result.title ? UI_TEXT.toastTomatoDone(result.title, result.total) : UI_TEXT.toastTomatoDoneNoTask);
+      if (result.partial) {
+        showToast(UI_TEXT.toastPartialFocus(Math.round((duration * progress) / 60000)));
+      } else {
+        showToast(result.title ? UI_TEXT.toastTomatoDone(result.title, result.total) : UI_TEXT.toastTomatoDoneNoTask);
+      }
     }
     updatePageTodayTomatosNum();
   }
@@ -195,10 +200,20 @@ function submitTask(event) {
 
   if (editTaskId != null) return;
 
+  // 主界面新增待办：必须关联里程碑（计划驱动的待办都有归属）
+  const msSelect = document.getElementById("msSelect");
+  const msId = msSelect ? msSelect.value : "";
+  if (!msId) {
+    showToast(UI_TEXT.msSelectRequired);
+    return;
+  }
+
   let task = {
     title: editor.textContent.trim(),
     type: "short",
     state: "待办", //待办、进行中、完成、删除
+    desc: "",
+    milestoneId: msId,
     // 当前时间戳
     createdTimestamp: Date.now(),
     modifiedTimestamp: 0,
@@ -767,6 +782,32 @@ pages.pages.forEach((page, index) => {
 
 updatePageTodayTomatosNum();
 
+// ———— 主界面新增待办的里程碑下拉（必选）：数据源 = 进行中计划的未完成里程碑 ————
+function renderMsSelect() {
+  const sel = document.getElementById("msSelect");
+  if (!sel) return;
+  const prev = sel.value;
+  const plans = (todoManger_.TaskList.plans || []).filter((p) => p.state === "active");
+  const opts = [];
+  for (const p of plans) {
+    for (const ms of p.milestones || []) {
+      if (ms.doneTimestamp) continue;
+      opts.push({ id: ms.id, label: `${p.title} · ${ms.title}` });
+    }
+  }
+  sel.innerHTML = `<option value="">${UI_TEXT.msSelectPlaceholder}</option>`
+    + opts.map((o) => `<option value="${o.id}">${o.label}</option>`).join("");
+  // 连续添加同里程碑的多个待办：保留上次选择
+  if (prev && opts.some((o) => o.id === prev)) sel.value = prev;
+}
+renderMsSelect();
+// 计划/里程碑增删改 → 下拉同步（链式挂接，不破坏 plans.js 已挂的 renderPlans）
+const prevOnPlanChangeForSelect = todoManger_.onPlanChange;
+todoManger_.onPlanChange = function () {
+  prevOnPlanChangeForSelect.call(this);
+  renderMsSelect();
+};
+
 function triggerActionOnDayChange(action) {
   let lastCheckedDate = new Date().getDate();
 
@@ -783,6 +824,8 @@ function triggerActionOnDayChange(action) {
 function OnDayChange() {
   todoManger_.archiveTasks();
   updatePageTodayTomatosNum();
+  // 主列表按天视图：跨天后新到期待办自动出现（如 8/25 排期的活到点显示）
+  todoManger_.onChange();
 }
 
 // 启动跨天检测
