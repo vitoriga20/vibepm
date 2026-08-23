@@ -304,10 +304,11 @@ function resolveStaticDir(): string {
 async function webopen(url: string): Promise<void> {
   try {
     const mod = await import("node:child_process");
-    const { exec } = mod;
-    if (process.platform === "win32") exec(`start "" "${url}"`);
-    else if (process.platform === "darwin") exec(`open "${url}"`);
-    else exec(`xdg-open "${url}"`);
+    // execFile 免 shell 直传参数：url 即使含元字符也无注入面（exec 拼串会被扫命令注入）
+    const { execFile } = mod;
+    if (process.platform === "win32") execFile("cmd", ["/c", "start", "", url]);
+    else if (process.platform === "darwin") execFile("open", [url]);
+    else execFile("xdg-open", [url]);
   } catch { /* noop */ }
 }
 
