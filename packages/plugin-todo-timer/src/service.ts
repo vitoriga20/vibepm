@@ -7,7 +7,7 @@
  */
 import {
   type TaskList, type Task, type Distribution, type DayAgg, type PlanInfo,
-  type StatisticsEntry, type StatisticsView,
+  type StatisticsEntry, type StatisticsView, type TaskStatsMap,
   localDateKey, UNKNOWN_TASK_LABEL,
 } from "./contract.js";
 
@@ -60,6 +60,32 @@ export class TodoTimerService {
         || (idx.get(e.tarId)?.title ?? "")
         || UNKNOWN_TASK_LABEL,
     }));
+  }
+
+  /**
+   * 任务维度聚合（任务列表🍅徽标 / 日历"点开某天看明细"的数据源）：
+   *  - 只计 type === "work" 的专注条目，休息不计
+   *  - 标题解析复用 getStatisticsViews 口径（title 冗余 → 反查 → 兜底），已删任务不丢
+   */
+  getTaskStats(): TaskStatsMap {
+    const map: TaskStatsMap = {};
+    for (const v of this.getStatisticsViews()) {
+      if (v.type !== "work") continue;
+      const s = map[v.tarId] ?? {
+        tarId: v.tarId,
+        title: v.taskTitle,
+        focusCount: 0,
+        focusMs: 0,
+        lastFocusAt: 0,
+        focusOnDay: {},
+      };
+      s.focusCount += 1;
+      s.focusMs += Number.isFinite(v.realDuration) ? v.realDuration : 0;
+      if (v.endTimestamp > s.lastFocusAt) s.lastFocusAt = v.endTimestamp;
+      s.focusOnDay[v.dateKey] = (s.focusOnDay[v.dateKey] ?? 0) + 1;
+      map[v.tarId] = s;
+    }
+    return map;
   }
 
   /**

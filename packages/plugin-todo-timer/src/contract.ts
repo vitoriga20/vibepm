@@ -142,6 +142,25 @@ export interface Distribution {
   todayKey: string;
 }
 
+/** 任务维度统计单项（getTaskStats 的值；日历"点开某天看任务明细"的数据源） */
+export interface TaskStat {
+  /** 任务 id（= statistics 条目的 tarId） */
+  tarId: number;
+  /** 展示标题（title 冗余 → tarId 反查 → 兜底，同 StatisticsView 口径） */
+  title: string;
+  /** 累计专注番茄数（type=work 条数） */
+  focusCount: number;
+  /** 累计专注有效时长（毫秒，realDuration 合计） */
+  focusMs: number;
+  /** 最近一次专注结束时间戳（无专注 = 0） */
+  lastFocusAt: number;
+  /** 按天番茄数：本地日期键 → 当日专注条数 */
+  focusOnDay: Record<string, number>;
+}
+
+/** 任务维度统计：tarId → TaskStat */
+export type TaskStatsMap = Record<number, TaskStat>;
+
 /** 统计条目的表现层展开（含解析后的任务/里程碑标题，缺失兜底） */
 export interface StatisticsView extends StatisticsEntry {
   /** 展示用任务标题（title 缺失 → tarId 反查 → 兜底文案） */

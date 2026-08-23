@@ -165,3 +165,42 @@ test("remove 后旧活动仍在日历可见（statistics 不随任务删除消�
   assert.equal(day.focusCount, 1);
   assert.equal(svc.getStatisticsViews()[0].taskTitle, "已完成专注");
 });
+
+test("任务维度聚合：番茄数/时长/最近专注按 tarId 累计，休息不计", () => {
+  const svc = new TodoTimerService();
+  const day1 = localTs(-1, 10, 0);
+  const day2 = localTs(0, 15, 0);
+  svc.ingest(baseList({
+    current: [task({ id: 7, title: "写文档" })],
+    statistics: [
+      { endTimestamp: day1, duration: 30 * 60000, realDuration: 30 * 60000, type: "work", progress: 1, tarId: 7 },
+      { endTimestamp: day1 + 60000, duration: 30 * 60000, realDuration: 15 * 60000, type: "work", progress: 0.5, tarId: 7 },
+      { endTimestamp: day2, duration: 25 * 60000, realDuration: 25 * 60000, type: "work", progress: 1, tarId: 7 },
+      // 休息挂在同一任务下，不应计入
+      { endTimestamp: day2 + 60000, duration: 5 * 60000, realDuration: 5 * 60000, type: "shortBreak", progress: 1, tarId: 7 },
+      // 另一任务一条
+      { endTimestamp: day2 + 120000, duration: 60000, realDuration: 60000, type: "work", progress: 1, tarId: 8, title: "读论文" },
+    ],
+  }));
+  const stats = svc.getTaskStats();
+  assert.equal(Object.keys(stats).length, 2);
+  const doc = stats[7];
+  assert.equal(doc.title, "写文档");
+  assert.equal(doc.focusCount, 3);
+  assert.equal(doc.focusMs, 70 * 60000);
+  assert.equal(doc.lastFocusAt, day2);
+  // 按天分布：昨天 2 颗、今天 1 颗（本地日期键口径）
+  assert.equal(doc.focusOnDay[localDateKey(day1)], 2);
+  assert.equal(doc.focusOnDay[localDateKey(day2)], 1);
+  // title 冗余优先于反查（任务 8 不在列表里也不丢标题）
+  assert.equal(stats[8].title, "读论文");
+});
+
+test("任务维度聚合：无快照/无专注 → 空表", () => {
+  const svc = new TodoTimerService();
+  assert.deepEqual(svc.getTaskStats(), {});
+  svc.ingest(baseList({
+    statistics: [{ endTimestamp: localTs(0, 9, 0), duration: 60000, realDuration: 60000, type: "longBreak", progress: 1, tarId: 1 }],
+  }));
+  assert.deepEqual(svc.getTaskStats(), {});
+});

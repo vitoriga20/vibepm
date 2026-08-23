@@ -53,6 +53,7 @@ class TodoTimerPlugin {
           ok: true,
           updatedAt: svc.updatedAt,
           distribution: svc.getDistribution(),
+          taskStats: svc.getTaskStats(),
           statisticsCount: svc.getStatistics().length,
         });
       }}));
