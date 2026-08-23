@@ -946,6 +946,30 @@ pointer-events: none;
     pointer-events: none;
 }
 
+/* 计划日期徽标（dueDate；今天=accent 提亮，过期=警示色） */
+.dueTag {
+    align-self: flex-start;
+    padding: 1px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--text-color-4);
+
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text-color-2);
+
+    pointer-events: none;
+}
+.dueTag.today {
+    border-color: var(--kv-orange-color);
+    color: var(--kv-orange-color);
+    font-weight: 700;
+}
+.dueTag.overdue {
+    border-color: var(--kv-red-color);
+    color: var(--kv-red-color);
+    font-weight: 700;
+}
+
 /* 卡片番茄总数角标（数据复盘：累计专注番茄；挂在番茄盒末尾） */
 .tomatoTotal {
     display: inline-flex;

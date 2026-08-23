@@ -72,6 +72,8 @@ export interface Task {
   tomato?: Record<string, number[]>;
   important?: boolean;
   urgent?: boolean;
+  /** 计划日期（本地日期键 "YYYY-MM-DD"；未指定为 null/缺省，旧数据天然兼容） */
+  dueDate?: string | null;
   [k: string]: unknown;
 }
 
@@ -120,6 +122,8 @@ export interface DayAgg {
   doneTitles: string[];
   /** 长目标投入：里程碑 id → 当日专注毫秒 */
   planMs: Record<string, number>;
+  /** 当日计划任务（dueDate 命中本地日期；三表合查，done = 已完成/已归档） */
+  planned: Array<{ title: string; done: boolean }>;
 }
 
 /** 面向表现的计划元信息（图例/tooltip 需要标题；色相由渲染端按 id 派生） */

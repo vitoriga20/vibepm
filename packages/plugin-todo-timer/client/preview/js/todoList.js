@@ -7,6 +7,29 @@ function countTaskTomato(task) {
   return Object.values(task.tomato).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
 }
 
+/**
+ * 本地日期键 "YYYY-MM-DD"（dueDate 全链路唯一口径；语义同 node 半契约 contract.ts 的
+ * localDateKey —— 本页无法 import TS 契约，保留字面量副本并注释指向）
+ */
+function previewLocalDateKey(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+/** 计划日期徽标 HTML（今天=accent 提亮 / 过期=警示色 / 未来=常规；title 带原文与状态） */
+function dueTagHtml(task) {
+  if (!task.dueDate) return "";
+  const dd = new Date(task.dueDate + "T00:00:00");
+  if (isNaN(dd.getTime())) return "";
+  const todayKey = previewLocalDateKey(new Date());
+  const cls = task.dueDate === todayKey ? "today" : (task.dueDate < todayKey ? "overdue" : "");
+  const label = cls === "today" ? UI_TEXT.dueToday : `${dd.getMonth() + 1}/${dd.getDate()}`;
+  const tip = cls === "overdue" ? UI_TEXT.dueTagTipOverdue(task.dueDate) : UI_TEXT.dueTagTip(task.dueDate);
+  return `<div class="dueTag ${cls}" title="${tip}">${label}</div>`;
+}
+
 class todoListManger {
   constructor(type) {
     this.type = type;
@@ -438,6 +461,19 @@ class todoListManger {
   }
 
   /**
+   * 设置/清除「计划日期」（dateKey = 本地日期键 "YYYY-MM-DD"；null = 清除）
+   * 只改字段不动列表：done/archived 的任务也可排期（跨表 findTask）
+   */
+  setDueDate(id, dateKey) {
+    const todo = this.findTask(id);
+    if (!todo) return;
+    todo.dueDate = dateKey || null;
+    todo.modifiedTimestamp = Date.now();
+    this.saveTaskList(this.TaskList);
+    this.onChange();
+  }
+
+  /**
    * 待办列表渲染顺序：象限优先（Q1→Q4），同象限内按创建时间新到旧
    * （只算视图顺序，不改存储数组；「在做」仍由 current[0] 承载）
    */
@@ -827,6 +863,9 @@ todoManger_.onChange = function () {
       if (found) milestoneTag = `<div class="milestoneTag" title="${found.plan.title}">${found.milestone.title}</div>`;
     }
 
+    // 计划日期徽标（dueDate 已设置时显示；点击卡片上的时钟按钮可改/清除）
+    const dueTag = dueTagHtml(task);
+
     let scale = `
     <div class="scale">
         <div class="s short op" ></div>
@@ -857,10 +896,14 @@ todoManger_.onChange = function () {
         ${quadrantBadge}
         <div class="title">${task.title}</div>
         ${milestoneTag}
+        ${dueTag}
 
         <div class="taskBtnBox">
           <span taskId="${task.id}" onclick="toggleImportantBtn(this,event)" class="markBtn imp ${impOn ? "on" : ""}" title="${impOn ? UI_TEXT.markImportantTipOn : UI_TEXT.markImportantTipOff}">${UI_TEXT.markImportant}</span>
           <span taskId="${task.id}" onclick="toggleUrgentBtn(this,event)" class="markBtn urg ${urgOn ? "on" : ""}" title="${urgOn ? UI_TEXT.markUrgentTipOn : UI_TEXT.markUrgentTipOff}">${UI_TEXT.markUrgent}</span>
+          <span taskId="${task.id}" onclick="promptDueDate(this,event)" class="dateBtn" title="${UI_TEXT.setDueBtnTip}">
+            <img src="pic/clock.svg" />
+          </span>
           <span taskId="${task.id}" onclick="setTopTask(this,event)"   class="settopBtn">
             <img src="pic/settop.svg" />
           </span>
@@ -951,6 +994,31 @@ function toggleUrgentBtn(element, event) {
   event.stopPropagation();
   const taskId = parseInt(element.getAttribute("taskId"));
   todoManger_.toggleUrgent(taskId);
+}
+
+// 计划日期按钮：唤起原生日期选择器（change 提交，选空 = 清除；入参格式 "YYYY-MM-DD"）
+function promptDueDate(element, event) {
+  event.stopPropagation();
+  const taskId = parseInt(element.getAttribute("taskId"));
+  const task = todoManger_.findTask(taskId);
+  const input = document.createElement("input");
+  input.type = "date";
+  input.value = task && task.dueDate ? task.dueDate : "";
+  input.style.cssText = "position:fixed;left:-100px;top:-100px;opacity:0;";
+  document.body.appendChild(input);
+  const cleanup = () => setTimeout(() => input.remove(), 200);
+  input.addEventListener("change", () => {
+    todoManger_.setDueDate(taskId, input.value || null);
+    cleanup();
+  });
+  input.addEventListener("blur", cleanup);
+  try {
+    input.showPicker();
+  } catch (e) {
+    // showPicker 不可用（旧浏览器/无手势）→ 聚焦手输兜底
+    input.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:99;";
+    input.focus();
+  }
 }
 
 function activeTask(element, event) {

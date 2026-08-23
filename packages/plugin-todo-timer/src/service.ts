@@ -98,7 +98,7 @@ export class TodoTimerService {
     const days: Record<string, DayAgg> = {};
     const day = (key: string): DayAgg => {
       let d = days[key];
-      if (!d) d = days[key] = { focusMs: 0, focusCount: 0, doneCount: 0, doneTitles: [], planMs: {} };
+      if (!d) d = days[key] = { focusMs: 0, focusCount: 0, doneCount: 0, doneTitles: [], planMs: {}, planned: [] };
       return d;
     };
 
@@ -113,7 +113,12 @@ export class TodoTimerService {
 
     const s = this._snapshot;
     if (s) {
+      // 计划任务：dueDate 命中当天（current 未做 / done+archived 已做，同一投影口径）
+      for (const t of s.current) {
+        if (t.dueDate) day(t.dueDate).planned.push({ title: t.title || UNKNOWN_TASK_LABEL, done: false });
+      }
       for (const t of [...s.done, ...s.archived]) {
+        if (t.dueDate) day(t.dueDate).planned.push({ title: t.title || UNKNOWN_TASK_LABEL, done: true });
         if (!t.doneTimestamp) continue;
         const d = day(localDateKey(t.doneTimestamp));
         d.doneCount += 1;

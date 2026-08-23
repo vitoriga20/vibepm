@@ -204,3 +204,39 @@ test("任务维度聚合：无快照/无专注 → 空表", () => {
   }));
   assert.deepEqual(svc.getTaskStats(), {});
 });
+
+test("计划任务聚合：dueDate 命中当天，current 未做 / done+archived 已做", () => {
+  const svc = new TodoTimerService();
+  const today = localDateKey(Date.now());
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = localDateKey(tomorrowDate.getTime());
+  svc.ingest(baseList({
+    current: [
+      task({ id: 1, title: "今天要做的", dueDate: today }),
+      task({ id: 2, title: "明天再做", dueDate: tomorrow }),
+      task({ id: 3, title: "没排期的不算" }), // 无 dueDate
+    ],
+    done: [task({ id: 4, title: "排了今天且已完成", dueDate: today, doneTimestamp: localTs(0, 11, 0) })],
+    archived: [task({ id: 5, title: "上周排期已归档", dueDate: "2020-01-01" })],
+  }));
+  const dist = svc.getDistribution();
+  assert.deepEqual(dist.days[today].planned, [
+    { title: "今天要做的", done: false },
+    { title: "排了今天且已完成", done: true },
+  ]);
+  assert.deepEqual(dist.days[tomorrow].planned, [{ title: "明天再做", done: false }]);
+  assert.deepEqual(dist.days["2020-01-01"].planned, [{ title: "上周排期已归档", done: true }]);
+  // 无 dueDate 的任务不产生任何 planned 日
+  assert.equal(dist.days[today].planned.length, 2);
+});
+
+test("计划任务聚合：空标题兜底，旧数据无 dueDate 不抛错", () => {
+  const svc = new TodoTimerService();
+  const key = localDateKey(Date.now());
+  svc.ingest(baseList({
+    current: [task({ id: 1, title: "", dueDate: key }), { id: 2 } as Task], // 裸旧任务对象
+  }));
+  const dist = svc.getDistribution();
+  assert.deepEqual(dist.days[key].planned, [{ title: UNKNOWN_TASK_LABEL, done: false }]);
+});

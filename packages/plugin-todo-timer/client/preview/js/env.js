@@ -153,6 +153,11 @@ var UI_TEXT = {
   markImportantTipOff: "标为重要",
   markUrgentTipOn: "取消紧急",
   markUrgentTipOff: "标为紧急",
+  // 任务卡计划日期（dueDate 本地日期键；选空 = 清除）
+  setDueBtnTip: "计划日期（选中即保存，清空即取消）",
+  dueToday: "今天",
+  dueTagTip: (dateKey) => `计划日期 ${dateKey}`,
+  dueTagTipOverdue: (dateKey) => `计划日期 ${dateKey}（已过期）`,
   // 任务-专注耦合提示
   toastNoBoundTask: "本次专注未绑定任务：可先在待办里把一条设为在做",
   toastTomatoDone: (title, total) => `专注完成，番茄 +1 ·「${title}」累计 ${total} 个`,

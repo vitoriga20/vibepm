@@ -25,15 +25,20 @@ const UI_TEXT = {
   // 单元格徽标
   focusBadge: (min: number) => (min >= 60 ? `${Math.floor(min / 60)}时${min % 60}分` : `${min}分`),
   doneBadge: (n: number) => `✓${n}`,
+  plannedBadge: (n: number) => `计${n}`,
   // tooltip（原生 title，多行 \n）
   tipFocus: (min: number, t: number) => `专注 ${min} 分钟 · ${t} 番茄`,
   tipDone: (n: number, titles: string[]) => `完成任务 ${n} 条：${titles.join("、")}`,
   tipPlan: (title: string, min: number) => `${title} ${min} 分钟`,
+  tipPlanned: (items: Array<{ title: string; done: boolean }>) =>
+    `计划任务 ${items.length} 条：${items.map((p) => (p.done ? `✓${p.title}` : p.title)).join("、")}`,
   noActivity: "当日无活动",
   // 详情卡
   detailTitle: (key: string) => `${key} · 活动详情`,
   detailFocus: (min: number, t: number) => `专注 ${min} 分钟（${t} 番茄）`,
   detailDoneTitle: "完成的任务：",
+  detailPlannedTitle: "计划任务：",
+  detailPlannedDone: (done: number, total: number) => `已完成 ${done}/${total}`,
   detailPlanTitle: "长目标投入：",
   detailEmpty: "当日无活动",
   detailPlanRow: (title: string, min: number, pct: number) => `${title} — ${min} 分钟（${pct}%）`,
@@ -68,6 +73,7 @@ interface DayAggLite {
   doneCount: number;
   doneTitles: string[];
   planMs: Record<string, number>;
+  planned: Array<{ title: string; done: boolean }>;
 }
 interface PlanLite {
   id: number;
@@ -107,6 +113,7 @@ const CSS = /* css */`
 .cell .d{font:700 12px/1 var(--numeric,monospace);color:var(--muted,#6b6f76)}
 .cell .focus{display:inline-block;margin-top:5px;font:700 10px/1 var(--numeric,monospace);
   color:var(--accent,#147d78);background:var(--accent-dim,#e3efee);padding:2px 5px;border-radius:3px}
+.cell .focus.planned{color:var(--muted,#6b6f76);background:transparent;border:1px solid var(--line-strong,#ccc);margin-left:4px}
 .cell .done{position:absolute;top:6px;right:7px;font:700 10px/1 var(--numeric,monospace);color:var(--ink-ok,#4d7a5e)}
 .cell .plans{position:absolute;left:0;right:0;bottom:0;display:flex;height:5px}
 .cell .plans i{display:block;height:100%}
@@ -312,6 +319,13 @@ export class CalendarPanel extends HTMLElement {
         db.textContent = UI_TEXT.doneBadge(agg.doneCount);
         cell.appendChild(db);
       }
+      // 计划任务徽标（dueDate 命中当天；与专注徽标同排）
+      if (agg.planned?.length) {
+        const pb = document.createElement("span");
+        pb.className = "focus planned";
+        pb.textContent = UI_TEXT.plannedBadge(agg.planned.length);
+        cell.appendChild(pb);
+      }
       // 长目标堆叠底条：宽度按各里程碑当日占比
       const planTotal = Object.values(agg.planMs).reduce((a, b) => a + b, 0);
       if (planTotal > 0) {
@@ -343,6 +357,7 @@ export class CalendarPanel extends HTMLElement {
     const lines: string[] = [key];
     if (agg.focusMs > 0 || agg.focusCount > 0) lines.push(UI_TEXT.tipFocus(fmtMin(agg.focusMs), agg.focusCount));
     if (agg.doneCount > 0) lines.push(UI_TEXT.tipDone(agg.doneCount, agg.doneTitles));
+    if (agg.planned?.length) lines.push(UI_TEXT.tipPlanned(agg.planned));
     for (const [msId, ms] of Object.entries(agg.planMs)) {
       lines.push(UI_TEXT.tipPlan(this._milestoneTitle(msId), fmtMin(ms)));
     }
@@ -375,6 +390,21 @@ export class CalendarPanel extends HTMLElement {
       }
       box.appendChild(ul);
     }
+    if (agg.planned?.length) {
+      const r = document.createElement("div");
+      r.className = "row";
+      const doneN = agg.planned.filter((p) => p.done).length;
+      r.textContent = `${UI_TEXT.detailPlannedTitle}${UI_TEXT.detailPlannedDone(doneN, agg.planned.length)}`;
+      box.appendChild(r);
+      const ul = document.createElement("ul");
+      for (const p of agg.planned) {
+        const li = document.createElement("li");
+        li.textContent = p.done ? `✓ ${p.title}` : p.title;
+        if (p.done) li.style.color = "var(--muted,#6b6f76)";
+        ul.appendChild(li);
+      }
+      box.appendChild(ul);
+    }
     const planEntries = Object.entries(agg.planMs).sort((a, b) => b[1] - a[1]);
     if (planEntries.length) {
       const r = document.createElement("div");
@@ -391,7 +421,7 @@ export class CalendarPanel extends HTMLElement {
       }
       box.appendChild(ul);
     }
-    if (!agg.focusMs && !agg.doneTitles.length && !planEntries.length) {
+    if (!agg.focusMs && !agg.doneTitles.length && !planEntries.length && !agg.planned?.length) {
       const r = document.createElement("div");
       r.className = "row";
       r.textContent = UI_TEXT.detailEmpty;
