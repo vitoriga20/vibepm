@@ -3,7 +3,7 @@
  *
  * 启动顺序：
  *  1) 自定义元素 <vibe-shell> → 首屏即渲染（容器 / 头部导航 / footer / 插槽占位，对齐 dsh 「壳先出、内容懒装」）。
- *  2) 动态 import() 其他在 bootGraph 里声明的 client 入口（onboarding / settings / github-auth / repo-feed…）。
+ *  2) 动态 import() 其他在 bootGraph 里声明的 client 入口（onboarding / settings / github / todo-timer / calendar…）。
  *     每个文件都是 ES module，内部会调 `modules.register(id, factory)` → `bootstrap()` 后 apply。
  *  3) 模块 apply 完后：fire `vibepm:ready`，让 <vibe-shell> 重渲染 slots（现在注册的卡片、面板都有了）。
  */

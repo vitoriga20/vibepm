@@ -40,10 +40,21 @@ vibepm web
 | --- | --- | --- | --- |
 | Home | `/` | plugin-onboarding | 首屏引导大卡（连接 GitHub / 打开设置 / 查看动态） |
 | GitHub | `#auth` | plugin-github | 三源连接（gh / Device Flow / PAT）+ 仓库分区列表 + 仓库详情 |
+| TODO番茄钟 | `#todo-timer` | plugin-todo-timer | 番茄钟 + ToDo 小目标：专注计时、任务排期、桌面胶囊 |
+| 活动日历 | `#calendar` | plugin-calendar | 月视图多维度日历：专注强度 / 任务完成 / 计划任务 / 按任务明细 |
 | Plugins | `#plugins` | plugin-plugin-manager | **设置里开关插件（冷启动生效）** |
 | Settings | `#settings` | plugin-settings | 通用键值设置面板 |
 
 开关插件：Settings → 插件（或顶栏 Plugins），列表一行一个插件 + 开关。开关写入本地 settings（`plugins.enabled`），**冷启动生效**——重启内核后该插件的界面与后端一起消失/恢复。内核三件套（Storage / Web UI / Shell）不可关。
+
+## 核心功能：TODO番茄钟 + 活动日历
+
+两个插件共享同一条数据链路：预览页（iframe 内纯 JS 页面）localStorage → postMessage → 壳侧桥（去抖去重 + 冷启动直读兜底）→ `POST /api/todo-timer/sync` → node 半 `TodoTimerService`（内存快照 + 聚合）。契约类型集中在 `plugin-todo-timer/src/contract.ts`，单一来源。
+
+- **专注计时**：番茄钟 + ToDo 小目标管理，专注时长按任务记账（任务级 🍅 统计），跨天自动归档。
+- **任务排期**：任务可指定计划日期（本地日期键，避免 UTC 错位），首页创建默认当天，计划页可就地改期、多天排期（左键多选 + 完成按钮 + 天数徽标）。逾期任务继续显示并标红。
+- **桌面胶囊**：独立小窗（盆栽 + 机械翻牌倒计时，跟随皮肤主题），可控制专注并与主页面实时同步。
+- **活动日历**：月视图 42 格，专注强度底色 + 完成/计划徽标；点击某天展开当日明细——专注时长按任务列出（🍅 数与分钟），已完成 / 计划任务一目了然。
 
 ## 架构（monorepo）
 
@@ -61,6 +72,9 @@ pnpm workspaces 管理 `packages/*` 多包：
 | `@vitoriga20/plugin-settings` | 通用设置面板 |
 | `@vitoriga20/plugin-plugin-manager` | 插件开关面板 |
 | `@vitoriga20/plugin-skin-rhine` | 终末地风格皮肤（暗墨蓝 + 柠檬黄），可独立装卸 |
+| `@vitoriga20/plugin-todo-timer` | TODO番茄钟（页面整体 iframe 嵌入预览壳）：番茄钟 + ToDo 小目标管理、跨天归档、任务排期、桌面胶囊；提供 `todoTimer` 服务与同步 API |
+| `@vitoriga20/plugin-calendar` | 活动日历：消费 `todoTimer` 服务（专注 / 任务完成 / 计划任务 / 长目标投入），多维度月视图面板 |
+| `@vitoriga20/plugin-ambient` | 壳背景动画（算法画布：慢移网格 / 十字星漂移 / 流星），可独立装卸 |
 
 ### Shell 槽位
 
@@ -71,7 +85,7 @@ pnpm workspaces 管理 `packages/*` 多包：
 - `shell.secondary` — 状态 pill 区
 - `shell.footer` — 底栏（版本号）
 
-插件经 bundle 加载（`minimal = [storage | web-ui | ide-view | onboarding | github | settings | plugin-manager]`）。插件开关在启动时被读取，禁用的插件不加载。
+插件经 bundle 加载（`minimal = [storage | web-ui | ide-view | onboarding | github | settings | plugin-manager | ambient | todo-timer | calendar]`）。插件开关在启动时被读取，禁用的插件不加载。
 
 ## 插件开关的数据链路
 

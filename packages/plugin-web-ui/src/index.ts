@@ -1,7 +1,7 @@
 // web-ui 插件 v3：webServer 哑载体（对齐 dsh-host-webserver）
 // - webServer 服务：register(route)（exact/prefix 命名路由）/ registerFallback（唯一兜底座位）/ tapIndex（纯 html 变换）
 // - 路由匹配：exact 表 → 最长 prefix（p 与 p/<anything>）→ fallback（静态壳，SPA 语义）
-// - 业务 API 不属于本插件：各业务插件（storage/github-auth/repo-feed/settings/plugin-manager）
+// - 业务 API 不属于本插件：各业务插件（storage/github/settings/plugin-manager/todo-timer/calendar）
 //   自己 register 到 webServer；本插件只做传输载体 + 静态壳 + boot/slots 注入。
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { dirname, join, normalize, resolve, sep } from "node:path";
