@@ -1096,10 +1096,15 @@ pointer-events: none;
 }
 .duePicker .dp-foot {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--border-color);
+}
+.duePicker .dp-foot-left {
+    display: flex;
+    gap: 4px;
 }
 .duePicker .dp-today-btn,
 .duePicker .dp-clear-btn {
@@ -1113,6 +1118,20 @@ pointer-events: none;
 .duePicker .dp-clear-btn:hover {
     background: var(--mask-color-light);
     color: var(--text-color-1);
+}
+/* 多选「完成」按钮（accent 主按钮，带已选天数反馈） */
+.duePicker .dp-done-btn {
+    padding: 3px 12px;
+    border-radius: 6px;
+    background: var(--kv-orange-color);
+    color: var(--on-accent);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.duePicker .dp-done-btn:hover {
+    opacity: 0.85;
 }
 
 /* 卡片番茄总数角标（数据复盘：累计专注番茄；挂在番茄盒末尾） */

@@ -365,8 +365,13 @@
         : getActiveTaskOf(list)
       : null;
     const title = task && task.id !== -1 ? task.title : "";
-    $("capTask").textContent = title ? UI_TEXT.focusIdlePrefix + title : "";
     $("capTask").style.display = title ? "" : "none";
+    if (!title) { $("capTask").textContent = ""; $("capTask").title = ""; return; }
+    // 归属链：有归属的代办显示「计划 > 里程碑 > 代办」，同名代办也分得清；单行超长省略，title 悬停看全
+    const chain = milestoneChainOf(list, task);
+    const full = chain ? `${chain.planTitle} > ${chain.milestoneTitle} > ${title}` : title;
+    $("capTask").textContent = UI_TEXT.focusIdlePrefix + full;
+    $("capTask").title = full;
   }
 
   function renderTodayStats() {

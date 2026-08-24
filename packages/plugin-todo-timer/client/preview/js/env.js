@@ -155,18 +155,20 @@ var UI_TEXT = {
   markImportantTipOff: "标为重要",
   markUrgentTipOn: "取消紧急",
   markUrgentTipOff: "标为紧急",
-  // 任务卡计划日期（dueDate 本地日期键；选空 = 清除）
-  setDueBtnTip: "计划日期（选中即保存，清空即取消）",
+  // 任务卡计划日期（dueDate 本地日期键数组=多天排期；选空 = 清除）
+  setDueBtnTip: "计划日期（左键点选/取消多天，「完成」生效）",
   dueToday: "今天",
-  dueTagTip: (dateKey) => `计划日期 ${dateKey}`,
-  dueTagTipOverdue: (dateKey) => `计划日期 ${dateKey}（已过期）`,
-  // 计划日期弹层（自制月历）
+  dueDays: (n) => `${n}天`,
+  dueTagTip: (days) => `计划日期 ${(Array.isArray(days) ? days : [days]).join("、")}`,
+  dueTagTipOverdue: (days) => `计划日期 ${(Array.isArray(days) ? days : [days]).join("、")}（已过期）`,
+  // 计划日期弹层（自制月历，多选）
   duePickerPrev: "上个月",
   duePickerNext: "下个月",
   duePickerMonthTitle: (y, m) => `${y}年${m}月`,
   duePickerWeekdays: ["日", "一", "二", "三", "四", "五", "六"],
   duePickerToday: "今天",
   duePickerClear: "清除日期",
+  duePickerDone: (n) => (n > 0 ? `完成（${n}天）` : "完成"),
   // 任务卡专注时长徽标
   focusMinuteUnit: "分钟",
   taskFocusTip: (min, n) => `累计专注 ${min} 分钟 · ${n} 番茄`,
@@ -180,7 +182,11 @@ var UI_TEXT = {
   planTaskAddClose: "收起",
   planTaskTitlePlaceholder: "待办名称（必填）",
   planTaskDescPlaceholder: "描述（可选）",
-  planTaskDateBtn: (dateKey) => (dateKey ? `${dateKey.slice(5).replace("-", "/")} 📅` : "日期 📅"),
+  planTaskDateBtn: (keys) => {
+    const days = Array.isArray(keys) ? keys : (keys ? [keys] : []);
+    if (!days.length) return "日期 📅";
+    return days.length === 1 ? `${days[0].slice(5).replace("-", "/")} 📅` : `${days.length}天 📅`;
+  },
   planTaskSubmit: "添加",
   planTaskSave: "保存",
   planTaskCancel: "取消",

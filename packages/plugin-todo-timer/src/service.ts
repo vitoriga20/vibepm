@@ -11,6 +11,12 @@ import {
   localDateKey, UNKNOWN_TASK_LABEL,
 } from "./contract.js";
 
+/** dueDate 多天归一化：单字符串（旧数据）→ [key]；数组 → 去重升序；空/脏值 → []（与 preview 侧 dueDatesOf 同口径） */
+function dueDateKeysOf(dueDate: string | string[] | null | undefined): string[] {
+  if (!dueDate) return [];
+  return [...new Set((Array.isArray(dueDate) ? dueDate : [dueDate]).filter((k): k is string => typeof k === "string" && /^\d{4}-\d{2}-\d{2}$/.test(k)))].sort();
+}
+
 export class TodoTimerService {
   name = "todoTimer";
   private _snapshot: TaskList | null = null;
@@ -116,12 +122,12 @@ export class TodoTimerService {
 
     const s = this._snapshot;
     if (s) {
-      // 计划任务：dueDate 命中当天（current 未做 / done+archived 已做，同一投影口径）
+      // 计划任务：dueDate 逐天命中（current 未做 / done+archived 已做，同一投影口径；多天排期每一天都投影）
       for (const t of s.current) {
-        if (t.dueDate) day(t.dueDate).planned.push({ title: t.title || UNKNOWN_TASK_LABEL, done: false });
+        for (const k of dueDateKeysOf(t.dueDate)) day(k).planned.push({ title: t.title || UNKNOWN_TASK_LABEL, done: false });
       }
       for (const t of [...s.done, ...s.archived]) {
-        if (t.dueDate) day(t.dueDate).planned.push({ title: t.title || UNKNOWN_TASK_LABEL, done: true });
+        for (const k of dueDateKeysOf(t.dueDate)) day(k).planned.push({ title: t.title || UNKNOWN_TASK_LABEL, done: true });
         if (!t.doneTimestamp) continue;
         const d = day(localDateKey(t.doneTimestamp));
         d.doneCount += 1;

@@ -242,3 +242,22 @@ test("计划任务聚合：空标题兜底，旧数据无 dueDate 不抛错", ()
   const dist = svc.getDistribution();
   assert.deepEqual(dist.days[key].planned, [{ title: UNKNOWN_TASK_LABEL, done: false }]);
 });
+
+test("计划任务聚合：dueDate 多天数组逐天投影，去重升序，空数组不算", () => {
+  const svc = new TodoTimerService();
+  const d1 = localDateKey(Date.now());
+  const d2Date = new Date();
+  d2Date.setDate(d2Date.getDate() + 2);
+  const d2 = localDateKey(d2Date.getTime());
+  svc.ingest(baseList({
+    current: [
+      task({ id: 1, title: "周一周三做", dueDate: [d1, d2, d2] }), // 含重复，应去重
+      task({ id: 2, title: "空数组不算", dueDate: [] }),
+    ],
+  }));
+  const dist = svc.getDistribution();
+  assert.deepEqual(dist.days[d1].planned, [{ title: "周一周三做", done: false }]);
+  assert.deepEqual(dist.days[d2].planned, [{ title: "周一周三做", done: false }]);
+  // 空数组 dueDate 不产生任何 planned 日（旧行为：无 dueDate 不算）
+  assert.equal(dist.days[d1].planned.length, 1);
+});

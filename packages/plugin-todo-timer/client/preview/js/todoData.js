@@ -113,12 +113,18 @@ function completeActiveTaskInList(list) {
   return true;
 }
 
-/** 任务所属里程碑标题（胶囊 #标签用；plans 结构：plan.milestones[].id === task.milestoneId） */
-function milestoneLabelOf(list, task) {
-  if (!list || !task || !task.milestoneId) return "";
+/** 任务所属计划+里程碑（plans 结构：plan.milestones[].id === task.milestoneId；未归属返回 null） */
+function milestoneChainOf(list, task) {
+  if (!list || !task || !task.milestoneId) return null;
   for (const plan of list.plans || []) {
     const ms = (plan.milestones || []).find((m) => m.id === task.milestoneId);
-    if (ms) return ms.title;
+    if (ms) return { planTitle: plan.title, milestoneTitle: ms.title };
   }
-  return "";
+  return null;
+}
+
+/** 任务所属里程碑标题（胶囊 #标签用；plans 结构：plan.milestones[].id === task.milestoneId） */
+function milestoneLabelOf(list, task) {
+  const chain = milestoneChainOf(list, task);
+  return chain ? chain.milestoneTitle : "";
 }

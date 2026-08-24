@@ -16,6 +16,17 @@ function previewLocalDateKey(date) {
 }
 
 /**
+ * 多天排期归一化：dueDate 单字符串（旧数据）→ [key]；数组 → 去重升序；空/缺省/脏值 → []
+ * 全链路读取唯一入口（徽标/按天可见/表单回填/服务端投影均只认它）
+ */
+function dueDatesOf(task) {
+  const v = task && task.dueDate;
+  if (!v) return [];
+  const arr = Array.isArray(v) ? v : [v];
+  return [...new Set(arr.filter((k) => typeof k === "string" && /^\d{4}-\d{2}-\d{2}$/.test(k)))].sort();
+}
+
+/**
  * 任务累计专注毫秒（statistics 里 type=work 且 tarId 命中的 realDuration 合计）
  * 数据复盘口径：任务卡时长徽标 / tooltip 全走这里
  */
@@ -29,15 +40,25 @@ function taskFocusMs(task) {
   return ms;
 }
 
-/** 计划日期徽标 HTML（今天=accent 提亮 / 过期=警示色 / 未来=常规；title 带原文与状态） */
+/**
+ * 计划日期徽标 HTML（多天排期：单天=今天/过期/常规着色 + M/D；多天=天数计数；
+ * 过期判定：全部选中日期都过去才算过期；title 带日期列表原文与状态）
+ */
 function dueTagHtml(task) {
-  if (!task.dueDate) return "";
-  const dd = new Date(task.dueDate + "T00:00:00");
-  if (isNaN(dd.getTime())) return "";
+  const days = dueDatesOf(task);
+  if (!days.length) return "";
   const todayKey = previewLocalDateKey(new Date());
-  const cls = task.dueDate === todayKey ? "today" : (task.dueDate < todayKey ? "overdue" : "");
-  const label = cls === "today" ? UI_TEXT.dueToday : `${dd.getMonth() + 1}/${dd.getDate()}`;
-  const tip = cls === "overdue" ? UI_TEXT.dueTagTipOverdue(task.dueDate) : UI_TEXT.dueTagTip(task.dueDate);
+  const hasToday = days.includes(todayKey);
+  const hasFuture = days.some((k) => k > todayKey);
+  const cls = hasToday ? "today" : (hasFuture ? "" : "overdue");
+  let label;
+  if (days.length === 1) {
+    const dd = new Date(days[0] + "T00:00:00");
+    label = cls === "today" ? UI_TEXT.dueToday : `${dd.getMonth() + 1}/${dd.getDate()}`;
+  } else {
+    label = UI_TEXT.dueDays(days.length);
+  }
+  const tip = cls === "overdue" ? UI_TEXT.dueTagTipOverdue(days) : UI_TEXT.dueTagTip(days);
   return `<div class="dueTag ${cls}" title="${tip}">${label}</div>`;
 }
 
@@ -411,11 +432,11 @@ class todoListManger {
   }
 
   /**
-   * 设置/清除「计划日期」（dateKey = 本地日期键 "YYYY-MM-DD"；null = 清除）
+   * 设置/清除「计划日期」（dateKeys = 本地日期键数组，多天排期；null/空数组 = 清除）
    * 只改字段不动列表：done/archived 的任务也可排期（跨表 findTask）
    */
-  setDueDate(id, dateKey) {
-    this.updateTaskMeta(id, { dueDate: dateKey || null });
+  setDueDate(id, dateKeys) {
+    this.updateTaskMeta(id, { dueDate: dateKeys && dateKeys.length ? [...dateKeys] : null });
   }
 
   /**
@@ -427,7 +448,10 @@ class todoListManger {
     if (!todo) return;
     if (meta.title !== undefined && String(meta.title).trim()) todo.title = String(meta.title).trim();
     if (meta.desc !== undefined) todo.desc = meta.desc || "";
-    if (meta.dueDate !== undefined) todo.dueDate = meta.dueDate || null;
+    if (meta.dueDate !== undefined) {
+      // 统一存为去重升序数组（或 null）；读侧 dueDatesOf 对旧单字符串同样兼容
+      todo.dueDate = Array.isArray(meta.dueDate) && meta.dueDate.length ? [...new Set(meta.dueDate)].sort() : null;
+    }
     todo.modifiedTimestamp = Date.now();
     this.saveTaskList(this.TaskList);
     this.onChange();
@@ -436,7 +460,8 @@ class todoListManger {
 
   /**
    * 当天可见待办（主列表「按天」视图）：
-   *  - 无 dueDate（随时可做）∪ dueDate ≤ 今天（到期/逾期；逾期由 dueTag 红标提醒）
+   *  - 无 dueDate（随时可做）∪ 首个排期日已到（多天排期自最早那天起持续可见，
+   *    到期/逾期任务留在列表由 dueTag 着色提醒；未来排期未到不混入）
    *  - 「在做」任务无条件可见（正在专注的对象不能从列表凭空消失）
    */
   visibleTodayTasks() {
@@ -444,7 +469,8 @@ class todoListManger {
     const activeId = this.getActiveTask().id;
     return this.TaskList.current.filter((t) => {
       if (t.id === activeId) return true;
-      return !t.dueDate || t.dueDate <= todayKey;
+      const days = dueDatesOf(t);
+      return !days.length || days[0] <= todayKey;
     });
   }
 
@@ -832,11 +858,15 @@ todoManger_.onChange = function () {
     const quadrant = this.quadrantOf(task);
     const quadrantBadge = UI_TEXT.quadrantBadges[quadrant] ? `<div class="quadrantBadge q${quadrant}">${UI_TEXT.quadrantBadges[quadrant]}</div>` : "";
 
-    // 里程碑标签：关联了计划的任务一眼可见来源（悬停显示所属计划名）
+    // 归属链标签：关联了计划的任务一眼可见「计划 > 里程碑」（同名代办也分得清；
+    // 超长省略，title 带完整归属链看全）
     let milestoneTag = "";
     if (task.milestoneId) {
       const found = this.findMilestone(task.milestoneId);
-      if (found) milestoneTag = `<div class="milestoneTag" title="${found.plan.title}">${found.milestone.title}</div>`;
+      if (found) {
+        const chain = `${found.plan.title} > ${found.milestone.title}`;
+        milestoneTag = `<div class="milestoneTag" title="${chain}">${chain}</div>`;
+      }
     }
 
     // 计划日期徽标（dueDate 已设置时显示；点击卡片上的时钟按钮可改/清除）
@@ -997,14 +1027,15 @@ function toggleUrgentBtn(element, event) {
 }
 
 // 计划日期弹层（自制轻量月历，同主题配色；弹在锚点正下方）
-// 通用版：openDueCalendar(锚点, 当前值, 回调(key|null)) —— 任务卡与计划页新增表单共用
+// 多选版：openDueCalendar(锚点, 当前日期数组, 回调(keys[]|null)) —— 任务卡与计划页新增表单共用
+// 左键点某天 = 选中/取消（不关闭弹层，可跨月连续点）；「完成」提交，「清除」清空，点外部丢弃
 let duePickerClose = null;
-function openDueCalendar(anchor, currentKey, onPick) {
+function openDueCalendar(anchor, currentKeys, onPick) {
   if (duePickerClose) duePickerClose(); // 重复打开：关旧开新
   const rect = anchor.getBoundingClientRect();
 
   // 视口月份：已有值所在月，无值 → 今天所在月
-  const initial = currentKey || previewLocalDateKey(new Date());
+  const initial = Array.isArray(currentKeys) && currentKeys.length ? currentKeys[0] : previewLocalDateKey(new Date());
   let vy = parseInt(initial.slice(0, 4), 10);
   let vm = parseInt(initial.slice(5, 7), 10); // 1-12
 
@@ -1014,14 +1045,16 @@ function openDueCalendar(anchor, currentKey, onPick) {
   root.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 236)) + "px";
   root.style.top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 292)) + "px";
 
-  const pick = (key) => {
-    onPick(key);
+  // 选中集（本地日期键；弹层内为暂存态，仅「完成」落库，「今天/清除」也在暂存集上操作）
+  const sel = new Set(Array.isArray(currentKeys) ? currentKeys.filter(Boolean) : []);
+
+  const commit = () => {
+    onPick([...sel].sort());
     close();
   };
 
   const renderGrid = () => {
     const todayKey = previewLocalDateKey(new Date());
-    const selKey = currentKey || "";
     // 周日起始（与活动日历同一习惯）：本月 1 号回退到首个周日
     const first = new Date(vy, vm - 1, 1);
     const start = new Date(first);
@@ -1040,22 +1073,31 @@ function openDueCalendar(anchor, currentKey, onPick) {
         "dp-day",
         cur.getMonth() !== vm - 1 ? "dp-other" : "",
         key === todayKey ? "dp-today" : "",
-        key === selKey ? "dp-sel" : "",
+        sel.has(key) ? "dp-sel" : "",
       ].filter(Boolean).join(" ");
       html += `<span class="${cls}" data-key="${key}">${cur.getDate()}</span>`;
       cur.setDate(cur.getDate() + 1);
     }
     html += `</div>
     <div class="dp-foot">
-      <span class="dp-today-btn">${UI_TEXT.duePickerToday}</span>
-      <span class="dp-clear-btn">${UI_TEXT.duePickerClear}</span>
+      <div class="dp-foot-left">
+        <span class="dp-today-btn">${UI_TEXT.duePickerToday}</span>
+        <span class="dp-clear-btn">${UI_TEXT.duePickerClear}</span>
+      </div>
+      <span class="dp-done-btn">${UI_TEXT.duePickerDone(sel.size)}</span>
     </div>`;
     root.innerHTML = html;
   };
 
   const onPickEvent = (e) => {
     const day = e.target.closest(".dp-day");
-    if (day) { pick(day.dataset.key); return; }
+    if (day) {
+      // 左键点选 = 选中/取消切换，弹层保持打开继续多选
+      const key = day.dataset.key;
+      if (sel.has(key)) sel.delete(key); else sel.add(key);
+      renderGrid();
+      return;
+    }
     const nav = e.target.closest(".dp-nav");
     if (nav) {
       const m = vm - 1 + parseInt(nav.dataset.nav, 10);
@@ -1064,8 +1106,14 @@ function openDueCalendar(anchor, currentKey, onPick) {
       renderGrid();
       return;
     }
-    if (e.target.closest(".dp-today-btn")) { pick(previewLocalDateKey(new Date())); return; }
-    if (e.target.closest(".dp-clear-btn")) { pick(null); }
+    if (e.target.closest(".dp-today-btn")) {
+      const key = previewLocalDateKey(new Date());
+      if (sel.has(key)) sel.delete(key); else sel.add(key);
+      renderGrid();
+      return;
+    }
+    if (e.target.closest(".dp-clear-btn")) { sel.clear(); renderGrid(); return; }
+    if (e.target.closest(".dp-done-btn")) { commit(); }
   };
   const onDocDown = (e) => { if (!root.contains(e.target)) close(); };
   const close = () => {

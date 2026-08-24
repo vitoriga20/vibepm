@@ -72,8 +72,8 @@ export interface Task {
   tomato?: Record<string, number[]>;
   important?: boolean;
   urgent?: boolean;
-  /** 计划日期（本地日期键 "YYYY-MM-DD"；未指定为 null/缺省，旧数据天然兼容） */
-  dueDate?: string | null;
+  /** 计划日期（本地日期键 "YYYY-MM-DD" 数组=多天排期；单字符串=旧数据单天，读时归一化；未指定为 null/缺省） */
+  dueDate?: string | string[] | null;
   /** 描述（计划页创建待办时填写；可缺省） */
   desc?: string | null;
   [k: string]: unknown;

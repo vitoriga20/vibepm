@@ -11,13 +11,13 @@ let linkPickerMilestoneId = null;
 
 // 「新增待办」表单当前挂靠的里程碑 id（模块级 UI 状态；null=收起）
 let taskFormMilestoneId = null;
-// 表单里已选的计划日期（""=未选；本地日期键）
-let taskFormDueDate = "";
+// 表单里已选的计划日期（[]=未选；本地日期键数组，多天排期）
+let taskFormDueDate = [];
 
 // 「编辑待办」表单当前编辑的任务 id（模块级 UI 状态；null=收起）
 let editingTaskId = null;
-// 编辑表单里已选的计划日期（""=未选；打开时初始化为任务现有值）
-let editFormDueDate = "";
+// 编辑表单里已选的计划日期（[]=未选；打开时初始化为任务现有值，多天排期）
+let editFormDueDate = [];
 
 /** HTML 属性值最小转义（input value / title 拼接防注入破版） */
 function escAttr(s) {
@@ -49,7 +49,7 @@ function milestoneHtml(plan, ms) {
       const tip = [
         t.title,
         t.desc || "",
-        t.dueDate ? UI_TEXT.dueTagTip(t.dueDate) : "",
+        t.dueDate ? UI_TEXT.dueTagTip(dueDatesOf(t)) : "",
         `🍅×${countTaskTomato(t)}`,
       ].filter(Boolean).join("\n");
       return `<span class="msTask" taskId="${t.id}" title="${escAttr(tip)}">${escAttr(t.title)}<i>×${countTaskTomato(t)}</i></span>`;
@@ -230,7 +230,7 @@ document.getElementById("planPage").addEventListener("click", (e) => {
       taskFormMilestoneId = null;
     } else {
       taskFormMilestoneId = msId;
-      taskFormDueDate = "";
+      taskFormDueDate = [];
       editingTaskId = null;
     }
     renderPlans();
@@ -250,7 +250,7 @@ document.getElementById("planPage").addEventListener("click", (e) => {
     editingTaskId = editingTaskId === taskId ? null : taskId;
     taskFormMilestoneId = null; // 编辑与创建表单互斥
     const et = todoManger_.findTask(taskId);
-    editFormDueDate = editingTaskId && et ? (et.dueDate || "") : "";
+    editFormDueDate = editingTaskId && et ? dueDatesOf(et) : [];
     renderPlans();
     if (editingTaskId) {
       requestAnimationFrame(() => {
@@ -265,13 +265,12 @@ document.getElementById("planPage").addEventListener("click", (e) => {
   if (t.classList.contains("msTaskDateBtn")) {
     const isEdit = !!t.closest(".msTaskForm.edit");
     const current = isEdit ? editFormDueDate : taskFormDueDate;
-    openDueCalendar(t, current, (key) => {
-      const k = key || "";
-      if (isEdit) editFormDueDate = k; else taskFormDueDate = k;
+    openDueCalendar(t, current, (keys) => {
+      if (isEdit) editFormDueDate = keys; else taskFormDueDate = keys;
       const btn = isEdit
         ? document.querySelector(".msTaskForm.edit .msTaskDateBtn")
         : document.querySelector(".msTaskForm:not(.edit) .msTaskDateBtn");
-      if (btn) btn.textContent = UI_TEXT.planTaskDateBtn(k);
+      if (btn) btn.textContent = UI_TEXT.planTaskDateBtn(keys);
     });
     return;
   }
@@ -279,7 +278,7 @@ document.getElementById("planPage").addEventListener("click", (e) => {
   // 编辑表单取消
   if (t.classList.contains("msTaskCancel")) {
     editingTaskId = null;
-    editFormDueDate = "";
+    editFormDueDate = [];
     renderPlans();
     return;
   }
@@ -297,10 +296,10 @@ document.getElementById("planPage").addEventListener("click", (e) => {
       todoManger_.updateTaskMeta(taskId, {
         title,
         desc: form.querySelector(".msTaskDesc").value.trim(),
-        dueDate: editFormDueDate || null,
+        dueDate: editFormDueDate.length ? editFormDueDate : null,
       });
       editingTaskId = null;
-      editFormDueDate = "";
+      editFormDueDate = [];
       renderPlans();
       return;
     }
@@ -314,7 +313,7 @@ document.getElementById("planPage").addEventListener("click", (e) => {
     todoManger_.add({
       title,
       desc,
-      dueDate: taskFormDueDate || null,
+      dueDate: taskFormDueDate.length ? taskFormDueDate : null,
       milestoneId: msId,
       type: "short",
       state: "待办",
@@ -328,7 +327,7 @@ document.getElementById("planPage").addEventListener("click", (e) => {
       tomato: {},
     });
     taskFormMilestoneId = null;
-    taskFormDueDate = "";
+    taskFormDueDate = [];
     renderPlans();
     return;
   }
