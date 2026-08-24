@@ -206,8 +206,13 @@
     updateProgress();
     clearTimeout(windowClosedTimer);
     windowClosedTimer = setTimeout(() => {
+      // 必须先解锁再刷新：windowClosedTimer 不置 null 会让 applyDeviceUI/onTick/
+      // onStateChange 的收窗分支永久生效（历史 bug：专注跑满后翻牌停 00:00、
+      // 按钮显隐永不恢复，界面锁死无法操作）
+      windowClosedTimer = null;
       win.classList.remove("closed");
-      applyDeviceUI();
+      // 补全收窗期间被跳过的完整状态刷新（翻牌落定当前状态时长/按钮显隐/进度线/文案）
+      clock.onStateChange();
     }, 2600);
   }
 
