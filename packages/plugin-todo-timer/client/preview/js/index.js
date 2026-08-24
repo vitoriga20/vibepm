@@ -69,7 +69,7 @@ function closeDesktopCapsule() {
 async function onWorkEnd(duration, progress) {
   // 时长持久化：只要专注过（progress>0）就落账——修复「专注一段时间但不足 30% 全部丢失」
   // 番茄个数的 ≥0.3 有效门槛保留在 addTomatoToTask 内（时长与个数口径分离）
-  if (progress > 0 && tryLockWorkEnd(progress)) {
+  if (progress > 0 && (await tryLockWorkEnd(progress))) {
     // 任务-专注耦合：番茄只累计到「开始专注时锁定的绑定任务」（boundTaskId），其它任务不受影响
     const boundTaskId = floatingWindow.clock.config.boundTaskId;
     const result = todoManger_.addTomatoToTask(boundTaskId, duration, progress);
@@ -127,7 +127,7 @@ function jumpToTask(taskId) {
 }
 
 async function onBreakEnd(duration, type, progress) {
-  if (!tryLockWorkEnd(progress)) return; // 双页防重：休息结束同样只记一次
+  if (!(await tryLockWorkEnd(progress))) return; // 双页防重：休息结束同样只记一次
   todoManger_.recordStatistics(duration, type, progress);
   if (settings.config.showSuccessPopup) {
     showToast("休息结束");

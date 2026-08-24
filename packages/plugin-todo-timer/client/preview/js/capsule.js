@@ -267,7 +267,7 @@
     const duration = this.config.totalTime;
     // 记账口径与主页面 index.js onWorkEnd 一致：progress>0 即落账，番茄个数仍 ≥0.3；
     // 双页防重：主页面与本页各自跑时钟，同一段专注结束时只有先落账的一方记账
-    if (progress > 0 && tryLockWorkEnd(progress)) {
+    if (progress > 0 && (await tryLockWorkEnd(progress))) {
       const result = addTomatoToTaskInList(getTodoList(), this.config.boundTaskId, duration, progress);
       if (settings.config.showSuccessPopup) {
         if (result.partial) {
@@ -300,7 +300,7 @@
 
   clock.onBreakEnd = async function () {
     // 双页防重：与 onWorkEnd 同一把锁（休息结束同样可能被两页同时触发）
-    if (tryLockWorkEnd(this.config.progress)) {
+    if (await tryLockWorkEnd(this.config.progress)) {
       const list = getTodoList();
       if (list) {
         recordStatisticsToList(

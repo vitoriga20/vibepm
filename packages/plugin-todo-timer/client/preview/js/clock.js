@@ -24,8 +24,11 @@ class TomatoClock {
 
     // 初始化配置
     this.config = null;
-    this.settingChanged();
+    // 顺序必须「先加载持久化状态、再应用设置时长」：反序时 settingChanged→setConfig→saveConfig
+    // 会把默认 idle 配置整包写回 storage，清掉活跃会话的 currentState/endTime/boundTaskId
+    // （历史 bug：专注中刷新页面或打开胶囊 → 计时被清零）
     this.getConfig();
+    this.settingChanged();
 
     // 计时相关事件
     this.onTick = () => {}; // 读秒更新事件
@@ -165,7 +168,7 @@ class TomatoClock {
     this.saveConfig();
   }
 
-  // 接续状态
+  // 接续状态（页面加载时调用，与 clockSync.resyncClock 共用 runDisplayTimer 单一源）
   continueState() {
     console.log("continueState:", this.config.currentState);
     this.onTick();
@@ -175,7 +178,7 @@ class TomatoClock {
         break;
       case "working":
         this.onWorkStart();
-        this.countdown();
+        this.runDisplayTimer();
         break;
       case "workPaused":
         this.onWorkPause();
@@ -183,17 +186,58 @@ class TomatoClock {
         break;
       case "breaking":
         this.onBreakStart();
-        this.countdown();
+        this.runDisplayTimer();
         break;
       case "breakPaused":
         this.onBreakPause();
         break;
     }
 
-    // this.setCurrentState(this.config.currentState,true);
-    this.config.pauseTimeFlag = true;
-    // this.countdown();
+    // 仅暂停态遗留 pauseTimeFlag 供 resume 续跑；活跃态残留会让下次 countdown 误判为暂停续跑
+    // （历史 bug：曾无条件置位 → 页面中途加载后，段结束切下一段时被压成 0 秒）
+    if (this.isPaused()) this.config.pauseTimeFlag = true;
     this.onStateChange();
+  }
+
+  /**
+   * 接续/跨窗展示计时（单一源：continueState 与 clockSync.resyncClock 共用）：
+   *  - 保留已落盘的 endTime 推算剩余，不重建倒计时——重建会经 stopCountdown 覆盖 startTime，
+   *    让活跃会话从满时长重来（历史 bug：页面中途加载 → 倒计时被重置回整段）
+   *  - 到点统一走 switchState（记账锁防重）；不写存储（避免双页乒乓）
+   *  - endTime 缺失/已过期（过渡态先于 countdown 落盘的场景）→ 按当前状态重算整段时长
+   */
+  runDisplayTimer() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    const st = this.config.currentState;
+    if (st !== "working" && st !== "breaking") { this.onTick(); this.onStateChange(); return; }
+    this.config.pauseTimeFlag = false;
+    this.config.pauseLeftTime = 0;
+    const dur = st === "working"
+      ? this.config.workTime
+      : (this.config.currentCycle % this.config.longBreakInterval === 0
+        ? this.config.longBreakTime
+        : this.config.shortBreakTime);
+    if (!(this.config.endTime - Date.now() > 0)) {
+      this.config.totalTime = dur;
+      this.config.endTime = Date.now() + dur;
+    }
+    const tick = () => {
+      this.config.timeLeft = Math.max(this.config.endTime - Date.now(), 0);
+      this.config.progress = this.config.totalTime ? parseFloat((1 - this.config.timeLeft / this.config.totalTime).toFixed(2)) : 0;
+      const cs = Math.floor(this.config.timeLeft / 1000);
+      if (this.lastSeconds !== cs) { this.lastSeconds = cs; this.onTick(); }
+      if (this.isWorking()) this.onWorkTick();
+      if (this.isBreaking()) this.onBreakTick();
+      if (this.config.timeLeft <= 0) {
+        clearInterval(this.timer); this.timer = null;
+        this.config.timeLeft = 0;
+        this.switchState(); // 统一结束流程；tryLockWorkEnd 保证只有一方落账
+      }
+    };
+    tick();
+    this.onTick();
+    this.onStateChange();
+    this.timer = setInterval(tick, 100);
   }
 
   // 从头开始
@@ -214,6 +258,7 @@ class TomatoClock {
     this.recordPauseTime();
     this.config.pauseTimeFlag = true;
     this.stopCountdown();
+    this.saveConfig(); // 暂停态完整落盘（pauseLeftTime/pauseTimeFlag），否则刷新后 resume 用 0 剩余瞬间判结束
   }
 
   recordPauseTime() {
@@ -290,6 +335,7 @@ class TomatoClock {
       console.log("使用当前往前推剩余时间的时间点");
     } else {
       this.config.endTime = this.config.startTime + this.config.totalTime;
+      this.config.pauseTimeFlag = false; // 防御：活跃态残留的暂停标志在此清除，杜绝下次误判续跑
       console.log("使用当前周期往前推总时间的时间点");
     }
     this.endTime = this.config.endTime + 500;
@@ -331,7 +377,7 @@ class TomatoClock {
     if (this.isWorking()) {
       this.config.currentCycle++;
 
-      this.onWorkEnd().then(() => {
+      const goBreak = () => {
         // 动作完成后执行后续代码
 
         this.startBreak();
@@ -340,15 +386,24 @@ class TomatoClock {
         }
 
         this.saveConfig(); // 保存当前周期数
+      };
+      // onWorkEnd 抛异常不得阻塞状态切换（历史 bug：Promise 链无 catch → 冻结在 00:00）
+      this.onWorkEnd().then(goBreak).catch((e) => {
+        console.error("[tomato] onWorkEnd 异常，已强制进入休息:", e);
+        goBreak();
       });
     } else {
-      this.onBreakEnd().then(() => {
+      const goWork = () => {
         this.startWork();
         if (!this.config.autoStartWork) {
           this.pause();
         }
 
         this.saveConfig(); // 保存当前周期数
+      };
+      this.onBreakEnd().then(goWork).catch((e) => {
+        console.error("[tomato] onBreakEnd 异常，已强制开始专注:", e);
+        goWork();
       });
     }
   }
