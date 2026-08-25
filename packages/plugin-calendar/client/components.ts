@@ -26,12 +26,12 @@ const UI_TEXT = {
   focusBadge: (min: number) => (min >= 60 ? `${Math.floor(min / 60)}时${min % 60}分` : `${min}分`),
   doneBadge: (n: number) => `✓${n}`,
   plannedBadge: (n: number) => `计${n}`,
-  // tooltip（原生 title，多行 \n）
+  // tooltip（自绘悬浮卡：结构化分组，色点对应图例维度）
   tipFocus: (min: number, t: number) => `专注 ${min} 分钟 · ${t} 番茄`,
-  tipDone: (n: number, titles: string[]) => `完成任务 ${n} 条：${titles.join("、")}`,
+  tipDoneLabel: "完成任务",
+  tipPlannedLabel: "计划任务",
+  tipPlanLabel: "长目标投入",
   tipPlan: (title: string, min: number) => `${title} ${min} 分钟`,
-  tipPlanned: (items: Array<{ title: string; done: boolean }>) =>
-    `计划任务 ${items.length} 条：${items.map((p) => (p.done ? `✓${p.title}` : p.title)).join("、")}`,
   noActivity: "当日无活动",
   // 详情卡
   detailTitle: (key: string) => `${key} · 活动详情`,
@@ -141,6 +141,24 @@ const CSS = /* css */`
 .empty{padding:38px 20px;text-align:center;border:1px dashed var(--line-strong,#cfccc2);border-radius:var(--radius-s,4px)}
 .empty .t{font-size:15px;font-weight:800;color:var(--fg,#222);margin-bottom:6px}
 .empty .h{font-size:12px;color:var(--muted,#6b6f76)}
+.tip{position:fixed;left:0;top:0;z-index:1000;max-width:280px;pointer-events:none;
+  background:var(--panel,#fff);border:1px solid var(--line-strong,#cfccc2);border-radius:var(--radius-s,6px);
+  box-shadow:0 6px 24px rgba(0,0,0,.14);padding:10px 12px;font-family:var(--sans,sans-serif);
+  color:var(--text,#333);opacity:0;visibility:hidden;transition:opacity .1s ease}
+.tip.show{opacity:1;visibility:visible}
+.tip .th{font:700 12px/1.3 var(--numeric,monospace);color:var(--fg,#222);margin-bottom:6px}
+.tip .sec{display:flex;align-items:flex-start;gap:7px;margin:4px 0;font-size:12px;line-height:1.45}
+.tip .sec .dot{flex:0 0 8px;height:8px;border-radius:50%;margin-top:5px}
+.tip .sec .body{min-width:0;flex:1}
+.tip .sec .lbl{font-weight:700;color:var(--fg,#222)}
+.tip .sec ul{margin:2px 0 0;padding:0;list-style:none}
+.tip .sec li{margin:1px 0;color:var(--text,#333);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tip .sec li.done{color:var(--muted,#6b6f76)}
+.tip .sec li.plan-row{display:flex;align-items:baseline;gap:6px;white-space:normal}
+.tip .sec li.plan-row .bar{flex:0 0 3px;height:10px;border-radius:2px;align-self:center}
+.detail .row.sec{display:flex;align-items:center;gap:6px;font-weight:700;color:var(--fg,#222);margin-top:8px}
+.detail .row.sec .dot{flex:0 0 7px;height:7px;border-radius:50%}
+.detail ul li .bar{display:inline-block;width:3px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 `;
 
 export class CalendarPanel extends HTMLElement {
@@ -157,11 +175,13 @@ export class CalendarPanel extends HTMLElement {
   private _selected: string | null = null;
   private _data: DaysPayload | null = null;
   private _loadErr = false;
+  private _tip: HTMLElement | null = null;
 
   connectedCallback(): void {
     if (this.shadowRoot) return;
     this.attachShadow({ mode: "open" });
-    this.shadowRoot!.innerHTML = `<style>${CSS}</style><div class="wrap" id="wrap">…</div>`;
+    this.shadowRoot!.innerHTML = `<style>${CSS}</style><div class="wrap" id="wrap"></div><div class="tip" id="tip"></div>`;
+    this._tip = this.shadowRoot!.getElementById("tip");
     void this.fetchData();
     this._poll = setInterval(() => {
       if (!document.hidden) void this.fetchData();
@@ -322,6 +342,7 @@ export class CalendarPanel extends HTMLElement {
       + (d.getMonth() !== this._cursor.getMonth() ? " other" : "")
       + (key === todayKey ? " today" : "")
       + (key === this._selected ? " sel" : "");
+    cell.dataset.key = key;
     const num = document.createElement("span");
     num.className = "d";
     num.textContent = String(d.getDate());
@@ -363,15 +384,17 @@ export class CalendarPanel extends HTMLElement {
           const planId = Number(msId.match(/^p(\d+)m/)?.[1] ?? 0) || 0;
           seg.style.flex = String(ms);
           seg.style.background = planHue(planId);
-          seg.title = UI_TEXT.tipPlan(this._milestoneTitle(msId), fmtMin(ms));
           stack.appendChild(seg);
         }
         cell.appendChild(stack);
       }
-      cell.title = this._cellTooltip(key, agg);
-    } else {
-      cell.title = `${key}\n${UI_TEXT.noActivity}`;
     }
+    cell.addEventListener("mouseenter", (e: MouseEvent) => {
+      this._showTip(key, agg);
+      this._moveTip(e);
+    });
+    cell.addEventListener("mousemove", (e: MouseEvent) => this._moveTip(e));
+    cell.addEventListener("mouseleave", () => this._hideTip());
     cell.addEventListener("click", () => {
       this._selected = key;
       this.render();
@@ -379,16 +402,123 @@ export class CalendarPanel extends HTMLElement {
     return cell;
   }
 
-  private _cellTooltip(key: string, agg: DayAggLite): string {
-    const lines: string[] = [key];
-    if (agg.focusMs > 0 || agg.focusCount > 0) lines.push(UI_TEXT.tipFocus(fmtMin(agg.focusMs), agg.focusCount));
-    if (agg.doneCount > 0) lines.push(UI_TEXT.tipDone(agg.doneCount, agg.doneTitles));
-    if (agg.planned?.length) lines.push(UI_TEXT.tipPlanned(agg.planned));
-    for (const [msId, ms] of Object.entries(agg.planMs)) {
-      lines.push(UI_TEXT.tipPlan(this._milestoneTitle(msId), fmtMin(ms)));
+  /** 悬浮卡（自绘 tooltip）：即时显示、结构化分组，替代原生 title */
+  private _showTip(key: string, agg: DayAggLite | undefined): void {
+    const tip = this._tip;
+    if (!tip) return;
+    tip.innerHTML = "";
+    const th = document.createElement("div");
+    th.className = "th";
+    th.textContent = key;
+    tip.appendChild(th);
+    if (!agg) {
+      tip.appendChild(this._tipLine("var(--muted,#6b6f76)", UI_TEXT.noActivity));
+    } else {
+      if (agg.focusMs > 0 || agg.focusCount > 0) {
+        tip.appendChild(this._tipLine("var(--accent,#147d78)", UI_TEXT.tipFocus(fmtMin(agg.focusMs), agg.focusCount)));
+      }
+      if (agg.doneCount > 0) {
+        tip.appendChild(this._tipLine("var(--ink-ok,#4d7a5e)",
+          `${UI_TEXT.tipDoneLabel} ${agg.doneCount} 条`,
+          agg.doneTitles.map((t) => ({ text: `✓ ${t}` }))));
+      }
+      if (agg.planned?.length) {
+        const doneN = agg.planned.filter((p) => p.done).length;
+        tip.appendChild(this._tipLine("var(--muted,#6b6f76)",
+          `${UI_TEXT.tipPlannedLabel} ${agg.planned.length} 条 · ${UI_TEXT.detailPlannedDone(doneN, agg.planned.length)}`,
+          agg.planned.map((p) => ({ text: (p.done ? "✓ " : "") + p.title, done: p.done }))));
+      }
+      const planEntries = Object.entries(agg.planMs).sort((a, b) => b[1] - a[1]);
+      if (planEntries.length) tip.appendChild(this._tipPlans(planEntries));
     }
-    if (lines.length === 1) lines.push(UI_TEXT.noActivity);
-    return lines.join("\n");
+    tip.classList.add("show");
+  }
+
+  /** 悬浮节：色点 + 标题（+ 可选子项列表；done 仅表示子项置灰，勾号由调用方拼入 text） */
+  private _tipLine(dotColor: string, label: string, items?: Array<{ text: string; done?: boolean }>): HTMLElement {
+    const sec = document.createElement("div");
+    sec.className = "sec";
+    const dot = document.createElement("i");
+    dot.className = "dot";
+    dot.style.background = dotColor;
+    sec.appendChild(dot);
+    const body = document.createElement("div");
+    body.className = "body";
+    const lbl = document.createElement("div");
+    lbl.className = "lbl";
+    lbl.textContent = label;
+    body.appendChild(lbl);
+    if (items?.length) {
+      const ul = document.createElement("ul");
+      for (const it of items) {
+        const li = document.createElement("li");
+        li.textContent = it.text;
+        if (it.done) li.className = "done";
+        ul.appendChild(li);
+      }
+      body.appendChild(ul);
+    }
+    sec.appendChild(body);
+    return sec;
+  }
+
+  /** 长目标投入悬浮节：计划色相色条 + 里程碑 · 分钟 */
+  private _tipPlans(planEntries: Array<[string, number]>): HTMLElement {
+    const sec = document.createElement("div");
+    sec.className = "sec";
+    const body = document.createElement("div");
+    body.className = "body";
+    const lbl = document.createElement("div");
+    lbl.className = "lbl";
+    lbl.textContent = UI_TEXT.tipPlanLabel;
+    body.appendChild(lbl);
+    const ul = document.createElement("ul");
+    for (const [msId, ms] of planEntries) {
+      const li = document.createElement("li");
+      li.className = "plan-row";
+      const bar = document.createElement("i");
+      bar.className = "bar";
+      const planId = Number(msId.match(/^p(\d+)m/)?.[1] ?? 0) || 0;
+      bar.style.background = planHue(planId);
+      li.appendChild(bar);
+      li.appendChild(document.createTextNode(UI_TEXT.tipPlan(this._milestoneTitle(msId), fmtMin(ms))));
+      ul.appendChild(li);
+    }
+    body.appendChild(ul);
+    sec.appendChild(body);
+    return sec;
+  }
+
+  /** 跟随鼠标定位 + 贴近视口边缘自动翻转 */
+  private _moveTip(e: MouseEvent): void {
+    const tip = this._tip;
+    if (!tip || !tip.classList.contains("show")) return;
+    const GAP = 14, EDGE = 8;
+    let x = e.clientX + GAP;
+    let y = e.clientY + GAP;
+    const r = tip.getBoundingClientRect();
+    if (x + r.width > window.innerWidth - EDGE) x = e.clientX - GAP - r.width;
+    if (y + r.height > window.innerHeight - EDGE) y = e.clientY - GAP - r.height;
+    if (x < EDGE) x = EDGE;
+    if (y < EDGE) y = EDGE;
+    tip.style.left = `${Math.round(x)}px`;
+    tip.style.top = `${Math.round(y)}px`;
+  }
+
+  private _hideTip(): void {
+    this._tip?.classList.remove("show");
+  }
+
+  /** 详情卡节标题：色点 + 加粗文案（与悬浮卡同一视觉语言） */
+  private _secTitle(text: string, dotColor: string): HTMLElement {
+    const r = document.createElement("div");
+    r.className = "row sec";
+    const dot = document.createElement("i");
+    dot.className = "dot";
+    dot.style.background = dotColor;
+    r.appendChild(dot);
+    r.appendChild(document.createTextNode(text));
+    return r;
   }
 
   private _renderDetail(key: string, agg: DayAggLite): HTMLElement {
@@ -398,20 +528,14 @@ export class CalendarPanel extends HTMLElement {
     h.textContent = UI_TEXT.detailTitle(key);
     box.appendChild(h);
     if (agg.focusMs > 0) {
-      const r = document.createElement("div");
-      r.className = "row";
-      r.textContent = UI_TEXT.detailFocus(fmtMin(agg.focusMs), agg.focusCount);
-      box.appendChild(r);
+      box.appendChild(this._secTitle(UI_TEXT.detailFocus(fmtMin(agg.focusMs), agg.focusCount), "var(--accent,#147d78)"));
     }
     // 按任务明细：taskStats.focusOnDay 命中当天，按当日番茄数降序（当日时长 = focusMsOnDay）
     const dayTasks = Object.values(this._data?.taskStats ?? {})
       .filter((t) => (t.focusOnDay?.[key] ?? 0) > 0)
       .sort((a, b) => (b.focusOnDay[key] ?? 0) - (a.focusOnDay[key] ?? 0));
     if (dayTasks.length) {
-      const r = document.createElement("div");
-      r.className = "row";
-      r.textContent = UI_TEXT.detailFocusByTaskTitle;
-      box.appendChild(r);
+      box.appendChild(this._secTitle(UI_TEXT.detailFocusByTaskTitle, "var(--accent,#147d78)"));
       const ul = document.createElement("ul");
       for (const t of dayTasks) {
         const li = document.createElement("li");
@@ -421,10 +545,7 @@ export class CalendarPanel extends HTMLElement {
       box.appendChild(ul);
     }
     if (agg.doneTitles.length) {
-      const r = document.createElement("div");
-      r.className = "row";
-      r.textContent = UI_TEXT.detailDoneTitle;
-      box.appendChild(r);
+      box.appendChild(this._secTitle(UI_TEXT.detailDoneTitle, "var(--ink-ok,#4d7a5e)"));
       const ul = document.createElement("ul");
       for (const t of agg.doneTitles) {
         const li = document.createElement("li");
@@ -434,11 +555,11 @@ export class CalendarPanel extends HTMLElement {
       box.appendChild(ul);
     }
     if (agg.planned?.length) {
-      const r = document.createElement("div");
-      r.className = "row";
       const doneN = agg.planned.filter((p) => p.done).length;
-      r.textContent = `${UI_TEXT.detailPlannedTitle}${UI_TEXT.detailPlannedDone(doneN, agg.planned.length)}`;
-      box.appendChild(r);
+      box.appendChild(this._secTitle(
+        `${UI_TEXT.detailPlannedTitle}${UI_TEXT.detailPlannedDone(doneN, agg.planned.length)}`,
+        "var(--muted,#6b6f76)",
+      ));
       const ul = document.createElement("ul");
       for (const p of agg.planned) {
         const li = document.createElement("li");
@@ -450,16 +571,18 @@ export class CalendarPanel extends HTMLElement {
     }
     const planEntries = Object.entries(agg.planMs).sort((a, b) => b[1] - a[1]);
     if (planEntries.length) {
-      const r = document.createElement("div");
-      r.className = "row";
-      r.textContent = UI_TEXT.detailPlanTitle;
-      box.appendChild(r);
+      box.appendChild(this._secTitle(UI_TEXT.detailPlanTitle, "var(--line-strong,#cfccc2)"));
       const total = planEntries.reduce((a, e) => a + e[1], 0);
       const ul = document.createElement("ul");
       for (const [msId, ms] of planEntries) {
         const li = document.createElement("li");
         const pct = Math.round((ms / total) * 100);
-        li.textContent = UI_TEXT.detailPlanRow(this._milestoneTitle(msId), fmtMin(ms), pct);
+        const bar = document.createElement("i");
+        bar.className = "bar";
+        const planId = Number(msId.match(/^p(\d+)m/)?.[1] ?? 0) || 0;
+        bar.style.background = planHue(planId);
+        li.appendChild(bar);
+        li.appendChild(document.createTextNode(UI_TEXT.detailPlanRow(this._milestoneTitle(msId), fmtMin(ms), pct)));
         ul.appendChild(li);
       }
       box.appendChild(ul);
