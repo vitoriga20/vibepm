@@ -28,6 +28,7 @@ const RHINE_TOKEN: Record<string, string> = {
   "--yellow":               "#ffd84d",
   "--yellow-2":             "#d9b300",
   "--accent":               "#ffd84d",
+  "--on-accent":            "#14161e",
   "--accent-dim":           "#3a3400",
   "--accent-line":          "#d9b300",
   "--warn":                 "#d9b300",

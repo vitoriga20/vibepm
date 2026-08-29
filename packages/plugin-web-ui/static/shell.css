@@ -43,6 +43,7 @@
   --yellow:      #147d78;   /* 语义约等于 accent */
   --yellow-2:    #0e6a66;
   --accent:      #147d78;
+  --on-accent:   #ffffff;   /* accent 实底上的前景字（跟 accent 明暗联动，rhine 黄底配深字） */
   --accent-dim:  #e3efee;
   --accent-line: #0f6a66;
   --warn:        #a16207;
@@ -169,8 +170,6 @@ button{
   transition:background .15s ease,border-color .15s ease,color .15s ease;
 }
 button:hover{border-color:var(--accent);color:var(--accent)}
-button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-button.primary:hover{background:var(--accent-line)}
 button:disabled{opacity:.45;cursor:not-allowed;transform:none}
 input[type=text],input[type=password],input[type=number],input[type=date],input[type=time],input[type=url],textarea,select{
   min-height:36px;padding:8px 12px;

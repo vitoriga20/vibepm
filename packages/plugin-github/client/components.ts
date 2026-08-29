@@ -30,7 +30,6 @@ h1{font-size:16px;letter-spacing:1.5px;color:var(--ink);margin:0;font-weight:900
 /* 头像右顶格：贴面板标题行右上角（absolute，不受 h1 宽度影响） */
 .ptitle github-avatar{position:absolute;top:0;right:0}
 .status{display:inline-block;padding:4px 9px;font:700 9px/1 var(--mono);letter-spacing:1px;border:1px solid var(--line-strong);color:var(--dim);text-transform:uppercase;background:var(--panel)}
-.status.on{color:var(--on-ink);border-color:var(--accent);background:var(--accent)}
 .status.off{color:var(--warn);border-color:var(--warn);background:var(--panel-alt)}
 .card{border:1px solid var(--line-strong);border-left:4px solid var(--accent);background:var(--panel);color:var(--ink);padding:14px 16px;margin-top:10px;border-radius:var(--radius-s)}
 .who{display:flex;align-items:center;gap:10px}
@@ -42,8 +41,8 @@ input[type=text],input[type=password],input[type=number]{width:100%;background:v
 input:focus{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 button{border:1px solid var(--line-strong);border-left:3px solid var(--accent);background:var(--panel);color:var(--ink);padding:7px 14px;cursor:pointer;font:700 11px/1 var(--display-cjk);letter-spacing:.5px;border-radius:var(--radius-s);transition:color .18s,border-color .18s}
 button:hover{border-color:var(--accent);color:var(--accent)}
-button.primary{background:var(--accent);border-color:var(--accent);border-left-color:var(--accent-2);color:var(--on-ink)}
-button.primary:hover{background:var(--accent-2);color:var(--on-ink)}
+button.primary{background:var(--accent);border-color:var(--accent);border-left-color:var(--accent-line);color:var(--on-accent)}
+button.primary:hover{background:var(--accent-line);color:var(--on-accent)}
 button.ghost{border-style:dashed}
 .btnrow{display:flex;gap:8px;align-items:center;margin-top:10px}
 .row{display:flex;gap:12px}
