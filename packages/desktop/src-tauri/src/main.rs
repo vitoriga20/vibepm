@@ -51,6 +51,37 @@ fn main() {
         })
         .setup(|app| {
             let handle = app.handle().clone();
+            // S4 托盘：三项菜单；退出 = kill sidecar → 退 app（spec §4 唯一退出入口）
+            let show_main = tauri::menu::MenuItem::with_id(app, "show_main", "显示主窗", true, None::<&str>)?;
+            let toggle_cap = tauri::menu::MenuItem::with_id(app, "toggle_capsule", "显示·隐藏胶囊", true, None::<&str>)?;
+            let quit = tauri::menu::MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = tauri::menu::Menu::with_items(app, &[&show_main, &toggle_cap, &quit])?;
+            let icon = app
+                .default_window_icon()
+                .cloned()
+                .expect("default window icon missing (check bundle.icon)");
+            tauri::tray::TrayIconBuilder::with_id("vibepm-tray")
+                .icon(icon)
+                .tooltip("vibepm")
+                .menu(&menu)
+                .show_menu_on_left_click(true)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show_main" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
+                        }
+                    }
+                    "toggle_capsule" => {
+                        if let Some(c) = app.get_webview_window("capsule") {
+                            if c.is_visible().unwrap_or(false) { let _ = c.hide(); } else { let _ = c.show(); }
+                        }
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .build(app)?;
             match sidecar::spawn_and_wait(&handle) {
                 Ok(sc) => {
                     let port = sc.port;
