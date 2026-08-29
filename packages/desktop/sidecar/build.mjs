@@ -5,12 +5,23 @@
 //   ├─ node.exe                  （复制 process.execPath）
 //   └─ server/                   （pnpm deploy --prod：dist/bin.js + node_modules/@vitoriga20/*）
 // 依赖前置：workspace 已 pnpm build（packages/cli/dist/bin.js 存在）。
-// 运行：node packages/desktop/sidecar/build.mjs           全量 deploy
-//       node packages/desktop/sidecar/build.mjs --sync   快速同步（web 层改动后刷构建产物进 out，不重 deploy）
+// 运行：node packages/desktop/sidecar/build.mjs           全量 deploy + 精简物化
+//       node packages/desktop/sidecar/sync.mjs            快速同步（web 层改动后刷构建产物进 out，不重 deploy）
 import { spawnSync } from "node:child_process";
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readlinkSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+function copyDir(src, dst) {
+  mkdirSync(dst, { recursive: true });
+  for (const name of readdirSync(src)) {
+    const s = join(src, name);
+    const d = join(dst, name);
+    const st = lstatSync(s);
+    if (st.isDirectory()) copyDir(s, d);
+    else if (!st.isSymbolicLink()) copyFileSync(s, d);
+  }
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(here, "..", "..", "..");
@@ -25,29 +36,6 @@ function step(msg) {
 function fail(msg) {
   console.error(`[sidecar] 失败: ${msg}`);
   process.exit(1);
-}
-
-// 0) --sync 快速模式：只把 workspace 构建产物刷进已存在的 out（web 层改动后的日常迭代路径）
-if (process.argv.includes("--sync")) {
-  if (!existsSync(serverDir)) fail("out/ 不存在，先跑一次全量 build.mjs");
-  const pkgsDir = join(workspaceRoot, "packages");
-  let n = 0;
-  for (const name of readdirSync(pkgsDir)) {
-    const src = join(pkgsDir, name);
-    if (!name.startsWith("plugin-") || !existsSync(join(src, "package.json"))) continue;
-    const dst = join(serverDir, "node_modules", "@vitoriga20", name);
-    if (!existsSync(dst)) continue;
-    for (const part of ["client-dist", "static", "dist"]) {
-      if (existsSync(join(src, part))) {
-        cpSync(join(src, part), join(dst, part), { recursive: true, force: true });
-        n++;
-      }
-    }
-  }
-  // cli dist（bin.js 等）
-  cpSync(join(workspaceRoot, "packages", "cli", "dist"), join(serverDir, "dist"), { recursive: true, force: true });
-  console.log(`[sidecar] sync 完成：${n} 个插件产物目录 + cli/dist 已刷进 out/`);
-  process.exit(0);
 }
 
 // 0) 前置检查
@@ -73,7 +61,33 @@ const r = spawnSync(
 );
 if (r.status !== 0) fail(`pnpm deploy 退出码 ${r.status}`);
 
-// 3) 捆绑 node.exe（当前运行时）
+// 3) 精简+物化（S6 NSIS 路径限制）：
+//    deploy 产物经 .pnpm junction 硬链接，路径 270+ 字符撞 NSIS 上限且含运行无关类型文件。
+//    处理：junction/symlink 解引用为真实目录 → 删 .pnpm → 删 *.d.ts/*.map/*.tsbuildinfo。
+const RUNTIME_JUNK = /\.(d\.ts|map|tsbuildinfo)$/;
+function materializeAndPrune(dir) {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    let st;
+    try { st = lstatSync(p); } catch { continue; }
+    if (st.isSymbolicLink()) {
+      const target = resolve(dirname(p), readlinkSync(p));
+      rmSync(p, { recursive: true, force: true });
+      if (existsSync(target)) { copyDir(target, p); materializeAndPrune(p); }
+    } else if (st.isDirectory()) {
+      materializeAndPrune(p);
+    } else if (RUNTIME_JUNK.test(name)) {
+      rmSync(p, { force: true });
+    }
+  }
+}
+step("精简+物化 node_modules（解引用 junction / 删 .pnpm / 删 .d.ts+.map）");
+materializeAndPrune(join(serverDir, "node_modules"));
+rmSync(join(serverDir, "node_modules", ".pnpm"), { recursive: true, force: true });
+rmSync(join(serverDir, "node_modules", ".bin"), { recursive: true, force: true });
+rmSync(join(serverDir, "node_modules", "package.json"), { force: true });
+
+// 4) 捆绑 node.exe（当前运行时）
 step(`复制 node.exe ← ${process.execPath}`);
 copyFileSync(process.execPath, nodeExe);
 
