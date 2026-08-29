@@ -38,13 +38,28 @@ impl Sidecar {
     }
 }
 
-/// 定位 sidecar 目录（含 node.exe + server/dist/bin.js）：
-/// 1) env VIBEPM_SIDECAR_DIR  2) dev 相对（cwd=src-tauri → ../sidecar/out）  3) 发布 resource
+/// 定位 sidecar 目录（含 node.exe + server/dist/bin.js），四级查找：
+/// 1) env VIBEPM_SIDECAR_DIR
+/// 2) exe 同级及向上回溯 ≤4 层的 sidecar/out（便携包布局 exe+sidecar 同级；dev 产物
+///    target/release 直跑 = 上溯 3 层 packages/desktop/sidecar/out；NSIS 安装版 exe 与 sidecar 同根）
+/// 3) dev 相对（tauri dev cwd=src-tauri → ../sidecar/out）
+/// 4) 发布 resource_dir
 pub fn sidecar_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
     if let Ok(v) = std::env::var("VIBEPM_SIDECAR_DIR") {
         let p = PathBuf::from(v);
         if p.join("node.exe").exists() {
             return Some(p);
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(Path::to_path_buf);
+        for _ in 0..5 {
+            let Some(d) = dir else { break };
+            let p = d.join("sidecar").join("out");
+            if p.join("node.exe").exists() {
+                return std::path::absolute(&p).ok();
+            }
+            dir = d.parent().map(Path::to_path_buf);
         }
     }
     if let Ok(cwd) = std::env::current_dir() {
