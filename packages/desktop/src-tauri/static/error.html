@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>vibepm 启动失败</title>
+  <style>
+    body { font-family: Consolas, monospace; background: #14161e; color: #e8e6e3; margin: 0; padding: 16px; }
+    h1 { font-size: 14px; color: #ffd84d; margin: 0 0 12px; }
+    pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; line-height: 1.5; color: #c9c7c4; }
+  </style>
+</head>
+<body>
+  <h1>sidecar 启动失败</h1>
+  <pre id="msg"></pre>
+  <script>
+    document.getElementById("msg").textContent = window.__SIDECAR_ERROR__ || "(无输出)";
+  </script>
+</body>
+</html>
