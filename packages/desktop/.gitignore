@@ -1,2 +1,5 @@
 # tauri/rust build cache
 src-tauri/target/
+
+# tauri generated ACL schemas (build artifacts)
+src-tauri/gen/
