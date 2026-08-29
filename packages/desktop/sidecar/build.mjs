@@ -5,9 +5,10 @@
 //   ├─ node.exe                  （复制 process.execPath）
 //   └─ server/                   （pnpm deploy --prod：dist/bin.js + node_modules/@vitoriga20/*）
 // 依赖前置：workspace 已 pnpm build（packages/cli/dist/bin.js 存在）。
-// 运行：node packages/desktop/sidecar/build.mjs
+// 运行：node packages/desktop/sidecar/build.mjs           全量 deploy
+//       node packages/desktop/sidecar/build.mjs --sync   快速同步（web 层改动后刷构建产物进 out，不重 deploy）
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +25,29 @@ function step(msg) {
 function fail(msg) {
   console.error(`[sidecar] 失败: ${msg}`);
   process.exit(1);
+}
+
+// 0) --sync 快速模式：只把 workspace 构建产物刷进已存在的 out（web 层改动后的日常迭代路径）
+if (process.argv.includes("--sync")) {
+  if (!existsSync(serverDir)) fail("out/ 不存在，先跑一次全量 build.mjs");
+  const pkgsDir = join(workspaceRoot, "packages");
+  let n = 0;
+  for (const name of readdirSync(pkgsDir)) {
+    const src = join(pkgsDir, name);
+    if (!name.startsWith("plugin-") || !existsSync(join(src, "package.json"))) continue;
+    const dst = join(serverDir, "node_modules", "@vitoriga20", name);
+    if (!existsSync(dst)) continue;
+    for (const part of ["client-dist", "static", "dist"]) {
+      if (existsSync(join(src, part))) {
+        cpSync(join(src, part), join(dst, part), { recursive: true, force: true });
+        n++;
+      }
+    }
+  }
+  // cli dist（bin.js 等）
+  cpSync(join(workspaceRoot, "packages", "cli", "dist"), join(serverDir, "dist"), { recursive: true, force: true });
+  console.log(`[sidecar] sync 完成：${n} 个插件产物目录 + cli/dist 已刷进 out/`);
+  process.exit(0);
 }
 
 // 0) 前置检查

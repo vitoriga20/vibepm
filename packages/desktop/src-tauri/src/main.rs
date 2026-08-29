@@ -67,6 +67,20 @@ fn main() {
                         .initialization_script(DRAG_REGION_SCRIPT)
                         .build()?;
                     eprintln!("[shell] main window created: visible={:?} decorated={:?}", win.is_visible(), win.is_decorated());
+                    // S3 胶囊窗：alwaysOnTop + 无边框 + 关闭=隐藏（spec §4）；URL=sidecar 同源 → 共享 localStorage（clockSync 白捡）
+                    let cap_url = tauri::Url::parse(&format!(
+                        "http://127.0.0.1:{port}/plugins/plugin-todo-timer/preview/capsule.html"
+                    ))
+                    .expect("parse capsule url");
+                    let cap = WebviewWindowBuilder::new(&handle, "capsule", WebviewUrl::External(cap_url))
+                        .title("vibepm capsule")
+                        .inner_size(640.0, 340.0)
+                        .decorations(false)
+                        .always_on_top(true)
+                        .skip_taskbar(true)
+                        .shadow(true)
+                        .build()?;
+                    eprintln!("[shell] capsule window created: visible={:?} topmost={:?}", cap.is_visible(), cap.is_always_on_top());
                 }
                 Err(msg) => {
                     // 超时/早退 → 报错窗（带输出尾巴，spec §2）

@@ -421,6 +421,9 @@
 
   /* ————————————————— 拖拽（弹窗窗口级 moveTo） ————————————————— */
 
+  // Tauri 桌面壳下 window.moveTo 无效：首次确认拖动后交给壳层 start_dragging（系统级窗口拖动）
+  let tauriDragArmed = true;
+
   let isDragging = false, startX = 0, startY = 0, hasDragged = false;
 
   $("capHead").addEventListener("mousedown", (e) => {
@@ -428,6 +431,7 @@
     if (e.target.closest(".devBtn") || e.target.closest("#menuBtn")) return;
     isDragging = true;
     hasDragged = false;
+    tauriDragArmed = true;
     startX = e.clientX;
     startY = e.clientY;
   });
@@ -441,7 +445,12 @@
       if (!hasDragged && (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4)) hasDragged = true;
       if (hasDragged) {
         win.classList.add("dragging");
-        try { window.moveTo(Math.round(e.screenX - startX), Math.round(e.screenY - startY)); } catch (_) { /* 非弹窗环境忽略 */ }
+        const t = window.__TAURI_INTERNALS__;
+        if (t && tauriDragArmed) {
+          tauriDragArmed = false; // 系统接管后本手势内不再重复调用
+          try { t.invoke("plugin:window|start_dragging"); } catch (_) { /* 非 Tauri 环境 */ }
+        }
+        try { window.moveTo(Math.round(e.screenX - startX), Math.round(e.screenY - startY)); } catch (_) { /* Tauri 下无 moveTo，忽略 */ }
       }
     }, 1000 / 60)
   );
@@ -487,6 +496,11 @@
   /* ————————————————— 菜单 / 打开主界面 / 双击 ————————————————— */
 
   function openMainWindow() {
+    // Tauri 桌面壳：主窗已由壳持有，聚焦它而不是 window.open（否则开出浏览器弹窗成假链路）
+    const t = window.__TAURI_INTERNALS__;
+    if (t) {
+      try { t.invoke("plugin:window|set_focus", { label: "main" }).catch(() => {}); return; } catch (_) { /* fallthrough */ }
+    }
     try { window.open("index.html", "_blank"); } catch (_) { /* noop */ }
   }
   window.openMainWindow = openMainWindow;
@@ -509,6 +523,11 @@
   $("miDark").addEventListener("click", () => { toggleDark(); toggleDropdown(false); });
   $("miClose").addEventListener("click", () => {
     toggleDropdown(false);
+    // Tauri 桌面壳：close 由壳接管为隐藏（保状态，托盘可再唤出）；浏览器弹窗仍走 window.close
+    const t = window.__TAURI_INTERNALS__;
+    if (t) {
+      try { t.invoke("plugin:window|close", { label: "capsule" }).catch(() => {}); return; } catch (_) { /* fallthrough */ }
+    }
     try { window.close(); } catch (_) { /* noop */ }
   });
 
