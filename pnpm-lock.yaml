@@ -29,6 +29,9 @@ importers:
       '@vitoriga20/plugin-ambient':
         specifier: workspace:*
         version: link:../plugin-ambient
+      '@vitoriga20/plugin-calendar':
+        specifier: workspace:*
+        version: link:../plugin-calendar
       '@vitoriga20/plugin-github':
         specifier: workspace:*
         version: link:../plugin-github
@@ -44,9 +47,15 @@ importers:
       '@vitoriga20/plugin-settings':
         specifier: workspace:*
         version: link:../plugin-settings
+      '@vitoriga20/plugin-skin-rhine':
+        specifier: workspace:*
+        version: link:../plugin-skin-rhine
       '@vitoriga20/plugin-storage':
         specifier: workspace:*
         version: link:../plugin-storage
+      '@vitoriga20/plugin-todo-timer':
+        specifier: workspace:*
+        version: link:../plugin-todo-timer
       '@vitoriga20/plugin-web-ui':
         specifier: workspace:*
         version: link:../plugin-web-ui
