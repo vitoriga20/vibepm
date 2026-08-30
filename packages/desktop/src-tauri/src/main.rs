@@ -1,12 +1,23 @@
 // vibepm 桌面壳（spec §7）：S1 骨架（sidecar 生命周期/单实例/错误窗）+ S2 主窗（无边框/拖拽/关闭隐藏）。
 // S3 起胶囊窗、S4 托盘在本文件上叠加。
+// M2 S7：岛落地（spec §10）——岛窗 widget / 控制台窗 panel（NSD 复用前端，tauri://localhost 双源），
+// 能力模块在 island.rs（NetSpeed Dynamic Pro MIT 代码原样并入）。
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod audio_spectrum;
+mod island;
+mod music_controller;
+mod notification;
 mod sidecar;
+mod system_events;
 
 use std::sync::Mutex;
 
+// NSD 原码里 AppState 在 crate root（music_controller 以 crate::AppState 引用），此处保持同构
+use island::AppState;
+
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_autostart::MacosLauncher;
 
 struct SidecarState(Mutex<Option<sidecar::Sidecar>>);
 
@@ -41,16 +52,46 @@ fn main() {
             }
         }))
         // S2：关闭=隐藏到托盘（S4 托盘落地前由单实例二次启动唤出兜底）
+        // M2 S7：panel（NSD 控制台）对齐 NSD 原行为——CloseRequested → 隐藏（从岛右键/托盘再开）
         .on_window_event(|win, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if win.label() == "main" || win.label() == "capsule" {
+                if win.label() == "main" || win.label() == "capsule" || win.label() == "panel" {
                     api.prevent_close();
                     let _ = win.hide();
                 }
             }
         })
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--autostart"]),
+        ))
         .setup(|app| {
             let handle = app.handle().clone();
+            // M2 S7：岛能力状态（网速统计）+ 系统级监听（NSD 原样：频谱/系统事件/剪贴板/全屏检测）
+            let networks = sysinfo::Networks::new_with_refreshed_list();
+            app.manage(AppState {
+                networks: Mutex::new(networks),
+                ws_task: tokio::sync::Mutex::new(None),
+                tray_items: Mutex::new(None),
+            });
+            audio_spectrum::start_monitor();
+            system_events::start_monitor(handle.clone());
+            #[cfg(target_os = "windows")]
+            island::start_clipboard_monitor(handle.clone());
+            island::start_fullscreen_monitor(handle.clone());
+            // M2 S7：岛窗(widget)/控制台窗(panel) 由 tauri.conf 静态定义（NSD 原样做法；
+            // setup 内运行时建 hidden 窗会阻塞——实测踩坑）。这里只取引用打日志。
+            if let Some(w) = app.get_webview_window("widget") {
+                eprintln!("[shell] island window: topmost={:?} visible={:?}", w.is_always_on_top(), w.is_visible());
+            } else {
+                eprintln!("[shell] island window missing!");
+            }
+            if let Some(p) = app.get_webview_window("panel") {
+                eprintln!("[shell] panel window: visible={:?}", p.is_visible());
+            } else {
+                eprintln!("[shell] panel window missing!");
+            }
             // S4 托盘：三项菜单；退出 = kill sidecar → 退 app（spec §4 唯一退出入口）
             let show_main = tauri::menu::MenuItem::with_id(app, "show_main", "显示主窗", true, None::<&str>)?;
             let toggle_cap = tauri::menu::MenuItem::with_id(app, "toggle_capsule", "显示·隐藏胶囊", true, None::<&str>)?;
@@ -127,6 +168,28 @@ fn main() {
             }
             Ok(())
         })
+        // M2 S7：岛命令面（NSD 原样并入，spec §10.2）
+        .invoke_handler(tauri::generate_handler![
+            island::get_network_stats,
+            island::is_widget_visible,
+            island::get_network_latency,
+            island::set_window_bounds,
+            island::start_island_animation,
+            island::show_window_no_activate,
+            island::sync_tray_menu,
+            island::get_clipboard_text,
+            notification::fetch_latest_notification,
+            audio_spectrum::get_audio_spectrum,
+            music_controller::set_target_player,
+            music_controller::fetch_netease_music_info,
+            music_controller::control_system_media,
+            music_controller::get_random_cover_url,
+            music_controller::get_smtc_cover,
+            music_controller::fetch_netease_lyrics,
+            music_controller::fetch_song_meta,
+            music_controller::start_websocket_lyrics,
+            music_controller::stop_websocket_lyrics,
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 

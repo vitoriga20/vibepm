@@ -19,3 +19,5 @@ smoke_test.py
 _artifacts_/
 .codegraph/
 .mimosa/
+packages/desktop/src-tauri/static/index.html
+packages/desktop/src-tauri/static/assets/

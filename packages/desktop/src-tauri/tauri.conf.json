@@ -7,7 +7,35 @@
     "frontendDist": "./static"
   },
   "app": {
-    "windows": [],
+    "windows": [
+      {
+        "title": "vibepm 控制台",
+        "width": 900,
+        "height": 680,
+        "resizable": false,
+        "label": "panel",
+        "url": "/",
+        "visible": false,
+        "decorations": false,
+        "transparent": true
+      },
+      {
+        "title": "vibepm island",
+        "width": 210,
+        "height": 36,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "visible": false,
+        "maximized": false,
+        "maximizable": false,
+        "skipTaskbar": true,
+        "shadow": false,
+        "label": "widget",
+        "url": "/widget"
+      }
+    ],
     "security": {
       "csp": null
     }
