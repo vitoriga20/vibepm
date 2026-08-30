@@ -1,8 +1,7 @@
 /**
- * todoData.js · todoList 数据层单一源（index.html 与 capsule.html 共用）
+ * todoData.js · todoList 数据层单一源（主页面实例共用）
  *  - 纯函数集合：直接操作 store 里的 "todoList" 快照（env.js store 已带 todo-tomato: 前缀）
- *  - todoList.js 的 todoListManger 方法委托到这里（保持对外 API 不变）；
- *    桌面胶囊页（capsule.js）不经 manager 直接调用，消除复制式副本
+ *  - todoList.js 的 todoListManger 方法委托到这里（保持对外 API 不变）
  *  - 依赖：env.js（store / MS_PER_MINUTE）需先于本文件加载
  */
 

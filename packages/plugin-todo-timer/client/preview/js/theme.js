@@ -1,14 +1,13 @@
 /**
  * 皮肤 token 同步：把 vibepm 壳 :root 的皮肤 CSS 变量同步到本页 :root。
- *  - 番茄钟页面跑在 iframe 内，不继承父文档 CSS 变量；
- *  - 桌面胶囊是 window.open 的独立弹窗，无父窗口 → 从 opener（主页面，其自身已
- *    从壳同步过 token）读取，同样不继承；两者共用同一套 token 清单；
+ *  - 番茄钟页面跑在 iframe 内，不继承父文档 CSS 变量 → 从 parent（壳页面，其自身已
+ *    从壳同步过 token）读取；
  *  - 皮肤插件（如 plugin-skin-rhine）向壳 :root 注入/移除 token，此处监听并实时同步；
  *  - color.css 的变量映射层引用这些 token → 番茄钟样式非硬编码、跟随当前皮肤。
- *  - 独立打开 preview（无父窗口/opener）时跳过，回落到 color.css 的 fallback 值。
+ *  - 独立打开 preview（无 parent）时跳过，回落到 color.css 的 fallback 值。
  */
 (function () {
-  const PARENT = window.opener && window.opener !== window ? window.opener : window.parent;
+  const PARENT = window.parent;
   if (!PARENT || PARENT === window) return;
 
   // 皮肤 token 清单：vibepm 壳 shell.css :root 全局 token + skin-* 分区 token + 字体族

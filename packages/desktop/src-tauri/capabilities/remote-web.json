@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "remote-web",
   "description": "remote sidecar web (127.0.0.1) 的窗口能力：顶部拖拽 hit-test 需要 start_dragging/toggle_maximize",
-  "windows": ["main", "capsule"],
+  "windows": ["main"],
   "remote": {
     "urls": ["http://127.0.0.1:*"]
   },

@@ -1,6 +1,6 @@
 /**
- * clockSync.js · 跨窗时钟同步单一源（index.html 与 capsule.html 共用）
- *  - 双页共用 localStorage（todo-tomato:*），storage 事件双向同步时钟/任务/设置
+ * clockSync.js · 跨窗时钟同步单一源（主页面各窗口实例共用）
+ *  - 各实例共用 localStorage（todo-tomato:*），storage 事件双向同步时钟/任务/设置
  *  - 接收方只读重载 + 纯展示计时器：不重建倒计时（避免两页各自跑结束流程互相踩），
  *    用保存的 endTime 推算剩余时间展示；到点统一走 switchState（记账锁防重）
  *  - 不变量（改动前必读）：

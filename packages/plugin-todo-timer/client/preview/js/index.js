@@ -39,35 +39,7 @@ function clockStop() {
   waittingClock();
 }
 
-// 桌面胶囊窗口管理：设置开关「桌面胶囊」驱动（开=独立小窗常驻桌面，关=收起；
-// 主窗口最小化后胶囊窗口仍在）。胶囊窗口被手动关闭时回写开关（见 capsule.js pagehide）。
-let desktopCapsuleWin = null;
-function openDesktopCapsule(silent = false) {
-  // Tauri 桌面壳：胶囊窗由壳创建（隐藏），显示/隐藏由胶囊页读设置自判定 + storage 联动；
-  // 这里不走 window.open（壳内会开成浏览器弹窗，成假链路）
-  if (window.__TAURI_INTERNALS__) return true;
-  if (desktopCapsuleWin && !desktopCapsuleWin.closed) {
-    try { desktopCapsuleWin.focus(); } catch (e) { /* noop */ }
-    return true;
-  }
-  desktopCapsuleWin = window.open(
-    "capsule.html",
-    "vibepmDesktopCapsule",
-    "popup=yes,width=640,height=340,menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=yes"
-  );
-  if (!desktopCapsuleWin && !silent) {
-    showToast("弹窗被拦截：请允许本站打开弹窗后重试");
-  }
-  return !!desktopCapsuleWin;
-}
-function closeDesktopCapsule() {
-  if (desktopCapsuleWin && !desktopCapsuleWin.closed) {
-    try { desktopCapsuleWin.close(); } catch (e) { /* noop */ }
-  }
-  desktopCapsuleWin = null;
-}
-
-// 双页记账互斥锁在 clockSync.js 单一源（tryLockWorkEnd）：桌面胶囊页与本页各自跑时钟，
+// 双页记账互斥锁在 clockSync.js 单一源（tryLockWorkEnd）：各页各自跑时钟，
 // 同一段专注/休息结束时仅先落账方记账。
 async function onWorkEnd(duration, progress) {
   // 时长持久化：只要专注过（progress>0）就落账——修复「专注一段时间但不足 30% 全部丢失」
@@ -616,11 +588,6 @@ settingsPageComponent = [
     component: new Switch("showFloatingWindow", settings, "showFloatingWindow"),
   },
   {
-    name: "showDesktopCapsule",
-    type: "switch",
-    component: new Switch("showDesktopCapsule", settings, "showDesktopCapsule"),
-  },
-  {
     name: "showTomatoAnimation",
     type: "switch",
     component: new Switch("showTomatoAnimation", settings, "showTomatoAnimation"),
@@ -876,9 +843,6 @@ triggerActionOnDayChange(OnDayChange);
 
 // 页面加载即应用主题（替代 utools.onPluginEnter 入口分发）
 setDarkMode(settings.config.darkMode);
-
-// 开机补位：设置里开着桌面胶囊 → 静默补开独立小窗（若被弹窗拦截则等设置开关再触发）
-if (settings.config.showDesktopCapsule) openDesktopCapsule(true);
 
 const darkModeSwitch = new Select("darkModeSwitch", settings, "darkMode", [
   { value: "light", label: "明亮模式", icon: "pic/darkMode-light.svg" },

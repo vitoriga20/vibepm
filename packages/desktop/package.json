@@ -2,7 +2,7 @@
   "name": "@vitoriga20/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "vibepm desktop shell (Tauri): main window + capsule window + tray, sidecar Node server",
+  "description": "vibepm desktop shell (Tauri): island widget + main window + tray, sidecar Node server",
   "scripts": {
     "tauri": "tauri",
     "build:sidecar": "node sidecar/build.mjs"

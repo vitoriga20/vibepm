@@ -6,7 +6,7 @@
  *  - 桌面常驻能力预留：FloatingSurface 抽象点（将来 vibepm 有桌面壳可接入）
  */
 
-// 状态文案单一源在 env.js UI_TEXT.capsuleStateText（主页面胶囊条 / 桌面胶囊共用）
+// 状态文案单一源在 env.js UI_TEXT.capsuleStateText（主页面胶囊条/迷你浮窗共用）
 const CLOCK_STATE_TEXT = UI_TEXT.capsuleStateText;
 
 // 页面内迷你胶囊同步（生长浮层顶部胶囊）
@@ -231,13 +231,13 @@ class FloatingWindow {
     this.refresh();
     syncPill();
 
-    // 跨窗口同步（单一源 clockSync.js）：桌面胶囊页与本页共用 localStorage（todo-tomato:*），
+    // 跨窗口同步（单一源 clockSync.js）：各窗口实例共用 localStorage（todo-tomato:*），
     // storage 事件双向同步时钟/任务/设置；页面级联动通过钩子注入。
     installClockStorageSync(clock, {
       onClockResync: () => this.refresh(),
       onTodoListChange: () => {
         if (typeof todoManger_ !== "undefined" && todoManger_) {
-          todoManger_.getTaskList(); // 重读存储（胶囊页可能已完成任务/落账番茄）
+          todoManger_.getTaskList(); // 重读存储（其他实例可能已完成任务/落账番茄）
           todoManger_.onChange();    // 触发主列表重渲染
           if (typeof updatePageTodayTomatosNum === "function") updatePageTodayTomatosNum();
         }
@@ -245,7 +245,7 @@ class FloatingWindow {
       },
       onSettingsChange: () => {
         this.refresh();
-        // 桌面胶囊窗口被手动关闭会回写开关状态（capsule.js pagehide）：同步重渲染设置页开关
+        // 设置变化（如浮窗开关）后同步重渲染设置页开关状态
         if (typeof settingsPageComponent !== "undefined" && settingsPageComponent) {
           settingsPageComponent.forEach((c) => c.component && c.component.render && c.component.render());
         }

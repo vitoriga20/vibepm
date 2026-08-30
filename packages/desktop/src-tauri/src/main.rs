@@ -1,7 +1,7 @@
-// vibepm 桌面壳（spec §7）：S1 骨架（sidecar 生命周期/单实例/错误窗）+ S2 主窗（无边框/拖拽/关闭隐藏）。
-// S3 起胶囊窗、S4 托盘在本文件上叠加。
-// M2 S7：岛落地（spec §10）——岛窗 widget / 控制台窗 panel（NSD 复用前端，tauri://localhost 双源），
+// vibepm 桌面壳（spec §7）：S1 骨架（sidecar 生命周期/单实例/错误窗）+ S2 主窗（无边框/拖拽/关闭隐藏）+ S4 托盘。
+// M2 S7：岛落地（spec §10）——岛窗 widget（NSD 复用前端，tauri://localhost），
 // 能力模块在 island.rs（NetSpeed Dynamic Pro MIT 代码原样并入）。
+// M2 S9：大胶囊退役（spec §10.4）——capsule 窗创建/托盘项/失焦豁免全部删除。
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio_spectrum;
@@ -52,11 +52,11 @@ fn main() {
             }
         }))
         // S2：关闭=隐藏到托盘（S4 托盘落地前由单实例二次启动唤出兜底）
-        // M2 S8：主窗失焦收纳（spec §10.3）——失焦后前台窗非岛/胶囊（点岛不算外部）→ 收起主窗回岛
+        // M2 S8：主窗失焦收纳（spec §10.3）——失焦后前台窗非岛（点岛不算外部）→ 收起主窗回岛
         .on_window_event(|win, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
-                    if win.label() == "main" || win.label() == "capsule" {
+                    if win.label() == "main" {
                         api.prevent_close();
                         let _ = win.hide();
                     }
@@ -66,11 +66,11 @@ fn main() {
                         let app = win.app_handle().clone();
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_millis(350));
-                            // 点岛（或胶囊）不算外部：前台窗句柄等于岛/胶囊句柄则不收纳
+                            // 点岛不算外部：前台窗句柄等于岛句柄则不收纳
                             #[cfg(target_os = "windows")]
                             {
                                 let fg = unsafe { winapi::um::winuser::GetForegroundWindow() } as isize;
-                                let keep = ["widget", "capsule"].iter().any(|lbl| {
+                                let keep = ["widget"].iter().any(|lbl| {
                                     app.get_webview_window(lbl)
                                         .and_then(|w| w.hwnd().ok())
                                         .map(|h| h.0 as isize == fg)
@@ -115,12 +115,11 @@ fn main() {
                 eprintln!("[shell] island window missing!");
             }
             // S4 托盘：菜单；退出 = kill sidecar → 退 app（spec §4 唯一退出入口）
-            // M2 S8 托盘合并（spec §10.3-3）：加"显隐岛"；胶囊项随 S9 退役删除
+            // M2 S8 托盘合并（spec §10.3-3）：加"显隐岛"；胶囊项随 S9 退役已删
             let show_main = tauri::menu::MenuItem::with_id(app, "show_main", "显示主窗", true, None::<&str>)?;
             let toggle_island = tauri::menu::MenuItem::with_id(app, "toggle_island", "显示·隐藏岛", true, None::<&str>)?;
-            let toggle_cap = tauri::menu::MenuItem::with_id(app, "toggle_capsule", "显示·隐藏胶囊", true, None::<&str>)?;
             let quit = tauri::menu::MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = tauri::menu::Menu::with_items(app, &[&show_main, &toggle_island, &toggle_cap, &quit])?;
+            let menu = tauri::menu::Menu::with_items(app, &[&show_main, &toggle_island, &quit])?;
             let icon = app
                 .default_window_icon()
                 .cloned()
@@ -143,11 +142,6 @@ fn main() {
                             if w.is_visible().unwrap_or(false) { let _ = w.hide(); } else { let _ = w.show(); }
                         }
                     }
-                    "toggle_capsule" => {
-                        if let Some(c) = app.get_webview_window("capsule") {
-                            if c.is_visible().unwrap_or(false) { let _ = c.hide(); } else { let _ = c.show(); }
-                        }
-                    }
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -168,23 +162,7 @@ fn main() {
                         .initialization_script(DRAG_REGION_SCRIPT)
                         .build()?;
                     eprintln!("[shell] main window created: visible={:?} decorated={:?}", win.is_visible(), win.is_decorated());
-                    // S3 胶囊窗：alwaysOnTop + 无边框 + 关闭=隐藏（spec §4）；URL=sidecar 同源 → 共享 localStorage（clockSync 白捡）
-                    let cap_url = tauri::Url::parse(&format!(
-                        "http://127.0.0.1:{port}/plugins/plugin-todo-timer/preview/capsule.html"
-                    ))
-                    .expect("parse capsule url");
-                    // M2 用户拍板：胶囊是插件功能，默认不随壳显示——主页「桌面胶囊」开关开了才显示
-                    //（capsule.js 启动自判定 + settings storage 联动 show/hide）
-                    let cap = WebviewWindowBuilder::new(&handle, "capsule", WebviewUrl::External(cap_url))
-                        .title("vibepm capsule")
-                        .inner_size(640.0, 340.0)
-                        .decorations(false)
-                        .always_on_top(true)
-                        .skip_taskbar(true)
-                        .shadow(true)
-                        .visible(false)
-                        .build()?;
-                    eprintln!("[shell] capsule window created: visible={:?} topmost={:?}", cap.is_visible(), cap.is_always_on_top());
+                    // S9：大胶囊退役（spec §10.4）——capsule 窗不再创建；壳级入口只剩岛 widget + 主窗
                 }
                 Err(msg) => {
                     // 超时/早退 → 报错窗（带输出尾巴，spec §2）
