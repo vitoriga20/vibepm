@@ -26,12 +26,52 @@ pub fn set_target_player(player: String) {
 
 // 根据前端选择的平台，匹配对应的系统媒体会话，返回会话及其应用包名
 fn get_target_media_session() -> Option<(GlobalSystemMediaTransportControlsSession, String)> {
-    let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-        .ok()?
-        .get()
-        .ok()?;
+    // 深入 debug：每一步失败点都留痕（区分"系统无会话"vs"本进程 WinRT 环境问题"）
+    let op = match GlobalSystemMediaTransportControlsSessionManager::RequestAsync() {
+        Ok(op) => op,
+        Err(e) => {
+            #[cfg(debug_assertions)]
+            eprintln!("[smtc-debug] RequestAsync err: {}", e);
+            return None;
+        }
+    };
+    let manager = match op.get() {
+        Ok(m) => m,
+        Err(e) => {
+            #[cfg(debug_assertions)]
+            eprintln!("[smtc-debug] RequestAsync.get err: {}", e);
+            return None;
+        }
+    };
+    let sessions = match manager.GetSessions() {
+        Ok(s) => s,
+        Err(e) => {
+            #[cfg(debug_assertions)]
+            eprintln!("[smtc-debug] GetSessions err: {}", e);
+            return None;
+        }
+    };
 
-    let sessions = manager.GetSessions().ok()?;
+    #[cfg(debug_assertions)]
+    {
+        let size = sessions.Size().unwrap_or(0);
+        eprintln!("[smtc-debug] sessions size={}", size);
+        for i in 0..size {
+            if let Ok(sc) = sessions.GetAt(i) {
+                let id = sc
+                    .SourceAppUserModelId()
+                    .map(|x| x.to_string())
+                    .unwrap_or_else(|_| "<err>".into());
+                let title = sc
+                    .TryGetMediaPropertiesAsync()
+                    .ok()
+                    .and_then(|p| p.get().ok())
+                    .map(|p| p.Title().unwrap_or_default().to_string())
+                    .unwrap_or_else(|| "<err>".into());
+                eprintln!("[smtc-debug] session[{}] id={:?} title={:?}", i, id, title);
+            }
+        }
+    }
 
     // 获取当前目标平台（前端未设置时默认 netease）
     let target = {
@@ -69,17 +109,8 @@ fn get_target_media_session() -> Option<(GlobalSystemMediaTransportControlsSessi
     // 指定平台：按包名匹配
     #[cfg(debug_assertions)]
     {
-        // debug 日志：枚举全部 SMTC 会话与当前 target，排查"平台选了但识别不到"
+        // debug 日志：当前目标平台
         eprintln!("[smtc-debug] target={}", target);
-        if let Ok(all) = manager.GetSessions() {
-            for i in 0..all.Size().unwrap_or(0) {
-                if let Ok(s) = all.GetAt(i) {
-                    if let Ok(app_id) = s.SourceAppUserModelId() {
-                        eprintln!("[smtc-debug] session app_id={:?}", app_id.to_string());
-                    }
-                }
-            }
-        }
     }
     for session in sessions {
         if let Ok(app_id) = session.SourceAppUserModelId() {
