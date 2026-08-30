@@ -1,0 +1,60 @@
+{
+  "name": "@vitoriga20/plugin-island-settings",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Island settings panel for vibepm desktop: forwards NSD island config via Tauri events (widget window lives on a different origin).",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "files": ["dist", "client-dist"],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rimraf dist client-dist",
+    "build:ts": "tsc -b",
+    "build:client": "esbuild client/index.ts --bundle --format=esm --outfile=client-dist/client.js --platform=browser --external:@vitoriga20/*",
+    "build": "pnpm run clean && pnpm run build:ts && pnpm run build:client",
+    "dev": "pnpm run build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.0",
+    "@vitoriga20/core": "workspace:*",
+    "@vitoriga20/plugin-ide-view": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.10",
+    "esbuild": "^0.24.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.3"
+  },
+  "vibepm": {
+    "id": "plugin-island-settings",
+    "display": "Island Settings",
+    "role": "ui",
+    "order": 32,
+    "node": {
+      "immediately": true,
+      "inject": ["slots"],
+      "provide": []
+    },
+    "client": {
+      "entry": "./client-dist/client.js",
+      "inject": [],
+      "provide": [],
+      "immediately": true
+    },
+    "configSchema": {}
+  }
+}

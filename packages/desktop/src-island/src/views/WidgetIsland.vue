@@ -2765,6 +2765,8 @@ onMounted(async () => {
     await listen<{ enabled: boolean, slots: (string | null)[] }>('control-custom-display', (event) => {
         enableCustomDisplay.value = event.payload.enabled;
         customSlots.value = event.payload.slots;
+        localStorage.setItem('nsd_custom_display', String(event.payload.enabled));
+        localStorage.setItem('nsd_custom_slots', JSON.stringify(event.payload.slots));
 
         // 检查自定义槽位中是否有 fps，如果有则自动唤醒采集
         checkAndToggleFpsPlugin();
@@ -2779,6 +2781,7 @@ onMounted(async () => {
     await listen<{ enabled: boolean }>('control-music-ctl', (event) => {
         const isEnabled = event.payload.enabled;
         isMusicCtlEnabled.value = isEnabled;
+        localStorage.setItem('nsd_music_ctrl', String(isEnabled));
         if (isEnabled) {
             enableSysResource.value = false; // 开启音乐，关资源监控
             if (localStorage.getItem('nsd_glow_border') === null) {
@@ -2837,6 +2840,7 @@ onMounted(async () => {
     await listen<{ enabled: boolean }>('control-sys-resource', (event) => {
         const isEnabled = event.payload.enabled;
         enableSysResource.value = isEnabled;
+        localStorage.setItem('nsd_sys_resource', String(isEnabled));
         if (isEnabled) {
             isMusicCtlEnabled.value = false; // 开启资源监控，关音乐控制器
             stopWebSocket();
@@ -2847,6 +2851,7 @@ onMounted(async () => {
     await listen<{ enabled: boolean }>('control-clipboard', (event) => {
         const isEnabled = event.payload.enabled;
         enableClipboard.value = isEnabled;
+        localStorage.setItem('nsd_clipboard', String(isEnabled));
         if (isEnabled) {
             startClipboardPolling();
         } else {
@@ -2887,16 +2892,19 @@ onMounted(async () => {
     // 监听来自控制台的透明度同步指令
     await listen<{ opacity: number }>('control-island-opacity', (event) => {
         islandOpacity.value = event.payload.opacity;
+        localStorage.setItem('nsd_island_opacity', String(event.payload.opacity));
     });
 
     // 监听来自控制台的主题同步指令
     await listen<{ theme: string }>('control-island-theme', (event) => {
         islandTheme.value = event.payload.theme;
+        localStorage.setItem('nsd_island_theme', event.payload.theme);
     });
 
     // 监听静默模式开关
     await listen<{ enabled: boolean }>('control-msg-mode', async (event) => {
         isMsgModeEnabled.value = event.payload.enabled;
+        localStorage.setItem('nsd_msg_mode', String(event.payload.enabled));
         if (isMsgModeEnabled.value) {
             // 静默模式开启时：无活跃事件则隐藏，有则保持显示
             if (!shouldShowInQuietMode.value && isIslandVisible.value) {
@@ -2914,11 +2922,29 @@ onMounted(async () => {
 
     await listen<{ language: AppLanguage }>('control-language', (event) => {
         currentLanguage.value = event.payload.language;
+        localStorage.setItem('nsd_language', event.payload.language);
     });
 
     // 监听控制台发来的“自动隐藏”配置变更
     await listen<{ enabled: boolean }>('control-autohide-fs', (event) => {
         isAutoHideEnabled.value = event.payload.enabled;
+        localStorage.setItem('nsd_autohide_fs', String(event.payload.enabled));
+    });
+    // vibepm 接入（主窗岛设置面板）：消息通知开关（notifyTimer 轮询此键）
+    await listen<{ enabled: boolean }>('control-msg-notify', (event) => {
+        localStorage.setItem('nsd_msg_notify', String(event.payload.enabled));
+    });
+    // vibepm 接入（主窗岛设置面板）：目标媒体平台下发（存键 + 同步 Rust 侧绑定）
+    await listen<{ player: string }>('control-target-player', (event) => {
+        localStorage.setItem('nsd_target_player', event.payload.player);
+        invoke('set_target_player', { player: event.payload.player }).catch(() => { });
+    });
+    // vibepm 接入（主窗岛设置面板）：配置回读（主窗跨源读不到本页 localStorage，打包回传）
+    await listen<null>('control-request-config', () => {
+        const cfgKeys = ['nsd_music_ctrl', 'nsd_msg_mode', 'nsd_autohide_fs', 'nsd_msg_notify', 'nsd_clipboard', 'nsd_sys_resource', 'nsd_target_player', 'nsd_island_opacity', 'nsd_island_theme', 'nsd_language'];
+        const cfg: Record<string, string | null> = {};
+        for (const k of cfgKeys) cfg[k] = localStorage.getItem(k);
+        emit('island-config', cfg);
     });
 
     // 监听 Rust 发来的系统级全屏状态变化
@@ -3150,6 +3176,7 @@ onMounted(async () => {
     // 接收来自控制台的独立 FPS 开关指令
     await listen<{ enabled: boolean }>('control-fps-monitor', (event) => {
         enableFps.value = event.payload.enabled;
+        localStorage.setItem('nsd_fps_monitor', String(event.payload.enabled));
         if (enableFps.value) {
             isMusicCtlEnabled.value = false;
             enableSysResource.value = false;

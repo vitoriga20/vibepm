@@ -28,6 +28,7 @@
     "@vitoriga20/plugin-calendar": "workspace:*",
     "@vitoriga20/plugin-github": "workspace:*",
     "@vitoriga20/plugin-ide-view": "workspace:*",
+    "@vitoriga20/plugin-island-settings": "workspace:*",
     "@vitoriga20/plugin-onboarding": "workspace:*",
     "@vitoriga20/plugin-plugin-manager": "workspace:*",
     "@vitoriga20/plugin-settings": "workspace:*",

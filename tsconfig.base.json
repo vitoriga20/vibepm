@@ -15,5 +15,6 @@
     "types": ["node"],
     "composite": true,
     "incremental": true
-  }
+  },
+  "exclude": ["node_modules", "packages/desktop/src-island", "packages/desktop/src-tauri/target"]
 }
