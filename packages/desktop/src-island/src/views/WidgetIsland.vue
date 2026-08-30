@@ -641,7 +641,7 @@ const isHighUpload = ref(false);
 const networkStatus = ref<'good' | 'warning' | 'error'>('good');
 
 // 音乐控制功能开关
-const isMusicCtlEnabled = ref(localStorage.getItem('nsd_music_ctrl') === 'true');
+const isMusicCtlEnabled = ref(localStorage.getItem('nsd_music_ctrl') !== 'false');
 const isPlaying = ref(false);
 // 歌词显示
 const parsedLyrics = ref<{ time: number; text: string }[]>([]);
@@ -2730,6 +2730,23 @@ onMounted(async () => {
                 if (Date.now() - lastProgrammaticMoveEnd < 1500) return;
                 // 重置位置后 2 秒内不保存（防止 setPosition 未生效时把旧坐标写回缓存）
                 if (Date.now() - positionResetAt < 2000) return;
+
+                // vibepm 接入（spec §1 右缘贴附锁定）：保存前先把 x 吸附到当前显示器右缘，
+                // 自由拖动松手 600ms 后自动贴回右缘，仅 y 可变；吸附后保存的就是贴附坐标
+                try {
+                    const mon = await currentMonitor();
+                    if (mon) {
+                        const pos = await appWindow.outerPosition();
+                        const sz = await appWindow.outerSize();
+                        const targetX = mon.position.x + mon.size.width - sz.width;
+                        if (Math.abs(pos.x - targetX) > 2) {
+                            lastProgrammaticMoveEnd = Date.now();
+                            await appWindow.setPosition(new PhysicalPosition(targetX, pos.y));
+                        }
+                    }
+                } catch (snapErr) {
+                    console.warn('右缘吸附失败:', snapErr);
+                }
 
                 await persistWindowPosition(appWindow);
             } catch (e) {
