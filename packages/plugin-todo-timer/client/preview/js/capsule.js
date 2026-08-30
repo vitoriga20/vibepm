@@ -526,6 +526,14 @@
     // Tauri 桌面壳：close 由壳接管为隐藏（保状态，托盘可再唤出）；浏览器弹窗仍走 window.close
     const t = window.__TAURI_INTERNALS__;
     if (t) {
+      // 壳内 hide 不触发 pagehide → 在此回写设置开关为关（下次启动不再自动显示）
+      try {
+        const s0 = store.getItem("settings");
+        if (s0 && s0.showDesktopCapsule) {
+          s0.showDesktopCapsule = false;
+          store.setItem("settings", s0);
+        }
+      } catch (_) { /* noop */ }
       try { t.invoke("plugin:window|close", { label: "capsule" }).catch(() => {}); return; } catch (_) { /* fallthrough */ }
     }
     try { window.close(); } catch (_) { /* noop */ }
@@ -536,6 +544,26 @@
     e.stopPropagation();
     openMainWindow();
   });
+
+  // Tauri 桌面壳：胶囊窗由壳创建（隐藏）。显示与否由主页「桌面胶囊」开关驱动：
+  // 启动按当前设置自判定；主页开关切换 → settings localStorage 变化 → storage 事件 → show/hide。
+  // 浏览器预览路径（window.open 弹窗）能弹出来就说明开关是开的，不受此逻辑影响。
+  (function capsuleVisibilityGate() {
+    const t = window.__TAURI_INTERNALS__;
+    if (!t) return;
+    const apply = () => {
+      try {
+        const s = store.getItem("settings");
+        const on = !!(s && s.showDesktopCapsule);
+        t.invoke("plugin:window|" + (on ? "show" : "hide"), { label: "capsule" }).catch(() => {});
+      } catch (_) { /* noop */ }
+    };
+    apply();
+    window.addEventListener("storage", (e) => {
+      // store 的真实 localStorage 键带 todo-tomato: 前缀（env.js store 包装）
+      if (e.key === "todo-tomato:settings") apply();
+    });
+  })();
 
   // 屏蔽快捷键关窗（弹窗常驻）
   document.addEventListener("keydown", (e) => {

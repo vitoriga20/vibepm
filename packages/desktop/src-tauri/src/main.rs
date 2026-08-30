@@ -173,6 +173,8 @@ fn main() {
                         "http://127.0.0.1:{port}/plugins/plugin-todo-timer/preview/capsule.html"
                     ))
                     .expect("parse capsule url");
+                    // M2 用户拍板：胶囊是插件功能，默认不随壳显示——主页「桌面胶囊」开关开了才显示
+                    //（capsule.js 启动自判定 + settings storage 联动 show/hide）
                     let cap = WebviewWindowBuilder::new(&handle, "capsule", WebviewUrl::External(cap_url))
                         .title("vibepm capsule")
                         .inner_size(640.0, 340.0)
@@ -180,6 +182,7 @@ fn main() {
                         .always_on_top(true)
                         .skip_taskbar(true)
                         .shadow(true)
+                        .visible(false)
                         .build()?;
                     eprintln!("[shell] capsule window created: visible={:?} topmost={:?}", cap.is_visible(), cap.is_always_on_top());
                 }

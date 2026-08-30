@@ -1057,6 +1057,10 @@ const fillCollapsedWithTrackInfo = () => {
 };
 
 const initWebSocket = async () => {
+    // 歌词 WS(ws://127.0.0.1:47290) 仅洛雪链路需要；其余平台走各自 API。
+    // 无本地服务时连接必被拒绝(os 10061)刷错误——按目标平台守卫。
+    const tp = localStorage.getItem('nsd_target_player') || 'netease';
+    if (tp !== 'lx-music' && tp !== 'other') return;
     // 一次性连接：尝试过就不再连第二次
     if (wsConnectAttempted) return;
     wsConnectAttempted = true;
@@ -2750,23 +2754,6 @@ onMounted(async () => {
                 if (Date.now() - lastProgrammaticMoveEnd < 1500) return;
                 // 重置位置后 2 秒内不保存（防止 setPosition 未生效时把旧坐标写回缓存）
                 if (Date.now() - positionResetAt < 2000) return;
-
-                // vibepm 接入（spec §1 右缘贴附锁定）：保存前先把 x 吸附到当前显示器右缘，
-                // 自由拖动松手 600ms 后自动贴回右缘，仅 y 可变；吸附后保存的就是贴附坐标
-                try {
-                    const mon = await currentMonitor();
-                    if (mon) {
-                        const pos = await appWindow.outerPosition();
-                        const sz = await appWindow.outerSize();
-                        const targetX = mon.position.x + mon.size.width - sz.width;
-                        if (Math.abs(pos.x - targetX) > 2) {
-                            lastProgrammaticMoveEnd = Date.now();
-                            await appWindow.setPosition(new PhysicalPosition(targetX, pos.y));
-                        }
-                    }
-                } catch (snapErr) {
-                    console.warn('右缘吸附失败:', snapErr);
-                }
 
                 await persistWindowPosition(appWindow);
             } catch (e) {

@@ -43,6 +43,9 @@ function clockStop() {
 // 主窗口最小化后胶囊窗口仍在）。胶囊窗口被手动关闭时回写开关（见 capsule.js pagehide）。
 let desktopCapsuleWin = null;
 function openDesktopCapsule(silent = false) {
+  // Tauri 桌面壳：胶囊窗由壳创建（隐藏），显示/隐藏由胶囊页读设置自判定 + storage 联动；
+  // 这里不走 window.open（壳内会开成浏览器弹窗，成假链路）
+  if (window.__TAURI_INTERNALS__) return true;
   if (desktopCapsuleWin && !desktopCapsuleWin.closed) {
     try { desktopCapsuleWin.focus(); } catch (e) { /* noop */ }
     return true;

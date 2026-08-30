@@ -14,6 +14,7 @@ export const DEFAULT_BUNDLES: Record<string, string[]> = {
     "plugin-ambient",
     "plugin-todo-timer",
     "plugin-calendar",
+    "plugin-skin-rhine",
   ],
 };
 
@@ -36,4 +37,5 @@ export const DEFAULT_PLUGIN_PACKAGES: string[] = [
   "@vitoriga20/plugin-ambient",
   "@vitoriga20/plugin-todo-timer",
   "@vitoriga20/plugin-calendar",
+  "@vitoriga20/plugin-skin-rhine",
 ];
