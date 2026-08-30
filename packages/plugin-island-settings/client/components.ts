@@ -99,7 +99,6 @@ export class IslandSettingsPanel extends HTMLElement {
             <option value="spotify">Spotify</option>
             <option value="apple">Apple Music</option>
             <option value="qqmusic">QQ音乐</option>
-            <option value="kugou">酷狗</option>
             <option value="echo">回声</option>
             <option value="lx-music">洛雪</option>
             <option value="other">其他</option>
@@ -154,7 +153,10 @@ export class IslandSettingsPanel extends HTMLElement {
       }
       b.classList.toggle("on", states[k]);
     });
-    (s.getElementById("player") as HTMLSelectElement).value = this.cfg["nsd_target_player"] || "netease";
+    const playerSel = s.getElementById("player") as HTMLSelectElement;
+    const savedPlayer = this.cfg["nsd_target_player"] || "netease";
+    // 已下架的选项（如 kugou，不注册 SMTC）回退默认
+    playerSel.value = playerSel.querySelector(`option[value="${savedPlayer}"]`) ? savedPlayer : "netease";
     (s.getElementById("theme") as HTMLSelectElement).value = this.cfg["nsd_island_theme"] || "black";
     (s.getElementById("lang") as HTMLSelectElement).value = this.cfg["nsd_language"] || "zh-CN";
     const op = Number(this.cfg["nsd_island_opacity"] ?? "100") || 100;
