@@ -114,11 +114,13 @@ fn main() {
             } else {
                 eprintln!("[shell] island window missing!");
             }
-            // S4 托盘：三项菜单；退出 = kill sidecar → 退 app（spec §4 唯一退出入口）
+            // S4 托盘：菜单；退出 = kill sidecar → 退 app（spec §4 唯一退出入口）
+            // M2 S8 托盘合并（spec §10.3-3）：加"显隐岛"；胶囊项随 S9 退役删除
             let show_main = tauri::menu::MenuItem::with_id(app, "show_main", "显示主窗", true, None::<&str>)?;
+            let toggle_island = tauri::menu::MenuItem::with_id(app, "toggle_island", "显示·隐藏岛", true, None::<&str>)?;
             let toggle_cap = tauri::menu::MenuItem::with_id(app, "toggle_capsule", "显示·隐藏胶囊", true, None::<&str>)?;
             let quit = tauri::menu::MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = tauri::menu::Menu::with_items(app, &[&show_main, &toggle_cap, &quit])?;
+            let menu = tauri::menu::Menu::with_items(app, &[&show_main, &toggle_island, &toggle_cap, &quit])?;
             let icon = app
                 .default_window_icon()
                 .cloned()
@@ -134,6 +136,11 @@ fn main() {
                             let _ = w.show();
                             let _ = w.unminimize();
                             let _ = w.set_focus();
+                        }
+                    }
+                    "toggle_island" => {
+                        if let Some(w) = app.get_webview_window("widget") {
+                            if w.is_visible().unwrap_or(false) { let _ = w.hide(); } else { let _ = w.show(); }
                         }
                     }
                     "toggle_capsule" => {
