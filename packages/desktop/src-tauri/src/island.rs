@@ -105,6 +105,16 @@ pub fn is_widget_visible(app: tauri::AppHandle) -> bool {
     }
 }
 
+/// 打开 vibepm 主工作台并聚焦（岛右键"打开主窗"/双击岛入口；M2 S8 拍板语义）
+#[tauri::command]
+pub fn show_main_window(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
 /// 读取系统剪贴板文本（Windows 专用），供灵动岛检测复制到链接
 #[cfg(target_os = "windows")]
 #[tauri::command]

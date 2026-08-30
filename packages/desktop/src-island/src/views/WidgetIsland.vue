@@ -2318,9 +2318,28 @@ const onLeave = (el: Element, done: () => void) => {
 let mouseDownX = 0;
 let mouseDownY = 0;
 let isMouseDown = false;
+// M2 S8：双击岛空白区 = 打开 vibepm 主窗（350ms 内两次按下、位移极小、非交互元素）
+let lastTapAt = 0;
+let lastTapX = 0;
+let lastTapY = 0;
+
+const openMainWindow = () => {
+    invoke('show_main_window').catch(() => { });
+};
 
 const handleMouseDown = (event: MouseEvent) => {
     if ((event.target as HTMLElement).closest('.ctl-btn')) return;
+
+    // 双击空白区开主窗（先于拖拽判定：双击位移极小不会触发拖拽）
+    const now = Date.now();
+    if (now - lastTapAt < 350 && Math.abs(event.clientX - lastTapX) < 8 && Math.abs(event.clientY - lastTapY) < 8) {
+        lastTapAt = 0;
+        openMainWindow();
+        return;
+    }
+    lastTapAt = now;
+    lastTapX = event.clientX;
+    lastTapY = event.clientY;
 
     // 无论有没有锁定，都必须老老实实记录坐标，给后面的“点击展开”提供判断依据！
     mouseDownX = event.clientX;
@@ -2372,7 +2391,8 @@ const handleRightClick = async (event: MouseEvent) => {
         text: t('openConsole'),
         id: 'open_settings',
         action: async () => {
-            await emit('open-settings-panel');
+            // M2 S8：控制台退役，"打开主窗"直接聚焦 vibepm 工作台
+            await invoke('show_main_window');
             showToast(t('consoleOpened'));
         }
     });

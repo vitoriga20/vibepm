@@ -9,17 +9,6 @@
   "app": {
     "windows": [
       {
-        "title": "vibepm 控制台",
-        "width": 900,
-        "height": 680,
-        "resizable": false,
-        "label": "panel",
-        "url": "/",
-        "visible": false,
-        "decorations": false,
-        "transparent": true
-      },
-      {
         "title": "vibepm island",
         "width": 210,
         "height": 36,

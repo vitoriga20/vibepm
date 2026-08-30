@@ -52,13 +52,40 @@ fn main() {
             }
         }))
         // S2：关闭=隐藏到托盘（S4 托盘落地前由单实例二次启动唤出兜底）
-        // M2 S7：panel（NSD 控制台）对齐 NSD 原行为——CloseRequested → 隐藏（从岛右键/托盘再开）
+        // M2 S8：主窗失焦收纳（spec §10.3）——失焦后前台窗非岛/胶囊（点岛不算外部）→ 收起主窗回岛
         .on_window_event(|win, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if win.label() == "main" || win.label() == "capsule" || win.label() == "panel" {
-                    api.prevent_close();
-                    let _ = win.hide();
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    if win.label() == "main" || win.label() == "capsule" {
+                        api.prevent_close();
+                        let _ = win.hide();
+                    }
                 }
+                tauri::WindowEvent::Focused(false) => {
+                    if win.label() == "main" {
+                        let app = win.app_handle().clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(std::time::Duration::from_millis(350));
+                            // 点岛（或胶囊）不算外部：前台窗句柄等于岛/胶囊句柄则不收纳
+                            #[cfg(target_os = "windows")]
+                            {
+                                let fg = unsafe { winapi::um::winuser::GetForegroundWindow() } as isize;
+                                let keep = ["widget", "capsule"].iter().any(|lbl| {
+                                    app.get_webview_window(lbl)
+                                        .and_then(|w| w.hwnd().ok())
+                                        .map(|h| h.0 as isize == fg)
+                                        .unwrap_or(false)
+                                });
+                                if !keep {
+                                    if let Some(m) = app.get_webview_window("main") {
+                                        let _ = m.hide();
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+                _ => {}
             }
         })
         .plugin(tauri_plugin_opener::init())
@@ -80,17 +107,12 @@ fn main() {
             #[cfg(target_os = "windows")]
             island::start_clipboard_monitor(handle.clone());
             island::start_fullscreen_monitor(handle.clone());
-            // M2 S7：岛窗(widget)/控制台窗(panel) 由 tauri.conf 静态定义（NSD 原样做法；
-            // setup 内运行时建 hidden 窗会阻塞——实测踩坑）。这里只取引用打日志。
+            // M2 S8：岛窗(widget) 由 tauri.conf 静态定义（NSD 原样做法；setup 内运行时建 hidden 窗
+            // 会阻塞——实测踩坑）。控制台窗(panel)已退役：功能集成进主窗 plugin-island-settings。
             if let Some(w) = app.get_webview_window("widget") {
                 eprintln!("[shell] island window: topmost={:?} visible={:?}", w.is_always_on_top(), w.is_visible());
             } else {
                 eprintln!("[shell] island window missing!");
-            }
-            if let Some(p) = app.get_webview_window("panel") {
-                eprintln!("[shell] panel window: visible={:?}", p.is_visible());
-            } else {
-                eprintln!("[shell] panel window missing!");
             }
             // S4 托盘：三项菜单；退出 = kill sidecar → 退 app（spec §4 唯一退出入口）
             let show_main = tauri::menu::MenuItem::with_id(app, "show_main", "显示主窗", true, None::<&str>)?;
@@ -172,6 +194,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             island::get_network_stats,
             island::is_widget_visible,
+            island::show_main_window,
             island::get_network_latency,
             island::set_window_bounds,
             island::start_island_animation,
