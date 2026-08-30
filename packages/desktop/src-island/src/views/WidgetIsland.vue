@@ -1397,6 +1397,8 @@ const syncMusicStatus = async () => {
         // 判定过去 3 秒内是否有活跃的本地 WebSocket 推送
         const isWsActive = (Date.now() - lastWsLyricTime < 3000);
 
+        if (!res) console.log('[debug] syncMusicStatus: SMTC 无匹配会话 (target=' + (localStorage.getItem('nsd_target_player') || 'netease') + ')');
+
         if (res) {
             const [rawSong, artist, playing, positionMs, durationMs, app_id_str] = res;
             // 标题命中任一视频站后缀（B站/优酷等）→ 强制判定为浏览器视频模式（用清理前的原始标题判断）
@@ -2729,6 +2731,14 @@ const getAppIcon = (appName: string) => {
 
 onMounted(async () => {
     const appWindow = getCurrentWindow();
+
+    // vibepm 接入：启动恢复目标媒体平台（原 NSD 由控制台 MainPanel onMounted 负责，控制台已退役；
+    // Rust TARGET_PLAYER 是内存态，不恢复则重启后回落 netease，酷狗等平台识别失效）
+    try {
+        await invoke('set_target_player', { player: localStorage.getItem('nsd_target_player') || 'netease' });
+    } catch (e) {
+        console.warn('恢复 target_player 失败:', e);
+    }
 
     // 启动剪贴板链接检测轮询（默认开启）
     if (enableClipboard.value) {

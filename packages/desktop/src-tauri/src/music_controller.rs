@@ -67,6 +67,20 @@ fn get_target_media_session() -> Option<(GlobalSystemMediaTransportControlsSessi
     }
 
     // 指定平台：按包名匹配
+    #[cfg(debug_assertions)]
+    {
+        // debug 日志：枚举全部 SMTC 会话与当前 target，排查"平台选了但识别不到"
+        eprintln!("[smtc-debug] target={}", target);
+        if let Ok(all) = manager.GetSessions() {
+            for i in 0..all.Size().unwrap_or(0) {
+                if let Ok(s) = all.GetAt(i) {
+                    if let Ok(app_id) = s.SourceAppUserModelId() {
+                        eprintln!("[smtc-debug] session app_id={:?}", app_id.to_string());
+                    }
+                }
+            }
+        }
+    }
     for session in sessions {
         if let Ok(app_id) = session.SourceAppUserModelId() {
             let app_id_str = app_id.to_string().to_lowercase();
