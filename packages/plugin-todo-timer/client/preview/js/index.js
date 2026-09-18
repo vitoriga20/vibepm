@@ -39,6 +39,33 @@ function clockStop() {
   waittingClock();
 }
 
+// 桌面胶囊窗口管理：设置开关「桌面胶囊」驱动（开=独立置顶小窗常驻桌面，关=收起）。
+// 壳内胶囊窗由壳创建（隐藏），显隐由胶囊页读设置自判定 + storage 联动（capsule.js 闸门）；
+// 浏览器环境走 popup 路径，胶囊被手动关闭时回写开关（见 capsule.js pagehide）。
+let desktopCapsuleWin = null;
+function openDesktopCapsule(silent = false) {
+  if (window.__TAURI_INTERNALS__) return true;
+  if (desktopCapsuleWin && !desktopCapsuleWin.closed) {
+    try { desktopCapsuleWin.focus(); } catch (e) { /* noop */ }
+    return true;
+  }
+  desktopCapsuleWin = window.open(
+    "capsule.html",
+    "vibepmDesktopCapsule",
+    "popup=yes,width=234,height=230,menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=no"
+  );
+  if (!desktopCapsuleWin && !silent) {
+    showToast("弹窗被拦截：请允许本站打开弹窗后重试");
+  }
+  return !!desktopCapsuleWin;
+}
+function closeDesktopCapsule() {
+  if (desktopCapsuleWin && !desktopCapsuleWin.closed) {
+    try { desktopCapsuleWin.close(); } catch (e) { /* noop */ }
+  }
+  desktopCapsuleWin = null;
+}
+
 // 双页记账互斥锁在 clockSync.js 单一源（tryLockWorkEnd）：各页各自跑时钟，
 // 同一段专注/休息结束时仅先落账方记账。
 async function onWorkEnd(duration, progress) {
@@ -583,9 +610,9 @@ settingsPageComponent = [
     component: new Switch("showSuccessPopup", settings, "showSuccessPopup"),
   },
   {
-    name: "showFloatingWindow",
+    name: "showDesktopCapsule",
     type: "switch",
-    component: new Switch("showFloatingWindow", settings, "showFloatingWindow"),
+    component: new Switch("showDesktopCapsule", settings, "showDesktopCapsule"),
   },
   {
     name: "showTomatoAnimation",
@@ -629,22 +656,12 @@ settings.onClockChange = (event) => {
   floatingWindow.sendMessage({ type: "clockSettingChanged", content: event });
 };
 
-settings.onShowFloatingWindowChange = (state) => {
-  floatingWindow.refresh();
-};
-
 settings.onShowDesktopCapsuleChange = (state) => {
   if (state) openDesktopCapsule();
   else closeDesktopCapsule();
 };
 
-settings.onShowTomatoAnimationChange = (state) => {
-  floatingWindow.refresh();
-};
-
-settings.onAutoHideAniChange = (state) => {
-  floatingWindow.refresh();
-};
+// 生长动画 / 专注时隐藏 / 透明度：消费者=桌面胶囊页（storage 联动自然生效），主页面不再响应
 
 function setDarkMode(state) {
   switch (state) {
@@ -672,10 +689,6 @@ function setDarkMode(state) {
 settings.onDarkModeChange = (state) => {
   console.log("onDarkModeChange", state);
   setDarkMode(state);
-};
-
-settings.onOpacityChange = (state) => {
-  floatingWindow.refresh();
 };
 
 class Pages {
@@ -843,6 +856,9 @@ triggerActionOnDayChange(OnDayChange);
 
 // 页面加载即应用主题（替代 utools.onPluginEnter 入口分发）
 setDarkMode(settings.config.darkMode);
+
+// 开机补位（浏览器环境）：设置里开着桌面胶囊 → 静默补开独立小窗（壳环境由胶囊页闸门驱动）
+if (settings.config.showDesktopCapsule) openDesktopCapsule(true);
 
 const darkModeSwitch = new Select("darkModeSwitch", settings, "darkMode", [
   { value: "light", label: "明亮模式", icon: "pic/darkMode-light.svg" },

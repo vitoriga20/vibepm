@@ -16,37 +16,6 @@
   <link rel="stylesheet" href="style/select.css" />
   <link rel="stylesheet" href="style/plans.css" />
   <script src="js/theme.js"></script>
-  <style>
-    /* 右下角生长浮层：胶囊在上 + 番茄动画在下（可拖拽） */
-    #growWin {
-      position: fixed; right: 18px; bottom: 18px; z-index: 999;
-      width: 232px; border-radius: 12px; overflow: hidden;
-      background: var(--bg-color); color: var(--text-color);
-      border: 1px solid var(--border-color);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
-      font-family: "JetBrains Mono", Consolas, monospace;
-      opacity: .96; transition: opacity .2s; user-select: none;
-    }
-    #growWin:hover { opacity: 1; }
-    #growWin .growHead {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 10px; border-bottom: 1px solid var(--border-color);
-      cursor: grab; font-size: 12px;
-    }
-    #growWin.dragging { cursor: grabbing; }
-    #growWin.dragging .growHead { cursor: grabbing; }
-    #growWin .pill-state { flex: 1; }
-    #growWin .pill-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kv-orange-color); }
-    #growWin.active .pill-dot { animation: pillPulse 1.2s infinite; }
-    #growWin iframe {
-      display: block; width: 100%; height: 188px; border: 0;
-      background: transparent; pointer-events: none;
-    }
-    @keyframes pillPulse {
-      0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--kv-orange-color) 40%, transparent); }
-      50% { box-shadow: 0 0 0 6px transparent; }
-    }
-  </style>
 </head>
 
 <body>
@@ -330,8 +299,8 @@
           <div class="setting_group_title">胶囊设置：</div>
           <div class="timeSet">
             <div class="switchBox">
-              <div id="showFloatingWindow" class="switch"></div>
-              <div class="settingLabel">屏幕胶囊</div>
+              <div id="showDesktopCapsule" class="switch"></div>
+              <div class="settingLabel">桌面胶囊</div>
             </div>
 
             <div class="liner">
@@ -435,18 +404,6 @@
   <script src="js/plans.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/index.js"></script>
-  <!-- 右下角生长浮层：胶囊在上 + 番茄动画在下（可拖拽） -->
-  <div id="growWin">
-    <div class="growHead" id="growHead" title="拖拽移动 · 点击回主时钟">
-      <span class="pill-state" id="growState">休息中</span>
-      <span class="pill-dot"></span>
-      <!-- 专注任务名（验收一·3：胶囊顶部显示正在专注哪条任务；由 syncFocusTask 注入） -->
-      <span class="pill-task" id="pill-task" style="display:none"></span>
-      <span class="pill-time" id="growTime">30 min</span>
-    </div>
-    <iframe id="tomatoLife" src="tomato-life.html" title="番茄生长动画"></iframe>
-  </div>
-  <script src="js/growBridge.js"></script>
 </body>
 
 </html>

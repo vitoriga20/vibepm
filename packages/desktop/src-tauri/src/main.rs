@@ -1,7 +1,8 @@
 // vibepm 桌面壳（spec §7）：S1 骨架（sidecar 生命周期/单实例/错误窗）+ S2 主窗（无边框/拖拽/关闭隐藏）+ S4 托盘。
 // M2 S7：岛落地（spec §10）——岛窗 widget（NSD 复用前端，tauri://localhost），
 // 能力模块在 island.rs（NetSpeed Dynamic Pro MIT 代码原样并入）。
-// M2 S9：大胶囊退役（spec §10.4）——capsule 窗创建/托盘项/失焦豁免全部删除。
+// M2 S9：640×340 大胶囊退役（spec §10.4）；后按用户拍板回归「桌面胶囊」形态——
+// capsule 窗 = 胶囊条+盆栽置顶小窗，插件设置开关驱动（默认关，capsule.js 可见性闸门 show/hide）。
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio_spectrum;
@@ -56,7 +57,7 @@ fn main() {
         .on_window_event(|win, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
-                    if win.label() == "main" {
+                    if win.label() == "main" || win.label() == "capsule" {
                         api.prevent_close();
                         let _ = win.hide();
                     }
@@ -66,11 +67,11 @@ fn main() {
                         let app = win.app_handle().clone();
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_millis(350));
-                            // 点岛不算外部：前台窗句柄等于岛句柄则不收纳
+                            // 点岛/胶囊不算外部：前台窗句柄等于其句柄则不收纳
                             #[cfg(target_os = "windows")]
                             {
                                 let fg = unsafe { winapi::um::winuser::GetForegroundWindow() } as isize;
-                                let keep = ["widget"].iter().any(|lbl| {
+                                let keep = ["widget", "capsule"].iter().any(|lbl| {
                                     app.get_webview_window(lbl)
                                         .and_then(|w| w.hwnd().ok())
                                         .map(|h| h.0 as isize == fg)
@@ -162,7 +163,24 @@ fn main() {
                         .initialization_script(DRAG_REGION_SCRIPT)
                         .build()?;
                     eprintln!("[shell] main window created: visible={:?} decorated={:?}", win.is_visible(), win.is_decorated());
-                    // S9：大胶囊退役（spec §10.4）——capsule 窗不再创建；壳级入口只剩岛 widget + 主窗
+                    // 桌面胶囊窗（用户拍板形态=胶囊条+盆栽置顶小窗）：无边框透明置顶、URL=sidecar 同源
+                    // → 与主窗共享 localStorage（clockSync 双窗机制白捡）；visible(false) 创建，
+                    // 显隐由胶囊页「可见性闸门」驱动（settings.showDesktopCapsule 启动自判定 + storage 联动）
+                    let cap_url = tauri::Url::parse(&format!(
+                        "http://127.0.0.1:{port}/plugins/plugin-todo-timer/preview/capsule.html"
+                    ))
+                    .expect("parse capsule url");
+                    let cap = WebviewWindowBuilder::new(&handle, "capsule", WebviewUrl::External(cap_url))
+                        .title("vibepm 桌面胶囊")
+                        .inner_size(234.0, 222.0)
+                        .decorations(false)
+                        .transparent(true)
+                        .always_on_top(true)
+                        .skip_taskbar(true)
+                        .shadow(false)
+                        .visible(false)
+                        .build()?;
+                    eprintln!("[shell] capsule window created: visible={:?} topmost={:?}", cap.is_visible(), cap.is_always_on_top());
                 }
                 Err(msg) => {
                     // 超时/早退 → 报错窗（带输出尾巴，spec §2）

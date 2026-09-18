@@ -1,0 +1,96 @@
+/**
+ * capsule.css · 桌面胶囊窗（胶囊条 + 盆栽）
+ *  - 卡=窗体：壳窗 transparent+无边框，body 全透明，圆角外露四角为透明区；
+ *  - 视觉平移自主页面 #growWin 生长浮层（胶囊条在上 + 番茄动画在下）。
+ */
+html, body {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+#growWin {
+  width: 232px;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  opacity: .96;
+  transition: opacity .2s;
+  user-select: none;
+}
+#growWin:hover { opacity: 1; }
+#growWin .growHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: grab;
+  font-size: 12px;
+}
+#growWin .pill-state { flex: 1; }
+#growWin .pill-task {
+  flex: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-color);
+  opacity: .75;
+}
+#growWin .pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kv-orange-color);
+  flex: none;
+}
+#growWin.active .pill-dot { animation: pillPulse 1.2s infinite; }
+#growWin .pill-time { flex: none; }
+#growWin .pill-close {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  cursor: pointer;
+  opacity: .55;
+  font-size: 14px;
+  line-height: 1;
+}
+#growWin .pill-close:hover { opacity: 1; }
+
+#growWin iframe {
+  display: block;
+  width: 100%;
+  height: 188px;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+@keyframes pillPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--kv-orange-color) 40%, transparent); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* 胶囊内轻提示（toast 文案开关开启时用） */
+.capsule-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 200px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--bg-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .14);
+  font-size: 12px;
+  font-family: "JetBrains Mono", Consolas, monospace;
+}
