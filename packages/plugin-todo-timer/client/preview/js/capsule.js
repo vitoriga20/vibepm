@@ -1,13 +1,15 @@
 /**
- * capsule.js 桌面胶囊页（胶囊条 + 盆栽，capsule.html 配套）
+ * capsule.js 桌面胶囊页（胶囊条 + 工业翻牌计时表 + 盆栽，capsule.html 配套）
  *  - 独立 TomatoClock 实例：continueState 接续持久化状态（展示计时单一源 runDisplayTimer），
  *    跨窗联动走 clockSync.js 单一源；到点记账 tryLockWorkEnd 选举防双窗重复（与主页面同口径）
+ *  - 翻牌引擎（FLAP/snapFlips/syncFlips/flipDigit）与设备面板驱动（applyDeviceUI/进度线/控制按钮）
+ *    自旧大胶囊（S9 退役前）源级找回；收窗「WINDOW CLOSED」放映不回归（盆栽终局承担收尾演出）
  *  - 可见性闸门（S8 拍板）：壳环境启动读 settings.showDesktopCapsule 自判定 + storage 事件联动
  *    invoke show/hide；浏览器 popup 生命周期由主页面开关驱动（index.js openDesktopCapsule）
- *  - 交互：胶囊条拖拽（Tauri 交壳 start_dragging / 浏览器由 growBridge 页内拖）、
- *    双击胶囊条开主窗、× 关闭并回写开关=false、pagehide 回写（浏览器手动关窗）
- *  - 位置记忆：desktopCapsulePos（store 键）低频轮询保存 + 启动恢复
- *  - 设置消费：透明度 / 生长动画 / 专注时隐藏 / darkMode（主页面浮层退役后，盆栽与透明度归本页）
+ *  - 交互：胶囊条拖拽（Tauri 交壳 start_dragging / popup=OS 标题栏）、双击胶囊条开主窗、
+ *    × 关闭并回写开关=false、pagehide 回写（浏览器手动关窗）
+ *  - 位置记忆：desktopCapsulePos（store 键）低频轮询保存 + 显示后恢复
+ *  - 设置消费：透明度 / 生长动画 / 专注时隐藏 / darkMode（主页面浮层退役后，本页为唯一消费者）
  */
 (function () {
   "use strict";
@@ -15,10 +17,10 @@
   const $ = (id) => document.getElementById(id);
   const IS_TAURI = !!(window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke);
   const SETTINGS_FULL_KEY = "todo-tomato:settings"; // env.js store 包装后的全键名（storage 事件匹配必须用全键）
-  const capWin = $("growWin");
+  const capWin = $("capsuleWin");
 
-  /* ————————————————— 盆栽桥：growBridge.js 已加载（growWin/growHead/tomatoLife 同 id） ————————————————— */
-  /* 胶囊页只看盆栽本体：viewBox 裁剪放大（growBridge 注入铺满样式后叠加本裁剪） */
+  /* ————————————————— 盆栽桥：growBridge.js 已加载（tomatoLife 同 id） ————————————————— */
+  /* 胶囊页只看盆栽主体：viewBox 裁剪放大（growBridge 注入铺满样式后叠加本裁剪） */
   const tomatoIframe = $("tomatoLife");
   tomatoIframe.addEventListener("load", () => {
     const doc = tomatoIframe.contentDocument;
@@ -54,18 +56,12 @@
     tomatoIframe.style.display = showAnim ? "block" : "none";
   }
 
-  /* ————————————————— 胶囊条 UI ————————————————— */
+  /* ————————————————— 胶囊条（头部） ————————————————— */
 
   function syncPill() {
     const st = clock.config.currentState;
     $("growState").textContent = UI_TEXT.capsuleStateText[st] || "休息中";
     capWin.classList.toggle("active", st !== "idle");
-    if (st === "idle") {
-      $("growTime").textContent = clock.formatTime(clock.config.workTime).minutes + " min";
-    } else {
-      const t = clock.formatTime();
-      $("growTime").textContent = t.minutes + ":" + t.seconds;
-    }
   }
 
   /** 专注任务名（归属链口径与主页面 syncFocusTask 一致） */
@@ -95,19 +91,158 @@
     setTimeout(() => el.remove(), 2200);
   }
 
+  /* ————————————————— 工业翻牌倒计时显示（机械记牌器，自旧大胶囊源级找回） —————————————————
+     每块数字 .flap 内 4 个半片：静态上/下半片 + 临时折叠片/翻起片（时序与样式见 flap.css）。
+     syncFlips 只翻变化的那位；分钟进位时多位按右→左级差依次翻；翻牌瞬间整块压暗+运行灯闪一次。 */
+  const FLAP = {
+    els: [],
+    prev: ["0", "0", "0", "0"],
+    HALF_MS: 250,     // 单片半程（上片折叠 / 下片翻起）
+    STAGGER: 130,     // 多位连续翻牌的级差
+  };
+  (function initFlaps() {
+    for (let i = 0; i < 4; i++) {
+      FLAP.els.push(document.querySelector(`.flap[data-digit="${i}"]`));
+    }
+  })();
+
+  function setFlapStatic(f, v) {
+    f.querySelector(".fh-top .fv").textContent = v;
+    f.querySelector(".fh-bot .fv").textContent = v;
+  }
+  /** 无动画直接落值（idle 复位 / 进入休息时长） */
+  function snapFlips(mm, ss) {
+    const v = [mm[0], mm[1], ss[0], ss[1]];
+    FLAP.prev = v.slice();
+    FLAP.els.forEach((f, i) => {
+      f.classList.remove("flipping");
+      setFlapStatic(f, v[i]);
+    });
+  }
+  /** 每秒调用：仅翻变化的那一位；进位时右→左依次翻 */
+  function syncFlips(mm, ss) {
+    const v = [mm[0], mm[1], ss[0], ss[1]];
+    const changed = [];
+    for (let i = 0; i < 4; i++) if (v[i] !== FLAP.prev[i]) changed.push(i);
+    if (!changed.length) return;
+    const order = changed.slice().sort((a, b) => b - a);
+    order.forEach((i, k) => flipDigit(i, FLAP.prev[i], v[i], k * FLAP.STAGGER));
+    FLAP.prev = v;
+  }
+  function flipDigit(i, oldV, newV, delay) {
+    const f = FLAP.els[i];
+    const top = f.querySelector(".fh-top .fv");
+    const bot = f.querySelector(".fh-bot .fv");
+    const fold = f.querySelector(".fh-fold .fv");
+    const rise = f.querySelector(".fh-rise .fv");
+    setTimeout(() => {
+      top.textContent = newV;   // 新上半片：旧片折叠时被露出
+      fold.textContent = oldV;  // 折叠片持旧值，自上向下折叠
+      rise.textContent = newV;  // 翻起片持新值，后半程自下向上
+      bot.textContent = oldV;   // 静态下半片维持旧值，待翻起片覆盖
+      f.classList.remove("flipping");
+      void f.offsetWidth;
+      f.classList.add("flipping");
+      flashLed();
+      setTimeout(() => {
+        bot.textContent = newV; // 翻牌完成，静态下半片落新值
+        f.classList.remove("flipping");
+      }, FLAP.HALF_MS * 2 + 30);
+    }, delay);
+  }
+  function flashLed() {
+    const led = $("devLed");
+    if (!led) return;
+    led.classList.remove("flash");
+    void led.offsetWidth;
+    led.classList.add("flash");
+    setTimeout(() => led.classList.remove("flash"), 520);
+  }
+
+  /* ————————————————— 设备面板 UI（状态文案 / 按钮显隐 / 进度线） ————————————————— */
+
+  const DEV_STATUS = {
+    idle: ["EXPEDITION WINDOW", "STANDBY"],
+    working: ["EXPEDITION WINDOW", "RUNNING"],
+    workPaused: ["EXPEDITION WINDOW", "PAUSED"],
+    breaking: ["RECOVERY WINDOW", "RUNNING"],
+    breakPaused: ["RECOVERY WINDOW", "PAUSED"],
+  };
+
+  /** 进度线：运行中按已耗时比例填充；idle 空 */
+  function updateProgress() {
+    const bar = $("devProgressBar");
+    if (!bar) return;
+    const t = clock.config.timeLeft ?? 0;
+    const total = clock.config.totalTime || clock.config.workTime;
+    const state = clock.config.currentState;
+    let p = 0;
+    if (state !== "idle" && total > 0) p = Math.max(0, Math.min(1, 1 - t / total));
+    bar.style.width = p * 100 + "%";
+  }
+
+  function applyDeviceUI() {
+    const state = clock.config.currentState;
+    const st = DEV_STATUS[state] || DEV_STATUS.idle;
+    $("devStatusPre").textContent = st[0];
+    $("devRun").textContent = st[1];
+    const show = (el, on) => { if (el) el.style.display = on ? "" : "none"; };
+    const begin = $("beginBtn"), pause = $("pauseBtn"), stop = $("stopBtn");
+    switch (state) {
+      case "idle":
+        show(begin, true); show(pause, false); show(stop, false);
+        break;
+      case "working":
+      case "breaking":
+        show(begin, false); show(pause, true); show(stop, true);
+        pause.textContent = "PAUSE";
+        break;
+      case "workPaused":
+      case "breakPaused":
+        show(begin, false); show(pause, true); show(stop, true);
+        pause.textContent = "RESUME";
+        break;
+    }
+    updateProgress();
+  }
+
   /* ————————————————— 时钟（独立实例，记账与主页面互斥防重） ————————————————— */
 
   const clock = new TomatoClock();
 
   clock.onTick = function () {
     syncPill();
+    const t = this.formatTime();
+    syncFlips(t.minutes, t.seconds);
+    updateProgress();
     if (this.config.currentState === "working") grow().apply(this.config.progress);
   };
 
   clock.onStateChange = function () {
+    const state = this.config.currentState;
+    capWin.classList.remove("idle", "working", "workPaused", "breaking", "breakPaused");
+    capWin.classList.add(state);
+    switch (state) {
+      case "idle":
+        this.config.timeLeft = 0;
+        {
+          const w = this.formatTime(this.config.workTime);
+          snapFlips(w.minutes, w.seconds);
+        }
+        break;
+      case "breaking":
+      case "breakPaused": {
+        // 进入休息：翻牌直接落在休息时长（此时 timeLeft 尚未刷新）
+        const bt = this.isLongBreak() ? this.config.longBreakTime : this.config.shortBreakTime;
+        const b = this.formatTime(bt);
+        snapFlips(b.minutes, b.seconds);
+        break;
+      }
+    }
     syncPill();
-    syncTask();
+    applyDeviceUI();
     refreshAnimationVisible();
+    syncTask();
   };
 
   clock.onWorkEnd = async function () {
@@ -165,16 +300,32 @@
     return Promise.resolve();
   };
 
+  /* ————————————————— 控制入口（胶囊上直接控钟，跨窗状态由 clockSync 广播） ————————————————— */
+
+  /** 开始专注即锁定绑定当前「在做」任务（与主页面 bindActiveTaskToClock 同口径） */
+  function bindActiveTaskToClock() {
+    const list = getTodoList();
+    const active = list ? getActiveTaskOf(list) : null;
+    clock.config.boundTaskId = active && active.id !== -1 ? active.id : -1;
+    clock.saveConfig();
+    if (clock.config.boundTaskId === -1) capsuleToast(UI_TEXT.toastNoBoundTask);
+    syncTask();
+  }
+
+  $("beginBtn").addEventListener("click", () => { bindActiveTaskToClock(); clock.begin(); });
+  $("pauseBtn").addEventListener("click", () => { if (clock.isPaused()) clock.continue(); else clock.pause(); });
+  $("stopBtn").addEventListener("click", () => clock.stop());
+
   /* ————————————————— 跨窗联动（单一源 clockSync.js） ————————————————— */
 
   installClockStorageSync(clock, {
-    onClockResync: () => syncPill(),
+    onClockResync: () => clock.onStateChange(),
     onTodoListChange: () => syncTask(),
     onSettingsChange: () => {
       applyTheme();
       applyOpacity();
       refreshAnimationVisible();
-      syncPill();
+      clock.onStateChange();
     },
   });
 
@@ -260,7 +411,7 @@
     });
   }
 
-  /** 位置记忆：启动恢复 + 低频轮询保存（Tauri 走 outer_position 精确坐标） */
+  /** 位置记忆：显示后恢复 + 低频轮询保存（Tauri 走 outer_position 精确坐标） */
   const POS_KEY = "desktopCapsulePos";
   function readPos() { try { return store.getItem(POS_KEY); } catch (_) { return null; } }
   function savePos(x, y) { try { store.setItem(POS_KEY, { x, y }); } catch (_) { /* noop */ } }
@@ -309,9 +460,7 @@
   applyTheme();
   applyOpacity();
   clock.continueState(); // 接续持久化状态（展示计时单一源，不重建倒计时）
-  syncPill();
-  syncTask();
-  refreshAnimationVisible();
+  clock.onStateChange(); // 完整落定初始画面（翻牌值/设备文案/按钮/进度/动画可见性）
   gate();                // 壳环境按当前开关自判定显隐（开=show+恢复记忆位置；默认关=启动即 hide）
   setInterval(pollPos, 1800);
 })();

@@ -6,20 +6,66 @@
   <title>vibepm 桌面胶囊</title>
   <link rel="stylesheet" href="base/css/color.css" />
   <link rel="stylesheet" href="style/capsule.css" />
+  <link rel="stylesheet" href="style/flap.css" />
   <script src="js/theme.js"></script>
 </head>
 
 <body>
-  <!-- 桌面胶囊：胶囊条在上 + 番茄生长动画在下（壳置顶窗 / 浏览器 popup） -->
-  <div id="growWin">
+  <!-- 桌面胶囊：胶囊条在上 + 工业翻牌计时表（设备面板）+ 番茄生长动画在下（壳置顶窗 / 浏览器 popup） -->
+  <div id="capsuleWin">
     <div class="growHead" id="growHead" title="拖拽移动 · 双击打开主界面">
       <span class="pill-dot"></span>
       <span class="pill-state" id="growState">休息中</span>
       <!-- 专注任务名（syncTask 注入；归属链与主页面同口径） -->
       <span class="pill-task" id="pill-task" style="display:none"></span>
-      <span class="pill-time" id="growTime">30 min</span>
       <span class="pill-close" id="capsuleClose" title="关闭（同时关闭「桌面胶囊」开关）">×</span>
     </div>
+
+    <!-- 工业科研终端 · 翻牌倒计时器（机械记牌器风格，flap.css 原样复用） -->
+    <div class="capPanel">
+      <div class="devHead">
+        <span class="devId">T-04 / FIELD TIMER</span>
+        <span class="devLed" id="devLed" title="设备运行灯"></span>
+      </div>
+
+      <div class="devClock">
+        <div class="flap" data-digit="0">
+          <div class="fh fh-top"><span class="fv">0</span></div>
+          <div class="fh fh-bot"><span class="fv">0</span></div>
+          <div class="fh fh-fold"><span class="fv"></span></div>
+          <div class="fh fh-rise"><span class="fv"></span></div>
+        </div>
+        <div class="flap" data-digit="1">
+          <div class="fh fh-top"><span class="fv">0</span></div>
+          <div class="fh fh-bot"><span class="fv">0</span></div>
+          <div class="fh fh-fold"><span class="fv"></span></div>
+          <div class="fh fh-rise"><span class="fv"></span></div>
+        </div>
+        <div class="flapColon"><span class="dot"></span><span class="dot"></span></div>
+        <div class="flap" data-digit="2">
+          <div class="fh fh-top"><span class="fv">0</span></div>
+          <div class="fh fh-bot"><span class="fv">0</span></div>
+          <div class="fh fh-fold"><span class="fv"></span></div>
+          <div class="fh fh-rise"><span class="fv"></span></div>
+        </div>
+        <div class="flap" data-digit="3">
+          <div class="fh fh-top"><span class="fv">0</span></div>
+          <div class="fh fh-bot"><span class="fv">0</span></div>
+          <div class="fh fh-fold"><span class="fv"></span></div>
+          <div class="fh fh-rise"><span class="fv"></span></div>
+        </div>
+      </div>
+
+      <div class="devStatus" id="devStatus"><span id="devStatusPre">EXPEDITION WINDOW</span><span id="devStatusSep"> / </span><span id="devRun">STANDBY</span></div>
+      <div class="devProgress"><div class="devProgressBar" id="devProgressBar"></div></div>
+
+      <div class="devCtl">
+        <button class="devBtn primary" id="beginBtn">START</button>
+        <button class="devBtn" id="pauseBtn" style="display:none">PAUSE</button>
+        <button class="devBtn" id="stopBtn" style="display:none">RESET</button>
+      </div>
+    </div>
+
     <iframe id="tomatoLife" src="tomato-life.html" title="番茄生长动画"></iframe>
   </div>
   <script src="base/js/settingsConfig.js"></script>

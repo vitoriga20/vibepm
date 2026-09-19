@@ -163,8 +163,8 @@ fn main() {
                         .initialization_script(DRAG_REGION_SCRIPT)
                         .build()?;
                     eprintln!("[shell] main window created: visible={:?} decorated={:?}", win.is_visible(), win.is_decorated());
-                    // 桌面胶囊窗（用户拍板形态=胶囊条+盆栽置顶小窗）：无边框透明置顶、URL=sidecar 同源
-                    // → 与主窗共享 localStorage（clockSync 双窗机制白捡）；visible(false) 创建，
+                    // 桌面胶囊窗（用户拍板形态=胶囊条+工业翻牌计时表+盆栽置顶小窗）：无边框透明置顶、
+                    // URL=sidecar 同源 → 与主窗共享 localStorage（clockSync 双窗机制白捡）；visible(false) 创建，
                     // 显隐由胶囊页「可见性闸门」驱动（settings.showDesktopCapsule 启动自判定 + storage 联动）
                     let cap_url = tauri::Url::parse(&format!(
                         "http://127.0.0.1:{port}/plugins/plugin-todo-timer/preview/capsule.html"
@@ -172,7 +172,7 @@ fn main() {
                     .expect("parse capsule url");
                     let cap = WebviewWindowBuilder::new(&handle, "capsule", WebviewUrl::External(cap_url))
                         .title("vibepm 桌面胶囊")
-                        .inner_size(234.0, 222.0)
+                        .inner_size(300.0, 510.0)
                         .decorations(false)
                         .transparent(true)
                         .always_on_top(true)

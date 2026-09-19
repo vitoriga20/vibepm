@@ -52,7 +52,7 @@ function openDesktopCapsule(silent = false) {
   desktopCapsuleWin = window.open(
     "capsule.html",
     "vibepmDesktopCapsule",
-    "popup=yes,width=234,height=230,menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=no"
+    "popup=yes,width=300,height=542,menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=no"
   );
   if (!desktopCapsuleWin && !silent) {
     showToast("弹窗被拦截：请允许本站打开弹窗后重试");

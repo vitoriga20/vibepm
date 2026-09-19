@@ -1,7 +1,8 @@
 /**
- * capsule.css · 桌面胶囊窗（胶囊条 + 盆栽）
+ * capsule.css · 桌面胶囊窗（胶囊条 + 工业翻牌计时表 + 盆栽）
  *  - 卡=窗体：壳窗 transparent+无边框，body 全透明，圆角外露四角为透明区；
- *  - 视觉平移自主页面 #growWin 生长浮层（胶囊条在上 + 番茄动画在下）。
+ *  - 三段：growHead 胶囊条（浅色卡头）→ capPanel 翻牌设备面板（深色，样式在 flap.css）
+ *    → 盆栽 iframe（透明底只显示植物）；容器 id=capsuleWin 沿用 flap.css 状态选择器（原样复用）。
  */
 html, body {
   height: 100%;
@@ -10,10 +11,12 @@ html, body {
   overflow: hidden;
 }
 
-#growWin {
-  width: 232px;
+#capsuleWin {
+  width: 100%;
   height: 100%;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   border-radius: 12px;
   overflow: hidden;
   background: var(--bg-color);
@@ -24,8 +27,9 @@ html, body {
   transition: opacity .2s;
   user-select: none;
 }
-#growWin:hover { opacity: 1; }
-#growWin .growHead {
+#capsuleWin:hover { opacity: 1; }
+
+#capsuleWin .growHead {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -33,9 +37,10 @@ html, body {
   border-bottom: 1px solid var(--border-color);
   cursor: grab;
   font-size: 12px;
+  flex: none;
 }
-#growWin .pill-state { flex: 1; }
-#growWin .pill-task {
+#capsuleWin .pill-state { flex: 1; }
+#capsuleWin .pill-task {
   flex: 2;
   min-width: 0;
   overflow: hidden;
@@ -44,16 +49,15 @@ html, body {
   color: var(--text-color);
   opacity: .75;
 }
-#growWin .pill-dot {
+#capsuleWin .pill-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--kv-orange-color);
   flex: none;
 }
-#growWin.active .pill-dot { animation: pillPulse 1.2s infinite; }
-#growWin .pill-time { flex: none; }
-#growWin .pill-close {
+#capsuleWin.active .pill-dot { animation: pillPulse 1.2s infinite; }
+#capsuleWin .pill-close {
   flex: none;
   width: 16px;
   text-align: center;
@@ -62,15 +66,19 @@ html, body {
   font-size: 14px;
   line-height: 1;
 }
-#growWin .pill-close:hover { opacity: 1; }
+#capsuleWin .pill-close:hover { opacity: 1; }
 
-#growWin iframe {
+/* 翻牌设备面板：通栏形态（flap.css 原样式微调——去掉双栏时代的左分隔线） */
+#capsuleWin .capPanel { border-left: none; flex: none; }
+
+#capsuleWin iframe {
   display: block;
   width: 100%;
   height: 188px;
   border: 0;
   background: transparent;
   pointer-events: none;
+  flex: none;
 }
 
 @keyframes pillPulse {
