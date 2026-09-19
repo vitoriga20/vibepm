@@ -19,6 +19,18 @@
   const SETTINGS_FULL_KEY = "todo-tomato:settings"; // env.js store 包装后的全键名（storage 事件匹配必须用全键）
   const capWin = $("capsuleWin");
 
+  /* ————————————————— [capsule-debug] 诊断日志（store 键持久化，主窗/CDP 可读；同 [smtc-debug] 策略） ————————————————— */
+  function dbg(msg) {
+    try {
+      const lines = store.getItem("capsuleDbg") || [];
+      lines.push(new Date().toISOString().slice(11, 23) + " " + msg);
+      store.setItem("capsuleDbg", lines.slice(-60));
+    } catch (_) { /* noop */ }
+    try { console.log("[capsule]", msg); } catch (_) { /* noop */ }
+  }
+  window.addEventListener("error", (e) => dbg("PAGE-ERROR " + (e.message || "?") + " @" + (e.filename || "?") + ":" + (e.lineno || "?")));
+  window.addEventListener("unhandledrejection", (e) => dbg("REJECT " + String(e.reason)));
+
   /* ————————————————— 盆栽桥：growBridge.js 已加载（tomatoLife 同 id） ————————————————— */
   /* 胶囊页只看盆栽主体：viewBox 裁剪放大（growBridge 注入铺满样式后叠加本裁剪） */
   const tomatoIframe = $("tomatoLife");
@@ -312,9 +324,9 @@
     syncTask();
   }
 
-  $("beginBtn").addEventListener("click", () => { bindActiveTaskToClock(); clock.begin(); });
-  $("pauseBtn").addEventListener("click", () => { if (clock.isPaused()) clock.continue(); else clock.pause(); });
-  $("stopBtn").addEventListener("click", () => clock.stop());
+  $("beginBtn").addEventListener("click", () => { dbg("ctl begin"); bindActiveTaskToClock(); clock.begin(); });
+  $("pauseBtn").addEventListener("click", () => { dbg("ctl pause"); if (clock.isPaused()) clock.continue(); else clock.pause(); });
+  $("stopBtn").addEventListener("click", () => { dbg("ctl stop"); clock.stop(); });
 
   /* ————————————————— 跨窗联动（单一源 clockSync.js） ————————————————— */
 
@@ -395,19 +407,22 @@
   function gate() {
     if (!IS_TAURI) return;
     const on = !!(settings.config && settings.config.showDesktopCapsule);
+    dbg(`gate on=${on} switch=${JSON.stringify(settings.config && settings.config.showDesktopCapsule)}`);
     try {
       if (on) {
         window.__TAURI_INTERNALS__.invoke("plugin:window|show", { label: "capsule" })
-          .then(() => restorePos())
-          .catch(() => {});
+          .then(() => { dbg("gate show ok"); restorePos(); })
+          .catch((e) => dbg("gate show ERR " + String(e)));
       } else {
-        window.__TAURI_INTERNALS__.invoke("plugin:window|hide", { label: "capsule" }).catch(() => {});
+        window.__TAURI_INTERNALS__.invoke("plugin:window|hide", { label: "capsule" })
+          .catch((e) => dbg("gate hide ERR " + String(e)));
       }
-    } catch (_) { /* noop */ }
+    } catch (e) { dbg("gate invoke throw " + String(e)); }
   }
   if (IS_TAURI) {
     window.addEventListener("storage", (e) => {
       if (e.key === SETTINGS_FULL_KEY) gate();
+      else if (e.key) dbg("storage key=" + e.key);
     });
   }
 
@@ -418,9 +433,14 @@
   function restorePos() {
     if (!IS_TAURI) return;
     const pos = readPos();
-    if (!pos || typeof pos.x !== "number") return;
+    if (!pos || typeof pos.x !== "number") { dbg("restorePos no saved pos"); return; }
+    dbg("restorePos -> " + JSON.stringify(pos));
     // 本 Tauri 版命令实参形状（registry 源码 setter! 宏 + CDP 探针实测）：value 为 externally-tagged Position
-    try { window.__TAURI_INTERNALS__.invoke("plugin:window|set_position", { label: "capsule", value: { Physical: { x: pos.x, y: pos.y } } }).catch(() => {}); } catch (_) { /* noop */ }
+    try {
+      window.__TAURI_INTERNALS__.invoke("plugin:window|set_position", { label: "capsule", value: { Physical: { x: pos.x, y: pos.y } } })
+        .then(() => dbg("restorePos ok"))
+        .catch((e) => dbg("restorePos ERR " + String(e)));
+    } catch (e) { dbg("restorePos throw " + String(e)); }
   }
   function pollPos() {
     if (IS_TAURI) {
@@ -461,6 +481,7 @@
   applyOpacity();
   clock.continueState(); // 接续持久化状态（展示计时单一源，不重建倒计时）
   clock.onStateChange(); // 完整落定初始画面（翻牌值/设备文案/按钮/进度/动画可见性）
+  dbg(`boot tauri=${IS_TAURI} switch=${JSON.stringify(settings.config && settings.config.showDesktopCapsule)} state=${clock.config.currentState} timeLeft=${clock.config.timeLeft}`);
   gate();                // 壳环境按当前开关自判定显隐（开=show+恢复记忆位置；默认关=启动即 hide）
   setInterval(pollPos, 1800);
 })();

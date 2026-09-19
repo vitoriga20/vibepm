@@ -55,6 +55,10 @@ fn main() {
         // S2：关闭=隐藏到托盘（S4 托盘落地前由单实例二次启动唤出兜底）
         // M2 S8：主窗失焦收纳（spec §10.3）——失焦后前台窗非岛（点岛不算外部）→ 收起主窗回岛
         .on_window_event(|win, event| {
+            // [capsule-debug] 胶囊窗全生命周期留痕（与 [smtc-debug] 同策略：debug 构建常驻）
+            if win.label() == "capsule" {
+                eprintln!("[capsule-debug] window event: {:?}", event);
+            }
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     if win.label() == "main" || win.label() == "capsule" {
@@ -181,6 +185,26 @@ fn main() {
                         .visible(false)
                         .build()?;
                     eprintln!("[shell] capsule window created: visible={:?} topmost={:?}", cap.is_visible(), cap.is_always_on_top());
+                    // [capsule-debug] 启动后 3s/10s 各 dump 一次胶囊窗状态（可见性/位置/尺寸——定位「看不见」类问题）
+                    {
+                        let h = handle.clone();
+                        std::thread::spawn(move || {
+                            for secs in [3u64, 10] {
+                                std::thread::sleep(std::time::Duration::from_secs(secs));
+                                match h.get_webview_window("capsule") {
+                                    None => eprintln!("[capsule-debug] t+{}s: window MISSING", secs),
+                                    Some(w) => eprintln!(
+                                        "[capsule-debug] t+{}s: visible={:?} pos={:?} inner={:?} focused={:?}",
+                                        secs,
+                                        w.is_visible(),
+                                        w.outer_position().map(|p| (p.x, p.y)),
+                                        w.inner_size().map(|s| (s.width, s.height)),
+                                        w.is_focused(),
+                                    ),
+                                }
+                            }
+                        });
+                    }
                 }
                 Err(msg) => {
                     // 超时/早退 → 报错窗（带输出尾巴，spec §2）
