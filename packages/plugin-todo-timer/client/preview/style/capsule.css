@@ -74,7 +74,7 @@ html, body {
 #capsuleWin iframe {
   display: block;
   width: 100%;
-  height: 188px;
+  height: 170px;
   border: 0;
   background: transparent;
   pointer-events: none;

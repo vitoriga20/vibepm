@@ -52,7 +52,8 @@ function openDesktopCapsule(silent = false) {
   desktopCapsuleWin = window.open(
     "capsule.html",
     "vibepmDesktopCapsule",
-    "popup=yes,width=300,height=542,menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=no"
+    // height=内容高 402（条31+翻牌198+盆栽170，CDP 实测）+ Chrome popup 修饰 33（与壳窗 inner_size(300,402) 对齐）
+    "popup=yes,width=300,height=435,menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=no"
   );
   if (!desktopCapsuleWin && !silent) {
     showToast("弹窗被拦截：请允许本站打开弹窗后重试");

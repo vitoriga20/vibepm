@@ -176,7 +176,7 @@ fn main() {
                     .expect("parse capsule url");
                     let cap = WebviewWindowBuilder::new(&handle, "capsule", WebviewUrl::External(cap_url))
                         .title("vibepm 桌面胶囊")
-                        .inner_size(300.0, 510.0)
+                        .inner_size(300.0, 402.0)
                         .decorations(false)
                         .transparent(true)
                         .always_on_top(true)

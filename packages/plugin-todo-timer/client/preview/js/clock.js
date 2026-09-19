@@ -224,7 +224,7 @@ class TomatoClock {
     const tick = () => {
       this.config.timeLeft = Math.max(this.config.endTime - Date.now(), 0);
       this.config.progress = this.config.totalTime ? parseFloat((1 - this.config.timeLeft / this.config.totalTime).toFixed(2)) : 0;
-      const cs = Math.floor(this.config.timeLeft / 1000);
+      const cs = Math.ceil(this.config.timeLeft / 1000); // 与 formatTime 同 ceil 口径，整秒边界对齐
       if (this.lastSeconds !== cs) { this.lastSeconds = cs; this.onTick(); }
       if (this.isWorking()) this.onWorkTick();
       if (this.isBreaking()) this.onBreakTick();
@@ -348,8 +348,8 @@ class TomatoClock {
       this.refreshTime();
 
       // 事件触发
-      // 只在秒数变化时触发 onTick
-      const currentSeconds = Math.floor(this.config.timeLeft / 1000);
+      // 只在秒数变化时触发 onTick（ceil 口径与 formatTime 对齐）
+      const currentSeconds = Math.ceil(this.config.timeLeft / 1000);
       if (!this.lastSeconds || this.lastSeconds !== currentSeconds) {
         this.lastSeconds = currentSeconds;
         this.onTick();
@@ -458,10 +458,12 @@ class TomatoClock {
   }
 
   // 返回MM:SS格式的时间（idle 时 timeLeft 未初始化，兜底显示工作时长）
+  // 取整用 ceil（倒计时惯例：剩 299.9s 显示 5:00，过整秒边界才落 4:59——
+  // 到点转场瞬间 timeLeft 已衰减几十 ms，floor 会跳过满时长直接显示 X:59）
   formatTime(time = this.config.timeLeft ?? this.config.workTime) {
-    const timeSeconds = time / 1000;
-    const minutes = Math.floor(timeSeconds / 60);
-    const seconds = Math.floor(timeSeconds % 60);
+    const totalSeconds = Math.ceil(time / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
     return {
       minutes: String(minutes).padStart(2, "0"),
       seconds: String(seconds).padStart(2, "0")

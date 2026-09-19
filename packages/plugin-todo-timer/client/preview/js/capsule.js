@@ -32,13 +32,15 @@
   window.addEventListener("unhandledrejection", (e) => dbg("REJECT " + String(e.reason)));
 
   /* ————————————————— 盆栽桥：growBridge.js 已加载（tomatoLife 同 id） ————————————————— */
-  /* 胶囊页只看盆栽主体：viewBox 裁剪放大（growBridge 注入铺满样式后叠加本裁剪） */
+  /* 胶囊页只看盆栽主体：viewBox 裁剪放大（growBridge 注入铺满样式后叠加本裁剪）。
+     框 x315~675 / y130~640：顶含顶芽毛(~138)、底含盆底弧(~616)与终局落叶落点(~624)，
+     左含 A 枝叶尖(~322)、右含 100% 暖金光晕缘(~668)；比例 360:510 贴近 iframe 300:170 减少两侧留白 */
   const tomatoIframe = $("tomatoLife");
   tomatoIframe.addEventListener("load", () => {
     const doc = tomatoIframe.contentDocument;
     if (!doc) return;
     const scene = doc.getElementById("scene");
-    if (scene) scene.setAttribute("viewBox", "290 90 390 560");
+    if (scene) scene.setAttribute("viewBox", "315 130 360 510");
   });
   const grow = () => window.growBridge;
 
